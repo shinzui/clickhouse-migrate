@@ -1,3 +1,14 @@
+---
+type: Runbook
+title: "Operating the Haskell API"
+description: "Operate the Haskell API and recover uncertain work using explicit coordination and evidence."
+docId: DOC-13
+tags: ["operations", "recovery", "coordination"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T15:34:07Z
+---
+
 # Operating the Haskell API
 
 Construct a validated TargetConfig with a stable TargetKey, direct endpoint,

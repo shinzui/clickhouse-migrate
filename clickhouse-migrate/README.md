@@ -16,7 +16,7 @@ expected state. Async cancellation propagates after bounded cleanup.
 Qualified target: exact ClickHouse 26.8.28.14 LTS official Apple Silicon macOS binary,
 direct self-managed Atomic/MergeTree on healthy writable Local storage. No Cloud,
 proxy, distributed/replicated, Linux or power-loss claim. Runtime version probes do
-not attest platform/digest. The workspace's docs/contracts and docs/operations.md
+not attest platform/digest. The workspace's docs/user/contracts and docs/user/operations.md
 publish frozen formats, server artifact identity and coordination/recovery limits.
 The standard Haskell process library is a transitive HTTP dependency; fixture tools,
 optional packages and the opt-in internal driver are absent from production outputs.

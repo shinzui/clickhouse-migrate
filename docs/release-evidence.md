@@ -90,7 +90,7 @@ failed roots/logs are preserved. Earlier failing attempts are not passing eviden
 | Captured real consumer fresh replay/adoption/new migration | `consumer`; frozen immutable revision/provenance with 25 files, 253 source statements, 257 native steps, 25 rows and one new native step | EP7 passed in Nix and extracted distributions |
 | Composition/authoring/CLI/target/access/maintenance/recovery/adoption guides | README, authoring.md, cli.md, operations.md, adoption.md | Passed: compiled public example and distribution checks |
 | Executable two-library example | `example` group; three independent private packages | Passed in Nix and extracted sibling archives |
-| Ledger/checksum/manifest/adoption/JSON schemas and error codes | docs/contracts, error-codes.md; pure vectors and CLI golden cases | Existing schemas passed; four CLI goldens passed |
+| Ledger/checksum/manifest/adoption/JSON schemas and error codes | docs/user/contracts, error-codes.md; pure vectors and CLI golden cases | Existing schemas passed; four CLI goldens passed |
 | Redaction and callback/cleanup failures | `boundaries`, `adoption`, `cli`, `example`; pure CLI goldens; capture stdout/stderr separately | Passed: core, adoption, CLI and separate subprocess streams |
 | Test tooling absent from production package closure | `just check-production-closure`; Cabal library graph, Nix derivation/path-info metadata | Passed: 113 Cabal package units / 330 Nix references; standard process library reported separately |
 

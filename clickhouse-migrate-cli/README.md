@@ -17,4 +17,4 @@ it after normal return and keeps progress on a separate sink. Synchronous failur
 retain primary cause, latest acknowledged report, query/receipt identities and separate
 secondary errors. Cancellation is rethrown and may produce no final JSON. Default
 text/JSON excludes SQL, credentials and raw exception bodies. Frozen golden fixtures
-ship under test/golden; the workspace's docs/contracts/json-v1.md defines the wire format.
+ship under test/golden; the workspace's docs/user/contracts/json-v1.md defines the wire format.

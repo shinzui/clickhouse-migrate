@@ -66,12 +66,12 @@ Validation: `just test-integration` groups pass in the Cabal harness (the initia
 
 ## Decision Log
 
-2026-10-16: Use configuration-only public command contexts, latest-acknowledged snapshots and separate transient SQL observations/secondary errors. Freeze this and the narrow repair scopes in [ADR 0007](../adr/0007-scope-commands-and-preserve-acknowledged-progress.md). Publish application-owned operational responsibilities in docs/operations.md. No new core dependency or wire-format change is needed.
+2026-10-16: Use configuration-only public command contexts, latest-acknowledged snapshots and separate transient SQL observations/secondary errors. Freeze this and the narrow repair scopes in [ADR 0007](../adr/0007-scope-commands-and-preserve-acknowledged-progress.md). Publish application-owned operational responsibilities in docs/user/operations.md. No new core dependency or wire-format change is needed.
 
 
 ## Outcomes & Retrospective
 
-Complete. Scoped commands use the accepted ledger wire format and preserve uncertainty at every tested boundary. ADR 0007 and docs/operations.md carry durable integration/recovery responsibilities. The next child can consume typed reports and private scoped runtime support for adoption; it must validate the entire adoption request before any initialization/adoption append. The optional Nix integration-tests output qualifies public consumers with the actual Nix dependency closure and does not start servers inside default package builds.
+Complete. Scoped commands use the accepted ledger wire format and preserve uncertainty at every tested boundary. ADR 0007 and docs/user/operations.md carry durable integration/recovery responsibilities. The next child can consume typed reports and private scoped runtime support for adoption; it must validate the entire adoption request before any initialization/adoption append. The optional Nix integration-tests output qualifies public consumers with the actual Nix dependency closure and does not start servers inside default package builds.
 
 
 ## Context and Orientation
@@ -96,7 +96,7 @@ M1 adds `clickhouse-migrate/src/ClickHouseMigrate/Runner.hs`, `Inspection.hs`, `
 
 M2 adds `clickhouse-migrate/src/ClickHouseMigrate/Repair.hs` using the original bound plan and ledger event definitions. Every repair includes exact expected ledger position/attempt, actor, reason, external evidence and typed quiescence assertion where required; re-read/revalidate inside acquired access. Resume starts the first never-started step only when no uncertain step remains. Retry-step durably authorizes a new attempt/query ID for the same bytes after evidence that retry is safe. Accept-step records an operator attestation without executing SQL or continuing later steps. Finalize records migration completion only when every step is successful or accepted. New attempts link to superseded identities. An authorization without a subsequent step-start remains blocking after a crash, requiring a fresh expected-state request.
 
-Treat event sinks as observations, not audit storage. A throwing callback stops further SQL, preserves already acknowledged state and is reported as callback failure. Emit completion callbacks only after the corresponding acknowledgement. Scope access through deterministic transport cleanup; aggregate primary, failure-recording, callback and cleanup failures without swallowing asynchronous cancellation. Default diagnostics redact credentials, SQL and raw server message bodies; expose raw diagnostics only through explicit caller opt-in. Create `docs/operations.md` with recovery sequences and write runner/recovery ADRs.
+Treat event sinks as observations, not audit storage. A throwing callback stops further SQL, preserves already acknowledged state and is reported as callback failure. Emit completion callbacks only after the corresponding acknowledgement. Scope access through deterministic transport cleanup; aggregate primary, failure-recording, callback and cleanup failures without swallowing asynchronous cancellation. Default diagnostics redact credentials, SQL and raw server message bodies; expose raw diagnostics only through explicit caller opt-in. Create `docs/user/operations.md` with recovery sequences and write runner/recovery ADRs.
 
 Freeze the public operation shapes in M1 and compile an application consumer before adding the full failure matrix:
 

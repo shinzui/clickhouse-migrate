@@ -16,7 +16,7 @@ The command also accepts `test` and `haddock`, with ordinary Cabal arguments aft
 the command. This preflight is needed because raw Cabal can skip GHC for preserved
 modification times. The public splice still registers all compiler dependencies.
 
-The workspace's `docs/contracts/manifest-v1.md` defines fields, containment and
+The workspace's `docs/user/contracts/manifest-v1.md` defines fields, containment and
 build guarantees. The source distribution includes fixtures and qualification
 scripts in `test/fixtures/` and `test/scripts/`; these expect sibling core/embed
 sources with a cabal.project naming both. No compiler plugin is required.

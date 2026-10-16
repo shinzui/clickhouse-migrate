@@ -1,9 +1,20 @@
+---
+type: Reference
+title: "Compatibility evidence"
+description: "Look up the exact qualified ClickHouse artifact, platform, and support limits."
+docId: DOC-5
+tags: ["compatibility", "clickhouse", "qualification"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T17:43:33Z
+---
+
 # Compatibility evidence
 
 The native-qualified candidate is ClickHouse **26.8.28.14 LTS** on
 Apple Silicon macOS. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
-[test/compatibility/clickhouse-matrix.json](../test/compatibility/clickhouse-matrix.json).
+[test/compatibility/clickhouse-matrix.json](../../test/compatibility/clickhouse-matrix.json).
 The fixture verifies the digest before execution. This file links to the packaged
 matrix in test-support so installed fixtures use the same candidate.
 

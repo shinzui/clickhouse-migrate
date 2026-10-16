@@ -19,6 +19,30 @@ in  Schema.Project::{
         }
       ]
     , standards = [ "mori://shinzui/haskell-jitsurei" ]
+    , okfBundles =
+      [ Schema.OkfBundle::{
+        , name = "user-documentation"
+        , path = "docs/user"
+        , profile = Some "mori/user-documentation-profile.dhall"
+        , profileBinding = Some
+            ( Schema.ProfileBinding.Published
+                Schema.PinnedImport::{
+                , publisher = "mori://shinzui/okf-profiles"
+                , publisherRef = Some Schema.MoriRef::{
+                  , namespace = "shinzui"
+                  , name = "okf-profiles"
+                  }
+                , export = Some "documentation.userDocumentation"
+                , version = Some "v0.21.0"
+                , pin = Some
+                    "sha256:4be32588d55c74282ceab54b06b22f552cdbf4215788e3eb5256ee8744cb92a2"
+                }
+            )
+        , okfVersion = "0.2"
+        , description = Some
+            "User guides, operational runbooks, and versioned interface references"
+        }
+      ]
     , packages =
       [ Schema.Package::{
         , name = "clickhouse-migrate"

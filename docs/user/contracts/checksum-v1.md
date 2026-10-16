@@ -1,3 +1,14 @@
+---
+type: Reference
+title: "Checksum format v1"
+description: "Look up the SHA-256 v1 byte encoding and independent checksum vectors."
+docId: DOC-7
+tags: ["contracts", "checksums", "sha256"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T11:39:59Z
+---
+
 # Checksum format v1
 
 The public format name is `sha256-v1`. Unknown format names fail validation.
@@ -36,12 +47,12 @@ sets and the explicit component/migration sequence independently. Adding a
 component before recorded work or changing recorded dependencies cannot be made
 compatible merely because the migration digests still match.
 
-The checked-in [24 vectors](../../clickhouse-migrate/test/vectors/checksum-v1.tsv)
+The checked-in [24 vectors](../../../clickhouse-migrate/test/vectors/checksum-v1.tsv)
 publish complete input hex and digest hex, plus all source fields. They cover
 step/migration domains, whitespace, each identity, two-step order and changed boundaries with equal concatenated SQL, Unicode SQL,
 and ambiguous concatenations (`a`/`bc` versus `ab`/`c`). They were generated once
 with Python's independent struct/hashlib reference in
-[scripts/checksum-reference.py](../../scripts/checksum-reference.py); Haskell
+[scripts/checksum-reference.py](../../../scripts/checksum-reference.py); Haskell
 tests compare its frozen inputs and outputs with both the private encoder and
 public component-bound checksums. Test execution does not regenerate expectations.
 Description changes and source relocation are separately verified as metadata;

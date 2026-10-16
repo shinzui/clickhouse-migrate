@@ -21,7 +21,7 @@ ordinary local DDL that need qualification in the initial conservative allowlist
 
 ## Decision
 
-Freeze [adoption v1](../contracts/adoption-v1.md). Require one reviewed complete
+Freeze [adoption v1](../user/contracts/adoption-v1.md). Require one reviewed complete
 mapping onto a native prefix, preserving source snapshot/mapping/definition hashes,
 per-entry evidence, exact expected state and external quiescence. Adopt only into
 fresh history or resume the identical interrupted batch. Initialization and every

@@ -1,3 +1,14 @@
+---
+type: Runbook
+title: "Reviewed legacy cutover"
+description: "Review and adopt a complete legacy migration prefix with explicit evidence and coordinated cutover."
+docId: DOC-2
+tags: ["adoption", "legacy", "cutover"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T16:18:01Z
+---
+
 # Reviewed legacy cutover
 
 Adoption accepts a reviewed baseline without running its application SQL. Start
@@ -72,7 +83,7 @@ The immutable source is `mori://shinzui/kansoku` at revision
 `db/clickhouse/migrate.sh` and `db/clickhouse/migrations/` (artifact-level URIs
 pending). Its shell runner uses filename order, multiquery execution, and a
 filename/applied_at ledger without checksums. The checked-in fixture is
-[test/fixtures/kansoku](../clickhouse-migrate-test-support/test/fixtures/kansoku/provenance.json),
+[test/fixtures/kansoku](../../clickhouse-migrate-test-support/test/fixtures/kansoku/provenance.json),
 containing originals, exact contiguous byte ranges, synthetic legacy rows and
 reviewed native manifests. Original files are never rewritten by embedding.
 

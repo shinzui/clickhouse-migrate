@@ -12,12 +12,13 @@ The four independently packaged libraries are core `clickhouse-migrate`, optiona
 and test harnesses. A [two-library executable example](examples/two-components/README.md)
 demonstrates composition and application-owned configuration/output/exit policy.
 
-Start with [authoring and composition](docs/authoring.md), [CLI integration](docs/cli.md),
-[operations and recovery](docs/operations.md), and [legacy adoption](docs/adoption.md).
-Versioned contracts cover [checksums](docs/contracts/checksum-v1.md),
-[SQL envelopes](docs/contracts/sql-envelope-v1.md), [manifests](docs/contracts/manifest-v1.md),
-[ledger](docs/contracts/ledger-v1.md), [adoption](docs/contracts/adoption-v1.md),
-[JSON results](docs/contracts/json-v1.md) and [error codes](docs/error-codes.md).
+The [user documentation](docs/user/README.md) collects guides and interface references.
+Start with [authoring and composition](docs/user/authoring.md), [CLI integration](docs/user/cli.md),
+[operations and recovery](docs/user/operations.md), and [legacy adoption](docs/user/adoption.md).
+Versioned contracts cover [checksums](docs/user/contracts/checksum-v1.md),
+[SQL envelopes](docs/user/contracts/sql-envelope-v1.md), [manifests](docs/user/contracts/manifest-v1.md),
+[ledger](docs/user/contracts/ledger-v1.md), [adoption](docs/user/contracts/adoption-v1.md),
+[JSON results](docs/user/contracts/json-v1.md) and [error codes](docs/user/error-codes.md).
 
 Use the pinned native GHC 9.12.4 environment:
 
@@ -27,6 +28,7 @@ just build
 just check-packages
 just test-unit
 just check-public-invariants
+just check-docs
 just test-embedding
 just test-release-matrix
 just check-production-closure
@@ -36,8 +38,11 @@ just check-format
 nix flake check --builders ''
 ```
 
+Documentation checks require `okf` 0.9.0.0 or later and `dhall`; see the
+[documentation workflow](docs/user/README.md). CI provisions these tools explicitly.
+
 Only the exact Apple Silicon macOS ClickHouse artifact in the
-[compatibility matrix](docs/compatibility.md) is qualified. Linux builders and remote
+[compatibility matrix](docs/user/compatibility.md) is qualified. Linux builders and remote
 CI execution are deferred. Test recipes own new server processes, credentials,
 temporary roots and ports; they never use a persistent application database. The
 optional process-compose service is a developer convenience, not qualification.

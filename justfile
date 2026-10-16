@@ -23,7 +23,13 @@ format:
 check-format:
     nix fmt -- --fail-on-change
 
-check: build check-packages test-unit check-public-invariants check-format
+check: build check-packages test-unit check-public-invariants check-docs check-format
+
+check-docs:
+    dhall type --file mori/user-documentation-profile.dhall > /dev/null
+    dhall type --file mori.dhall > /dev/null
+    okf validate docs/user --strict --profile mori/user-documentation-profile.dhall --profile-enforce --log-enforce
+    okf graph docs/user --json > /dev/null
 
 sdist:
     cabal sdist all

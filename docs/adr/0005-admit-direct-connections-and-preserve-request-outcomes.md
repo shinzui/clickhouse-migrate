@@ -44,7 +44,7 @@ package exactly to 0.7.19; upgrading requires source review and fault qualificat
 The production library exposes validated target configuration, not raw HTTP access.
 
 The exact binary/platform matrix and identity limitations live in
-[compatibility.md](../compatibility.md). This is local completion evidence, not a
+[compatibility.md](../user/compatibility.md). This is local completion evidence, not a
 claim of power-loss durability, distributed affinity or exactly-once execution.
 Ledger recovery must prove all prior requests quiescent before reusing sequence
 numbers or issuing successor mutations; an empty read is insufficient.

@@ -1,3 +1,14 @@
+---
+type: Guide
+title: "Authoring and composing migrations"
+description: "Author validated migrations, compose library components, and embed ordered SQL safely."
+docId: DOC-3
+tags: ["authoring", "composition", "embedding"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T17:20:17Z
+---
+
 # Authoring and composing migrations
 
 A library owns a stable component name, dependency names, ordered migrations and
@@ -8,7 +19,7 @@ there is no filename sorting, topological reordering or runtime SQL discovery.
 Dependencies must exist earlier in the supplied component order. Migration names
 are scoped to a component; step names are scoped to a migration.
 
-The [two-component example](../examples/two-components/README.md) compiles separate
+The [two-component example](../../examples/two-components/README.md) compiles separate
 catalog and analytics libraries. Each exports `component :: MigrationComponent`;
 the application composes `migrationPlan (Catalog.component :| [Analytics.component])`.
 Analytics declares a dependency on catalog. The application may append its own

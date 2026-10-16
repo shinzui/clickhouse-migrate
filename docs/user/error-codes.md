@@ -1,3 +1,14 @@
+---
+type: Reference
+title: "Structured error codes"
+description: "Look up stable error-code families and their operational meaning."
+docId: DOC-12
+tags: ["errors", "json", "diagnostics"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T17:20:17Z
+---
+
 # Structured error codes
 
 All codes below are lowercase stable strings in [JSON v1](contracts/json-v1.md).

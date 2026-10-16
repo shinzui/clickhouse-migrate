@@ -23,6 +23,9 @@ jobs:
       - run: nix develop --builders '' --accept-flake-config -c just test-unit
       - run: nix develop --builders '' --accept-flake-config -c just test-embedding
       - run: nix develop --builders '' --accept-flake-config -c just check-public-invariants
+      - name: Validate user documentation
+        # Released OKF tool; canonical project: mori://shinzui/okf.
+        run: nix develop --builders '' --accept-flake-config -c nix shell --inputs-from . github:shinzui/okf/bdf8893ccf0dfbd77fd68fe3c58348b5e49809c7 nixpkgs#dhall -c just check-docs
       - run: nix develop --builders '' --accept-flake-config -c just sdist
       - run: nix fmt --accept-flake-config -- --fail-on-change
       - run: nix flake check --builders '' --accept-flake-config

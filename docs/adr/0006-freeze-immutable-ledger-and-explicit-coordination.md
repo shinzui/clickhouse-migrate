@@ -18,7 +18,7 @@ or transport access.
 
 ## Decision
 
-Freeze [ledger v1](../contracts/ledger-v1.md): one dedicated Atomic database and
+Freeze [ledger v1](../user/contracts/ledger-v1.md): one dedicated Atomic database and
 local append-only MergeTree table, with strict canonical event JSON and physical
 sequence/UUID cross-checks. Include initialization, execution, recovery and adoption
 in one versioned protocol. Individual migration/step events retain stable identity

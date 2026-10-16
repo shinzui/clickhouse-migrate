@@ -1,3 +1,14 @@
+---
+type: Reference
+title: "SQL envelope v1"
+description: "Look up accepted SQL statement boundaries, command families, and completion settings."
+docId: DOC-11
+tags: ["contracts", "sql", "validation"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T16:18:01Z
+---
+
 # SQL envelope v1
 
 Each step is exact UTF-8 bytes with no NUL. Validation scans boundaries without

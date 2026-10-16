@@ -46,7 +46,7 @@ executes no application SQL. `status --json`, `history --json` and
 
 For repair, take fresh guarded history and use the exact position, current attempt
 and (for a selected step) its original owner attempt/name/query ID. See
-[CLI inputs](../../docs/cli.md) and [recovery](../../docs/operations.md).
+[CLI inputs](../../docs/user/cli.md) and [recovery](../../docs/user/operations.md).
 For legacy adoption, retain all source rows and a reviewed complete mapping in the
 explicit input file, then `adopt plan`, `adopt apply` or `adopt resume` with the same
 source identity and mapping. An interrupted batch needs fresh expected state.

@@ -1,3 +1,14 @@
+---
+type: Reference
+title: "Ledger v1 wire and projection contract"
+description: "Look up the immutable ledger schema, event encoding, projection, and append protocol."
+docId: DOC-9
+tags: ["contracts", "ledger", "recovery"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T14:21:42Z
+---
+
 # Ledger v1 wire and projection contract
 
 The dedicated validated database uses Atomic. Its only table is `events`, a local

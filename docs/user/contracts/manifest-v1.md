@@ -1,3 +1,14 @@
+---
+type: Reference
+title: "Manifest format v1 and qualified embedding builds"
+description: "Look up the manifest v1 format, path containment, and qualified embedding build procedure."
+docId: DOC-10
+tags: ["contracts", "manifests", "embedding"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T12:00:55Z
+---
+
 # Manifest format v1 and qualified embedding builds
 
 `ClickHouseMigrate.Embed.embedComponent` is a Template Haskell splice taking a

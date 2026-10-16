@@ -1,3 +1,14 @@
+---
+type: Guide
+title: "Mounting the CLI"
+description: "Mount reusable migration commands with application-owned configuration, output, and exit policy."
+docId: DOC-4
+tags: ["cli", "integration", "adoption"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T17:20:17Z
+---
+
 # Mounting the CLI
 
 `clickhouse-migrate-cli` is a library. Mount `commandParser` beneath your application's
@@ -36,7 +47,7 @@ explicit file I/O and remote observation, then validates the complete batch befo
 any initialization. Apply/resume reread/revalidate under the core's fresh guard.
 There are no force/reset/mark-clean/checksum-rewrite commands.
 
-See [the executable example](../examples/two-components/README.md),
+See [the executable example](../../examples/two-components/README.md),
 [authoring](authoring.md), [operations](operations.md), [adoption](adoption.md),
 [JSON v1](contracts/json-v1.md) and [errors](error-codes.md).
 

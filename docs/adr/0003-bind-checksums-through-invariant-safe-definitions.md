@@ -20,13 +20,13 @@ migrationPlan computes step and migration checksums and exposes immutable view
 values. Public description updates apply before binding and do not affect hashes.
 Embedding must reconstruct through these same smart constructors.
 
-Freeze [checksum v1](../contracts/checksum-v1.md) as domain-separated SHA-256
+Freeze [checksum v1](../user/contracts/checksum-v1.md) as domain-separated SHA-256
 with unsigned 64-bit big-endian lengths/counts, exact SQL bytes, context identity
 and policy. Migration inputs contain ordered complete step encodings. Component
 dependency sets and global order remain independently compared descriptors;
 matching SQL digests do not establish history compatibility.
 
-The [SQL envelope](../contracts/sql-envelope-v1.md) recognizes literal/comment
+The [SQL envelope](../user/contracts/sql-envelope-v1.md) recognizes literal/comment
 boundaries, restricts command families and rejects protected setting spellings.
 It preserves payload bytes and never claims to prove arbitrary SQL semantics,
 ledger isolation, remote-write absence or response-bound completion. Authors

@@ -24,7 +24,7 @@ part of serializable reports. Keep initialization/repair/adoption authorization
 explicit, and revalidate under core scopes. Adoption input is bounded strict v1 JSON
 with duplicate/unknown field refusal and historical bytes only as evidence.
 
-Freeze [JSON v1](../contracts/json-v1.md), explicit exhaustive encoders and independent
+Freeze [JSON v1](../user/contracts/json-v1.md), explicit exhaustive encoders and independent
 goldens. Preserve primary failure, latest acknowledged report, separate local SQL
 observations, exact append receipts and secondary cleanup/observer/recording failures.
 UInt64 event sequences are decimal strings. Distinguish accepted/operator-attested

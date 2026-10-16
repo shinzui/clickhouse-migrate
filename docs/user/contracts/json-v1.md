@@ -1,3 +1,14 @@
+---
+type: Reference
+title: "CLI command-result JSON v1"
+description: "Look up the CLI command-result JSON v1 envelope, report variants, and failure evidence."
+docId: DOC-8
+tags: ["contracts", "json", "cli"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T17:43:33Z
+---
+
 # CLI command-result JSON v1
 
 `ClickHouseMigrate.CLI.Render.Json.renderJson` returns UTF-8 bytes without a newline.
@@ -26,10 +37,10 @@ Other indexes/counts are bounded JSON integers. No timestamps are reparsed or
 normalized for display. Boolean observations are not claims of schema equality.
 
 The executable reference encoders are `CLI/Render/Json.hs`; frozen independent
-fixtures are [malformed](../../clickhouse-migrate-cli/test/golden/malformed.json),
-[partial SQL failure](../../clickhouse-migrate-cli/test/golden/partial.json),
-[delayed ledger acknowledgement](../../clickhouse-migrate-cli/test/golden/delayed-ledger.json)
-and [operator acceptance](../../clickhouse-migrate-cli/test/golden/accepted.json).
+fixtures are [malformed](../../../clickhouse-migrate-cli/test/golden/malformed.json),
+[partial SQL failure](../../../clickhouse-migrate-cli/test/golden/partial.json),
+[delayed ledger acknowledgement](../../../clickhouse-migrate-cli/test/golden/delayed-ledger.json)
+and [operator acceptance](../../../clickhouse-migrate-cli/test/golden/accepted.json).
 They are synthetic display fixtures; native tests separately establish report semantics.
 The encoders use exhaustive constructor matches with incomplete patterns as errors.
 

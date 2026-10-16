@@ -1,4 +1,4 @@
--- | Versioned byte encoder. Keep in agreement with docs/contracts/checksum-v1.md.
+-- | Versioned byte encoder. Keep in agreement with docs/user/contracts/checksum-v1.md.
 module ClickHouseMigrate.Internal.Checksum
   ( completionPolicyV1,
     encodeStepV1,

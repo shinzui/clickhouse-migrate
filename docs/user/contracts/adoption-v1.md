@@ -1,3 +1,14 @@
+---
+type: Reference
+title: "Adoption v1"
+description: "Look up the versioned legacy adoption evidence and digest contract."
+docId: DOC-6
+tags: ["contracts", "adoption", "evidence"]
+generated:
+  by: human:nadeem
+  at: 2026-10-16T16:18:01Z
+---
+
 # Adoption v1
 
 Adoption accepts a reviewed complete prefix into a fresh native ledger. It never
