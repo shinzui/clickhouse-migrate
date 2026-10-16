@@ -1,0 +1,39 @@
+cabal-version: 3.12
+name: clickhouse-migrate-embed
+version: 0.1.0.0
+synopsis: Compile-time embedding for ClickHouse migration definitions
+description:
+  Compile-time embedding for ClickHouse migration definitions.
+  Part of the clickhouse-migrate workspace; initial implementation in progress.
+
+license: BSD-3-Clause
+license-file: LICENSE
+author: shinzui
+maintainer: shinzui@users.noreply.github.com
+category: Database
+build-type: Simple
+extra-doc-files: README.md
+tested-with: ghc ==9.12.4
+
+source-repository head
+  type: git
+  location: https://github.com/shinzui/clickhouse-migrate.git
+  subdir: clickhouse-migrate-embed
+
+common common
+  default-language: GHC2024
+  default-extensions:
+    DeriveAnyClass
+    DuplicateRecordFields
+    OverloadedLabels
+    OverloadedStrings
+
+  ghc-options: -Wall
+  build-depends:
+    base >=4.21 && <4.22,
+    clickhouse-migrate ==0.1.*,
+
+library
+  import: common
+  hs-source-dirs: src
+  exposed-modules: ClickHouseMigrate.Embed

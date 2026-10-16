@@ -18,6 +18,7 @@ in  Schema.Project::{
         , github = Some "shinzui/clickhouse-migrate"
         }
       ]
+    , standards = [ "mori://shinzui/haskell-jitsurei" ]
     , packages =
       [ Schema.Package::{
         , name = "clickhouse-migrate"
@@ -30,18 +31,21 @@ in  Schema.Project::{
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "clickhouse-migrate-embed"
+        , dependencies = [ Schema.Dependency.ByName "clickhouse-migrate" ]
         }
       , Schema.Package::{
         , name = "clickhouse-migrate-cli"
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "clickhouse-migrate-cli"
+        , dependencies = [ Schema.Dependency.ByName "clickhouse-migrate" ]
         }
       , Schema.Package::{
         , name = "clickhouse-migrate-test-support"
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "clickhouse-migrate-test-support"
+        , dependencies = [ Schema.Dependency.ByName "clickhouse-migrate" ]
         }
       ]
     }

@@ -27,6 +27,11 @@ provenance:
       at: 2026-10-16T05:03:29Z
       mode: "update"
       note: "Apply API/correctness review, reconcile shared ownership and record durable uncertainty contracts without starting implementation."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T11:23:17Z
+      mode: "implement"
+      note: "Begin EP-1 in declared dependency order with inherited intention."
 ---
 
 # Bootstrap the initial ClickHouse migration library
@@ -43,7 +48,7 @@ The four public packages are `clickhouse-migrate`, `clickhouse-migrate-embed`, `
 
 Scope includes reproducible tooling, pure definitions and SQL envelope, exact-byte checksums/embedding, direct HTTP transport, target identity, exclusive access, immutable ledger, runner/inspection/repair, generic adoption, consumer fixtures, CLI, operational documentation and release qualification. The actual first-consumer cutover is a separate change at `mori://shinzui/kansoku`, with explicit evidence required to close the initiative. It is not a request to run migrations on a live database during planning. Release preparation does not imply package publication or deployment.
 
-Keep the spec's exclusions: no down migrations, automatic retries/rollback/repair, arbitrary Haskell actions, runtime discovery, database-neutral framework, distributed/Cloud/replicated execution, built-in distributed coordination, background migration scheduling, ledger-owning user SQL, or schema-equality claims. Exactly-once SQL and atomic SQL-plus-ledger commit are not guarantees. Pending work is compatible; unresolved work is blocking. The current change reviews and updates the plans before implementation; all implementation remains Not Started.
+Keep the spec's exclusions: no down migrations, automatic retries/rollback/repair, arbitrary Haskell actions, runtime discovery, database-neutral framework, distributed/Cloud/replicated execution, built-in distributed coordination, background migration scheduling, ledger-owning user SQL, or schema-equality claims. Exactly-once SQL and atomic SQL-plus-ledger commit are not guarantees. Pending work is compatible; unresolved work is blocking. Implementation is proceeding in the registry order; the registry and child acceptance evidence record the current state.
 
 
 ## Decomposition Strategy
@@ -61,7 +66,7 @@ Use the fewest boundaries that preserve these acceptance differences. A single l
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Seihou tooling and package workspace | [docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md](../../docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md) | None | None | Not Started |
+| 1 | Seihou tooling and package workspace | [docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md](../../docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md) | None | None | Complete |
 | 2 | Validated definitions and checksum v1 | [docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md](../../docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md) | EP-1 | None | Not Started |
 | 3 | Compile-time manifest embedding | [docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md](../../docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md) | EP-2 | None | Not Started |
 | 4 | Direct HTTP transport and isolated fixtures | [docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md](../../docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md) | EP-2 | None | Not Started |
@@ -117,13 +122,15 @@ Promote durable choices into local ADRs as their owning children implement them:
 ## Progress
 
 
-Pre-implementation review and plan updates are complete: one MasterPlan and eight child ExecPlans remain drafted; all implementation is Not Started. EP-1 is ready. No child was split or reordered. The review checked every registry file and the acyclic whole-child dependencies; shared-type ownership and private-module test access were corrected. EP-2 through EP-8 await the hard prerequisites in the registry. Tooling was previewed with a read-only Seihou dry run, not applied. No Haskell or server tests have run because their targets do not exist yet.
+EP-1 is Complete under the user’s local-only validation scope: all four libraries, package metadata and source distributions pass, and local aarch64-darwin Nix checks and formatter rejection checks pass. Linux validation and remote CI remain deferred. EP-2 is next; later children remain Not Started pending their whole-child prerequisites.
 
 The remaining initiative-level integration gate is the separate consumer cutover: record its canonical change reference and evidence that the old runner is retired, exclusive administration is established, the adopted native ledger verifies, and a subsequent native migration succeeds on an isolated existing-history fixture. EP-8 records the full section 19 acceptance mapping in `docs/release-evidence.md`; all claimed versions must pass before release qualification is complete.
 
 
 ## Surprises & Discoveries
 
+
+2026-10-16: Linux builder validation is deferred at the user’s request. Continue through local acceptance; the workflow definition does not establish Linux or remote CI qualification.
 
 2026-10-15 API/correctness review found these implementation blockers in the original text, now addressed in the owning plans. At the coordination layer, initialization authorization belonged to EP-6 even though EP-5 needed it, and persisted evidence belonged to EP-7 even though EP-5/EP-6 needed it. The external test suite also lacked a route to private transport/storage modules. EP-5 now owns shared primitives and EP-1/EP-4 define an opt-in private driver.
 

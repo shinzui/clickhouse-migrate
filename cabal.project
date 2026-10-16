@@ -1,0 +1,8 @@
+packages:
+  clickhouse-migrate
+  clickhouse-migrate-embed
+  clickhouse-migrate-cli
+  clickhouse-migrate-test-support
+
+-- Cabal uses a dated index; Nix uses the template's pinned package set.
+index-state: 2026-10-15T00:00:00Z

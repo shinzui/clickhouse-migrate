@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-16T05:03:30Z
       mode: "update"
       note: "Add opt-in private core test driver while preserving production package boundaries."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T11:23:17Z
+      mode: "implement"
+      note: "Implement reproducible Seihou tooling and four-package workspace."
 ---
 
 # Bootstrap Seihou tooling and the four-package workspace
@@ -43,21 +48,27 @@ A contributor can enter a reproducible development shell, build all four librari
 ## Progress
 
 
-- [ ] M1 — The Seihou-generated shell and formatting checks evaluate with the tracked managed lock.
-- [ ] M2 — All four packages build, distribution metadata checks pass, and CI runs reproducible compiler and formatting gates.
+- [x] M1 — 2026-10-16: Seihou 0.30.0 shell evaluates with the unchanged shipped lock; GHC reports 9.12.4. Formatting rejects a temporary malformed Haskell fixture (exit 1) and passes after its removal.
+- [x] M2 — 2026-10-16: All four libraries build on aarch64-darwin; all four `cabal check` results are warning-free; all source distributions contain licenses and sources; the opt-in private driver builds. Local `nix flake check` passes all six checks. Linux validation is deferred at the user’s request; CI is configured but has not run remotely.
 
 ## Surprises & Discoveries
 
+
+2026-10-16: The installed Seihou CLI accepts `seihou diff` without a module argument; the planned invocation was corrected. It reports no generated-file drift. The default-off driver flag needs an actual executable stanza for warning-free Cabal checks, so EP-1 supplies an explicitly failing bootstrap entry point for EP-4 to replace.
 
 
 
 ## Decision Log
 
 
+2026-10-16: The user requested skipping the Linux builder. Accept this workspace using local aarch64-darwin gates and leave Linux execution deferred; the configured CI is not evidence of a remote run or a support claim. The initially submitted Linux check had already exited when cancellation was attempted; no further Linux builder jobs will be submitted and that run is not used to qualify the final candidate.
+
 2026-10-15: Use the requested nix-haskell-flake template with `nix.builtin-package=false` and project-owned multi-package wiring. The existing Mori package metadata requires four sibling package roots, while the template's default assumes one root package.
 
 ## Outcomes & Retrospective
 
+
+2026-10-16: The four-package workspace is accepted under the user’s local-only validation scope. The generated lock is unchanged, Seihou reports no drift, and local build/metadata/distribution/formatter/Nix gates pass. The project-owned module is the only package-wiring definition. No migration functionality or server compatibility is claimed. Later plans replace empty entry modules and the deliberately failing private driver with their actual behavior and tests. Linux CI remains deferred.
 
 
 
@@ -107,7 +118,7 @@ nix develop -c just test-unit
 nix develop -c cabal sdist all
 nix fmt -- --fail-on-change
 nix flake check
-seihou diff nix-haskell-flake
+seihou diff
 ```
 
 Implement `just check-packages` to run `cabal check` from each package directory; implement `just test-unit` to select only non-server suites. Expect GHC 9.12.4 for the inspected generation, successful builds/checks and no edits proposed to managed template files. Record actual versions and any platform restrictions.
@@ -115,7 +126,7 @@ Implement `just check-packages` to run `cabal check` from each package directory
 ## Validation and Acceptance
 
 
-A fresh checkout can enter the shell without regenerating the module-owned lock, build every public package, and make source distributions containing their licenses and sources. Every stanza uses common language settings. Formatting checks fail on a deliberately malformed temporary fixture and pass after restoration. The package graph has no optional or test-support dependency reachable from the core library. Do not add a meaningless pass-only test merely to populate a suite. The template's developer server on default ports is a convenience; later fault tests must use isolated servers. Exercise Linux CI and the supported local platform, and do not claim a compiler or platform that has not passed.
+A fresh checkout can enter the shell without regenerating the module-owned lock, build every public package, and make source distributions containing their licenses and sources. Every stanza uses common language settings. Formatting checks fail on a deliberately malformed temporary fixture and pass after restoration. The package graph has no optional or test-support dependency reachable from the core library. Do not add a meaningless pass-only test merely to populate a suite. The template's developer server on default ports is a convenience; later fault tests must use isolated servers. Exercise the supported local platform. Linux execution is deferred per the user’s 2026-10-16 instruction; keep the CI definition ready and do not claim Linux qualification before it runs.
 
 ## Idempotence and Recovery
 

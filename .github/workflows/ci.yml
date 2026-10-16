@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: shinzui
+      - run: nix develop --accept-flake-config -c ghc --numeric-version
+      - run: nix develop --accept-flake-config -c cabal update
+      - run: nix develop --accept-flake-config -c just build
+      - run: nix develop --accept-flake-config -c just check-packages
+      - run: nix develop --accept-flake-config -c just test-unit
+      - run: nix develop --accept-flake-config -c just sdist
+      - run: nix fmt --accept-flake-config -- --fail-on-change
+      - run: nix flake check --accept-flake-config
