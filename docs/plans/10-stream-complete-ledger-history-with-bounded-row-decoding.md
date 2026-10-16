@@ -76,17 +76,22 @@ response bytes). Status, history, require-current verification, pending up,
 recovery, adoption resume and identical committed adoption all pass. Exact physical
 duplicates retain their logical position; late sequence/identity conflicts,
 truncated framing, trailing errors and oversized rows reject the whole read and
-permit no mutation. Deadlines and asynchronous cancellation retain their meanings, including
+permit no mutation. Deadlines and asynchronous cancellation retain their meanings,
+including
 interruption after headers and half of a real response body have been flushed.
 
 The private Rows boundary, complete projection, ordinary response limits and
 persisted formats remain intact. [ADR 0011](../adr/0011-read-complete-history-with-bounded-rows.md)
 records bounded raw rows and retained-history memory costs. The focused native
 transport, ledger, runner, repair, adoption and failure-boundary groups pass. The
-MasterPlan's final verification record remains a separate closing step.
+MasterPlan's verification is recorded in [REV-2](../reviews/initial-library-remediation-verification.md).
 
 ## Context and Orientation
 
+
+The defect descriptions below preserve the reviewed baseline from REV-1. The
+accepted implementation is summarized in Outcomes & Retrospective and verified
+in REV-2; these baseline descriptions do not describe the completed runtime.
 
 Work from the repository root. The core implementation is under
 `clickhouse-migrate/src/ClickHouseMigrate`. `Internal/Transport.hs` has private

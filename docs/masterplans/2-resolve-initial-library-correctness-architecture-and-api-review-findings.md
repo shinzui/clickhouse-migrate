@@ -149,9 +149,10 @@ All three children are Complete and the combined native gate passed. Full packag
 builds, all three unit suites, public invariant/checksum/adoption vectors,
 embedding rebuild/source-free qualification, the mounted example, and all focused
 native transport, ledger, runner, repair, adoption, failure-boundary, surviving-work
-and CLI groups pass. Mid-body deadline/cancellation checks also pass. The post-fix
-verification record is the only remaining coordination step. No external consumer
-cutover is implied.
+and CLI groups pass. Mid-body deadline/cancellation checks also pass.
+[REV-2](../reviews/initial-library-remediation-verification.md) records accepted
+verification at the fixed commit. This MasterPlan is complete; no integration gate
+remains within its scope. No external consumer cutover is implied.
 
 ## Surprises & Discoveries
 
@@ -160,6 +161,11 @@ cutover is implied.
 all three review reproductions failed as described. In particular, recovery had
 already appended authorization before detecting an oversized acceptance event.
 Existing small-history coverage is not sufficient evidence for the streaming work.
+
+2026-10-16: The combined public fixture exercises all three repairs together above
+16 MiB. A separate 360-entry adoption fixture also exceeds that ceiling without
+private seeding. Physical SELECT string aliases can sort lexicographically; the
+projection's numeric sorting and full duplicate/conflict validation remain essential.
 
 ## Decision Log
 
@@ -182,7 +188,17 @@ be supplied after a typed rejection; no automatic repair or evidence loss is add
 ## Outcomes & Retrospective
 
 
-Implementation outcomes will be recorded after acceptance. Before closing the
-initiative, distill the scheduling, complete-read and recovery-validation decisions
-into local ADRs, preserve the historical review, and record the combined gate and
-verification review. MasterPlan 1's external consumer gate remains independent.
+All three review findings and all child acceptance gates are complete.
+[REV-2](../reviews/initial-library-remediation-verification.md) names the actual
+fixed commit and records the native combined gate, affected consumer checks and
+scope of implementation-author verification. The historical REV-1 remains intact.
+
+Durable decisions were distilled into
+[ADR 0010](../adr/0010-separate-component-catalog-from-execution-schedule.md),
+[ADR 0011](../adr/0011-read-complete-history-with-bounded-rows.md) and
+[ADR 0012](../adr/0012-prepare-recovery-metadata-before-authorization.md), with links
+from the earlier coordination/recovery/adoption decisions. Catalog identity,
+execution order, complete observation and request-specific recovery validation now
+have separate explicit contracts. Persisted checksum/event formats remain stable.
+Retained memory grows with history and request deadlines remain active. MasterPlan
+1's external consumer gate remains independent and governed by its own plan.

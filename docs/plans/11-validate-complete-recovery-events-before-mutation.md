@@ -87,8 +87,15 @@ recovery, dependent append loss, cancellation and surviving-work regressions pas
 records preparation-before-authorization without weakening uncertainty. The same
 replacement-evidence path passes against the MasterPlan's history above 16 MiB.
 
+Final implementation-author verification is recorded in
+[REV-2](../reviews/initial-library-remediation-verification.md).
+
 ## Context and Orientation
 
+
+The defect descriptions below preserve the reviewed baseline from REV-1. The
+accepted implementation is summarized in Outcomes & Retrospective and verified
+in REV-2; these baseline descriptions do not describe the completed runtime.
 
 Work from the repository root. `clickhouse-migrate/src/ClickHouseMigrate/Ledger.hs`
 reexports validated audit/quiescence inputs from `Internal/LedgerValidation.hs`.

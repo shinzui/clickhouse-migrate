@@ -79,8 +79,15 @@ remains; the MasterPlan owns the separate post-fix verification record.
 [ADR 0010](../adr/0010-separate-component-catalog-from-execution-schedule.md)
 records the durable catalog/schedule and dependency-activation decisions.
 
+Final implementation-author verification is recorded in
+[REV-2](../reviews/initial-library-remediation-verification.md).
+
 ## Context and Orientation
 
+
+The defect descriptions below preserve the reviewed baseline from REV-1. The
+accepted implementation is summarized in Outcomes & Retrospective and verified
+in REV-2; these baseline descriptions do not describe the completed runtime.
 
 Work from the repository root. The four Cabal packages are core, optional embedding,
 optional CLI and isolated test support. The core's
