@@ -12,7 +12,10 @@ author: shinzui
 maintainer: shinzui@users.noreply.github.com
 category: Database
 build-type: Simple
-extra-doc-files: README.md
+extra-doc-files:
+  CHANGELOG.md
+  README.md
+
 extra-source-files:
   test/fixtures/*.cabal
   test/fixtures/*.hs

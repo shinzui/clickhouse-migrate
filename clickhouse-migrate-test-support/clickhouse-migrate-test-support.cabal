@@ -12,7 +12,10 @@ author: shinzui
 maintainer: shinzui@users.noreply.github.com
 category: Database
 build-type: Simple
-extra-doc-files: README.md
+extra-doc-files:
+  CHANGELOG.md
+  README.md
+
 data-files:
   test/data/clickhouse-matrix.json
   test/fixtures/kansoku/**/*.sql
