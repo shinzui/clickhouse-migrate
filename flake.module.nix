@@ -24,6 +24,8 @@
         integration-tests = pkgs.haskell.lib.compose.overrideCabal
           (old: {
             doCheck = true;
+            # cabal2nix's default-off integration flag omits this test dependency.
+            testHaskellDepends = (old.testHaskellDepends or [ ]) ++ [ hs.clickhouse-migrate-embed ];
             checkPhase = ''
               runHook preCheck
               echo "Integration suite built; run the installed executable explicitly for native qualification."

@@ -243,3 +243,10 @@ limited to this exact view header and one fully qualified exchange pair; protect
 settings, standalone SELECT and replacement-table/ALTER forms remain excluded.
 The capture records explicit assertion/local-policy adaptations, without editing
 original source or claiming historical checksum evidence from current file hashes.
+
+The optional integration output also supplies testHaskellDepends explicitly for
+embed: cabal2nix evaluates the default-off integration flag and otherwise omits
+that dependency. The locked `mori://NixOS/nixpkgs`, project-relative
+`pkgs/development/haskell-modules/generic-builder.nix` (file URI pending), consumes
+this list only under doCheck. Native compilation must exercise the actual splice and package
+data before qualification; normal test-support/core library dependencies are unchanged.

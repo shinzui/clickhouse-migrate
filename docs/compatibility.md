@@ -1,6 +1,6 @@
 # Compatibility evidence
 
-The currently transport/ledger/runner-qualified candidate is ClickHouse **26.8.28.14 LTS** on
+The currently transport/ledger/runner/adoption-qualified candidate is ClickHouse **26.8.28.14 LTS** on
 Apple Silicon macOS. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
 [test/compatibility/clickhouse-matrix.json](../test/compatibility/clickhouse-matrix.json).
@@ -11,8 +11,8 @@ On 2026-10-16, the upstream [security/support policy](https://github.com/ClickHo
 and [release](https://github.com/ClickHouse/ClickHouse/releases/tag/v26.8.28.14-lts)
 were checked before selecting the current LTS patch. The developer template's
 ClickHouse version is not release evidence. Linux execution is deferred by the
-user; this evidence makes no Linux or remote CI claim. Transport, ledger and runner qualification are
-intermediate gates; adoption-command and release qualification are still pending.
+user; this evidence makes no Linux or remote CI claim. Transport, ledger, runner and adoption qualification are
+intermediate gates; CLI and release qualification are still pending.
 
 Only this exact patch passes the runtime version allowlist. New patches and
 prereleases fail closed until independently qualified and explicitly added.
@@ -96,3 +96,17 @@ and explicit evidence are required before recovery. Ordinary up never consumes
 standing recovery authorization. ADR 0007 and operations.md describe these limits.
 The optional `integration-tests` Nix output installs this public harness for
 explicit native execution; it does not start a server during a Nix package build.
+
+
+Adoption qualification passes `just test-adoption` and `just test-consumer-fixtures`.
+All ten native groups pass with the Nix-built public harness/core driver and again
+from extracted sibling source distributions. Coverage includes every adoption
+append/observer boundary, cancellation/cleanup, stale/conflicting batches, exact
+receipts and a delayed entry arriving after NotObserved with a blocked successor.
+The captured consumer at its recorded immutable revision independently passes
+25 native migrations / 257 reviewed steps and 253 original source statements,
+then zero-SQL adoption of 25 filename/time rows and one appended native migration.
+Its three explicit native adaptations and unchanged source hashes are published in
+provenance and ADR 0008. Filename-only evidence remains operator-attested. Schema
+metadata comparisons are fixture observations, not a general schema-equality claim.
+The external consumer runner replacement remains separate.

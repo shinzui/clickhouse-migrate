@@ -49,9 +49,13 @@ An application can review and adopt a complete legacy prefix without running its
 
 
 - [x] M1 — Pure adoption planning validates the complete mapping and preserves evidence strength.
-- [ ] M2 — Audited apply/resume and immutable consumer fixtures pass interruption, conflict and subsequent-migration tests.
+- [x] M2 — Audited apply/resume and immutable consumer fixtures pass interruption, conflict and subsequent-migration tests.
 
-M1 accepted 2026-10-16: the opaque source-neutral request/plan API, whole-prefix validation, evidence-strength checks and two independent complete-input digest vectors pass. Public native early adoption and the complete consumer replay/adoption comparison pass. M2's append/callback/cancellation/late-entry matrix now passes in Cabal; final Nix, archive, public-invariant and regression qualification remains before whole-child completion.
+M1/M2 accepted 2026-10-16 on native Apple Silicon / ClickHouse 26.8.28.14 LTS. Whole-prefix validation and evidence strength pass two independent full-input digest vectors and fourteen public representation-bypass negatives. Public apply/resume passes initialization/start/entry/completion response loss and observed error, all six adoption observer boundaries, stale/different batch refusal, no-initialization resume, asynchronous cancellation and separate cleanup failure. A real predecessor algorithm/digest row plus matching historical bytes retains PredecessorChecksum evidence; filename/time imports remain OperatorAttestation. A proxy-held entry is NotObserved with absent server process rows, yet host-local exclusion blocks a successor; only controlled complete drain admits a fresh resume, with one entry and zero application SQL.
+
+The complete immutable consumer capture passes: first real two-statement file as one native migration; full fresh 25-migration / 257-step native replay; independent 253-statement original replay; matching schema observations; all 25 legacy rows adopted without SQL; and one appended native migration. Originals/ranges/runner/native-adaptation hashes are checked. Embedding occurs only in the test component and both manifest inputs use the content-qualified build entry point.
+
+All ten native groups pass from extracted sibling source distributions and again using the Nix-built public harness plus Nix core driver. Archive workspace: `/tmp/clickhouse-migrate-ep7-sdist-g46g_7z3`. Logs: `/tmp/clickhouse-migrate-ep7-{qualification,archives-build,nix-build-final,checks,pure-vectors,flake-final}.log`. Four-package metadata, format, independent references, public invariants and all six native flake checks pass. Linux and remote CI remain deferred. No package publication or external consumer mutation occurred.
 
 ## Surprises & Discoveries
 
@@ -63,11 +67,13 @@ M1 accepted 2026-10-16: the opaque source-neutral request/plan API, whole-prefix
 ## Decision Log
 
 
+2026-10-16: [ADR 0008](../adr/0008-adopt-reviewed-prefixes-with-explicit-evidence.md) freezes source-neutral whole-prefix validation, evidence strength and the three reviewed native adaptations. The scoped runtime validates a fresh observation before initialization and permits a no-write return only for an identical committed batch. The optional Nix integration target supplies its flag-dependent embedding dependency explicitly in testHaskellDepends; normal library dependencies are unchanged.
+
 2026-10-15: Require independent fresh-replay and adoption tests. Filename-only legacy evidence cannot establish historical bytes or successful completion of a partially executed file; explicit operator attestation is retained permanently in native history.
 
 ## Outcomes & Retrospective
 
-
+Complete. The source-neutral core API and frozen digest contract are ready for CLI integration. ADR 0008 and docs/adoption.md preserve evidence limits and the explicit operational sequence. The optional Nix harness now includes flag-dependent embedding only as a test dependency. Full fresh replay and existing-effects adoption are independently accepted; neither closes the separate external consumer runner replacement gate, which follows the CLI example.
 
 
 ## Context and Orientation
