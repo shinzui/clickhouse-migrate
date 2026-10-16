@@ -53,7 +53,12 @@ withRuntime :: MutationContext -> L.AuditContext -> Maybe L.InitializationAuthor
 withRuntime = withRuntimeCheck (Right ())
 
 withRuntimeCheck :: Either R.RunError () -> MutationContext -> L.AuditContext -> Maybe L.InitializationAuthorization -> Maybe L.QuiescenceEvidence -> Plan.MigrationPlan -> (Runtime -> IO ()) -> IO (Either R.RunFailure R.RunReport)
-withRuntimeCheck prerequisite context@(MutationContext config@(T.TargetConfig target _ _ _ _ _ _) provider@(ExclusiveAccess description _ _ _ _) _ _) audit initialization quiet plan action = do
+withRuntimeCheck prerequisite = withRuntimeObservation prerequisite Nothing
+
+-- Adoption validates its fresh read before openStore may initialize anything.
+-- Ordinary execution retains its existing single-load path.
+withRuntimeObservation :: Either R.RunError () -> Maybe (R.HistoryReport -> Either R.RunError Bool) -> MutationContext -> L.AuditContext -> Maybe L.InitializationAuthorization -> Maybe L.QuiescenceEvidence -> Plan.MigrationPlan -> (Runtime -> IO ()) -> IO (Either R.RunFailure R.RunReport)
+withRuntimeObservation prerequisite validateObservation context@(MutationContext config@(T.TargetConfig target _ _ _ _ _ _) provider@(ExclusiveAccess description _ _ _ _) _ _) audit initialization quiet plan action = do
   seed <- try @SomeException freshUuid
   let identity = either (const "00000000-0000-4000-8000-000000000000") id seed
   latest <- newIORef (Reporting.initialRun identity target description plan)
@@ -90,23 +95,35 @@ withRuntimeCheck prerequisite context@(MutationContext config@(T.TargetConfig ta
                   -- ordinary job. Repair supplies a separate explicit operator
                   -- attestation; no elapsed-time/process-list inference is made.
                   established = fromMaybe (L.QuiescenceEvidence target (L.AuditContext (Ledger.auditActor audit) "Coordinator granted a job after all predecessor requests became quiescent" ["strategy:" <> strategy, "scope:" <> scope])) quiet
-              opened <- Store.storeResult (Store.openStore guard transport config initialization established identity)
-              store <- case opened of
-                Left (Store.LedgerProblem L.InitializationNotAuthorized) | T.TargetConfig _ _ _ _ (T.ExistingLedger _) _ _ <- config, isNothing initialization -> abort R.LedgerRequired
-                Left failure -> abort (Reporting.storeError failure)
-                Right value -> pure value
-              let runtime = Runtime context audit plan guard transport store identity latest secondary
-              refresh runtime
-              case (config, initialization) of
-                (T.TargetConfig _ _ _ _ T.FirstUse _ _, Just (L.InitializationAuthorization _ ledger _)) -> modifyIORef' latest (\report -> report {R.initialized = Just ledger})
-                _ -> pure ()
-              report <- readIORef latest
-              let R.InspectionReport _ _ issues = Reporting.inspectHistory plan (Reporting.runHistory report)
-                  changes = [issue | issue@R.DefinitionChanged {} <- issues]
-              unless (null changes) (abort (R.IncompatibleHistory changes))
-              action runtime
-              emit runtime Event.RunCompleted Nothing Nothing Nothing
-              callStore (Store.checkAccess guard)
+              observationOnly <- case validateObservation of
+                Nothing -> pure False
+                Just validate -> do
+                  observation <- callStore (Store.load (Just guard) transport config)
+                  let snapshot = Reporting.observationReport target server (R.GuardedObservation (guardDescription guard)) observation
+                  modifyIORef' latest (Reporting.updateRun plan snapshot)
+                  either abort pure (validate snapshot)
+              if observationOnly
+                then do
+                  emitAt context identity latest Event.RunCompleted Nothing Nothing Nothing
+                  callStore (Store.checkAccess guard)
+                else do
+                  opened <- Store.storeResult (Store.openStore guard transport config initialization established identity)
+                  store <- case opened of
+                    Left (Store.LedgerProblem L.InitializationNotAuthorized) | T.TargetConfig _ _ _ _ (T.ExistingLedger _) _ _ <- config, isNothing initialization -> abort R.LedgerRequired
+                    Left failure -> abort (Reporting.storeError failure)
+                    Right value -> pure value
+                  let runtime = Runtime context audit plan guard transport store identity latest secondary
+                  refresh runtime
+                  case (config, initialization) of
+                    (T.TargetConfig _ _ _ _ T.FirstUse _ _, Just (L.InitializationAuthorization _ ledger _)) -> modifyIORef' latest (\report -> report {R.initialized = Just ledger})
+                    _ -> pure ()
+                  report <- readIORef latest
+                  let R.InspectionReport _ _ issues = Reporting.inspectHistory plan (Reporting.runHistory report)
+                      changes = [issue | issue@R.DefinitionChanged {} <- issues]
+                  unless (null changes) (abort (R.IncompatibleHistory changes))
+                  action runtime
+                  emit runtime Event.RunCompleted Nothing Nothing Nothing
+                  callStore (Store.checkAccess guard)
           pure $ case scoped of
             Left failure -> (Left failure, [])
             Right (AccessResult acquired accessCleanup) -> case acquired of

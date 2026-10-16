@@ -1,4 +1,4 @@
-module RunnerIntegration (runnerEarlyCases, runnerValidationCases, fixture, provider, planFor, scalar, assert, right, field, fromJson) where
+module RunnerIntegration (runnerEarlyCases, runnerValidationCases, fixture, fixtureWithLimits, provider, planFor, scalar, assert, right, field, fromJson) where
 
 import ClickHouseMigrate
 import ClickHouseMigrate.Event qualified as Event
@@ -38,10 +38,13 @@ field key value = case Aeson.fromJSON value :: Aeson.Result Aeson.Object of
   _ -> fail "Invalid runner object"
 
 fixture :: Server -> Text.Text -> Text.Text -> LedgerBinding -> IO TargetConfig
-fixture server label endpoint binding = do
+fixture = fixtureWithLimits defaultHttpLimits
+
+fixtureWithLimits :: HttpLimits -> Server -> Text.Text -> Text.Text -> LedgerBinding -> IO TargetConfig
+fixtureWithLimits limits server label endpoint binding = do
   rows <- queryServer server "SELECT toString(serverUUID()) AS server_id" >>= fromJson :: IO [Value]
   identity <- case rows of [row] -> field "server_id" row; _ -> fail "Missing server identity"
-  targetConfig <$> right (targetKey ("runner-tests/" <> label)) <*> right (directEndpoint endpoint) <*> right (serverId identity) <*> right (ledgerNamespace (label <> "_history")) <*> pure binding <*> right (basicCredentials "default" "test-password") <*> pure defaultHttpLimits
+  targetConfig <$> right (targetKey ("runner-tests/" <> label)) <*> right (directEndpoint endpoint) <*> right (serverId identity) <*> right (ledgerNamespace (label <> "_history")) <*> pure binding <*> right (basicCredentials "default" "test-password") <*> pure limits
 
 fromJson :: (FromJSON a) => Value -> IO a
 fromJson value = case Aeson.fromJSON value of Aeson.Success result -> pure result; _ -> fail "Invalid independent runner observation"

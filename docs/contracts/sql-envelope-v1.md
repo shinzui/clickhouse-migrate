@@ -17,11 +17,13 @@ and may nest. One trailing semicolon and trailing comments are accepted. Any
 second separator or token after a separator is rejected.
 
 The allowlist accepts CREATE TABLE/VIEW/MATERIALIZED VIEW/DATABASE,
-DROP TABLE/VIEW/DATABASE, TRUNCATE TABLE, RENAME TABLE, ALTER TABLE, and
+DROP TABLE/VIEW/DATABASE, TRUNCATE TABLE, RENAME TABLE, a single EXCHANGE TABLES pair, ALTER TABLE, and
 INSERT INTO a table with a SELECT or VALUES body. Table/view names in the command
 header must have a database qualifier, including individually quoted names.
 Database DDL names one database. Optional IF EXISTS/IF NOT EXISTS clauses are
-recognized. CREATE OR REPLACE, temporary tables, standalone SELECT, lightweight
+recognized. The exact CREATE OR REPLACE VIEW header is also accepted; every other
+REPLACE token remains excluded. Both EXCHANGE objects must be qualified and no
+additional pairs or suffixes are accepted. CREATE OR REPLACE TABLE, temporary tables, standalone SELECT, lightweight
 DELETE and administrative/session/transaction commands are outside v1.
 
 ALTER TABLE must begin with ADD, DROP, CLEAR, MODIFY, RENAME, COMMENT,
@@ -60,3 +62,14 @@ The comment/literal forms were checked against the official
 2026-10-16. EP-4 must qualify these forms and accepted completion cases against
 its selected server matrix before claiming runtime support. In particular, a
 lexically accepted materialized view must not have a detached refresh policy.
+
+
+The consumer fixture adds qualification for local Atomic table exchanges and
+replacement views. See the official [EXCHANGE statement](https://clickhouse.com/docs/reference/statements/exchange)
+and [CREATE VIEW statement](https://clickhouse.com/docs/reference/statements/create/view).
+An exchange is one atomic metadata-name swap; replacement of an ordinary view
+updates its query definition. These operations retain the same direct-server and
+response-bound completion obligations. No Shared/replicated/cluster execution is
+qualified here. Original standalone assertions and query-level protected-policy
+overrides remain rejected; the consumer's explicit native adaptations are recorded
+in its provenance and ADR 0008. Existing checksum encodings/policy bytes are unchanged.

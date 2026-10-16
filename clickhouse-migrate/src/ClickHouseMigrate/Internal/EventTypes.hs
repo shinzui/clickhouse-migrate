@@ -21,6 +21,12 @@ data EventPhase
   | MigrationCompleted
   | RecoveryAuthorized
   | StepAccepted
+  | BeforeAdoptionStart
+  | AdoptionStarted
+  | BeforeAdoptionEntry
+  | AdoptionEntryRecorded
+  | BeforeAdoptionComplete
+  | AdoptionCompleted
   deriving stock (Eq, Ord, Show)
 
 data RunEvent = RunEvent

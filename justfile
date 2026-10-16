@@ -31,6 +31,7 @@ sdist:
 check-public-invariants:
     python3 scripts/check-public-invariants.py
     python3 scripts/checksum-reference.py --check
+    python3 scripts/adoption-reference.py --check
 
 test-embedding:
     bash scripts/test-embedding-rebuild.sh
@@ -69,3 +70,9 @@ test-repair:
 test-failure-boundaries:
     cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=boundaries
     cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=survivors
+
+test-adoption:
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest.json --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest-first.json -- test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=adoption
+
+test-consumer-fixtures:
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest.json --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest-first.json -- test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=consumer

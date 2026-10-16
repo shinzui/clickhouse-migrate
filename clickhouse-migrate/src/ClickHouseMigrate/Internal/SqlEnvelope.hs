@@ -116,11 +116,11 @@ checkEnvelope tokens = do
   case find protected tokens of
     Just (Token n _) -> failure ProtectedSetting (Just n)
     Nothing -> pure ()
-  case find forbidden tokens of
+  case find forbidden (localViewHeader tokens) of
     Just (Token n _) -> failure UnsupportedSql (Just n)
     Nothing -> pure ()
   if any onCluster (pairs tokens) || quotedSettings tokens then failure UnsupportedSql Nothing else pure ()
-  if accepted tokens then Right () else failure UnsupportedSql (case tokens of Token n _ : _ -> Just n; _ -> Nothing)
+  if accepted (localViewHeader tokens) then Right () else failure UnsupportedSql (case tokens of Token n _ : _ -> Just n; _ -> Nothing)
   where
     protected (Token _ (Word w)) = w `elem` protectedNames
     protected (Token _ (Identifier w)) = w `elem` protectedNames
@@ -135,6 +135,13 @@ checkEnvelope tokens = do
     quotedAssignment (Token _ (Identifier _), Token _ (Symbol '=')) = True
     quotedAssignment (Token _ Literal, Token _ (Symbol '=')) = True
     quotedAssignment _ = False
+
+-- Only this exact local view header permits REPLACE. ALTER replacement,
+-- CREATE OR REPLACE TABLE and later REPLACE tokens remain excluded.
+localViewHeader :: [Token] -> [Token]
+localViewHeader (create : orToken : replace : view : rest)
+  | and [keyword "CREATE" create, keyword "OR" orToken, keyword "REPLACE" replace, keyword "VIEW" view] = create : view : rest
+localViewHeader tokens = tokens
 
 protectedNames :: [Text]
 protectedNames = ["ASYNC_INSERT", "MUTATIONS_SYNC", "ALTER_SYNC"]
@@ -172,6 +179,9 @@ accepted (a : b : rest)
       _ -> False
   | keyword "DROP" a = object b (skipIf rest)
   | keyword "TRUNCATE" a && keyword "TABLE" b = maybe False (const True) (qualifiedTarget (skipIf rest))
+  | keyword "EXCHANGE" a && keyword "TABLES" b = case qualifiedTarget rest of
+      Just (andToken : second) | keyword "AND" andToken -> qualifiedTarget second == Just []
+      _ -> False
   | keyword "RENAME" a && keyword "TABLE" b = maybe False (const True) (qualifiedTarget rest)
   | keyword "INSERT" a && keyword "INTO" b = case qualifiedTarget rest of
       Just body -> any (\t -> keyword "SELECT" t || keyword "VALUES" t) body

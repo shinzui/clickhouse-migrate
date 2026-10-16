@@ -54,6 +54,7 @@ library
   hs-source-dirs: src
   exposed-modules:
     ClickHouseMigrate
+    ClickHouseMigrate.Adoption
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
     ClickHouseMigrate.Event
@@ -68,6 +69,8 @@ library
     ClickHouseMigrate.Target
 
   other-modules:
+    ClickHouseMigrate.Internal.AdoptionTypes
+    ClickHouseMigrate.Internal.AdoptionValidation
     ClickHouseMigrate.Internal.Checksum
     ClickHouseMigrate.Internal.EventTypes
     ClickHouseMigrate.Internal.Exclusive
@@ -106,11 +109,14 @@ executable clickhouse-migrate-test-driver
   main-is: Main.hs
   other-modules:
     ClickHouseMigrate
+    ClickHouseMigrate.Adoption
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
     ClickHouseMigrate.Event
     ClickHouseMigrate.ExclusiveAccess
     ClickHouseMigrate.Inspection
+    ClickHouseMigrate.Internal.AdoptionTypes
+    ClickHouseMigrate.Internal.AdoptionValidation
     ClickHouseMigrate.Internal.Checksum
     ClickHouseMigrate.Internal.EventTypes
     ClickHouseMigrate.Internal.Exclusive
@@ -153,12 +159,16 @@ test-suite clickhouse-migrate-unit
 
   main-is: Main.hs
   other-modules:
+    AdoptionTests
     ClickHouseMigrate
+    ClickHouseMigrate.Adoption
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
     ClickHouseMigrate.Event
     ClickHouseMigrate.ExclusiveAccess
     ClickHouseMigrate.Inspection
+    ClickHouseMigrate.Internal.AdoptionTypes
+    ClickHouseMigrate.Internal.AdoptionValidation
     ClickHouseMigrate.Internal.Checksum
     ClickHouseMigrate.Internal.EventTypes
     ClickHouseMigrate.Internal.Exclusive

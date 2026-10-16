@@ -15,9 +15,14 @@ build-type: Simple
 extra-doc-files: README.md
 data-files:
   test/data/clickhouse-matrix.json
+  test/fixtures/kansoku/**/*.sql
+  test/fixtures/kansoku/*.json
+  test/fixtures/kansoku/original/migrate.sh
   test/scripts/native_fixture.py
 
-extra-source-files: test/scripts/transport_smoke.py
+extra-source-files:
+  test/scripts/transport_smoke.py
+
 tested-with: ghc ==9.12.4
 
 source-repository head
@@ -74,15 +79,21 @@ test-suite clickhouse-migrate-integration
   hs-source-dirs: test
   main-is: Main.hs
   other-modules:
+    AdoptionFaults
+    AdoptionIntegration
+    ConsumerFixtures
     FailureBoundaries
     LedgerIntegration
+    Paths_clickhouse_migrate_test_support
     RepairBoundaries
     RepairIntegration
     RunnerIntegration
     SurvivingWork
 
+  autogen-modules: Paths_clickhouse_migrate_test_support
   ghc-options: -threaded
   build-depends:
+    clickhouse-migrate-embed ==0.1.*,
     clickhouse-migrate-test-support,
     containers >=0.7 && <0.9,
 

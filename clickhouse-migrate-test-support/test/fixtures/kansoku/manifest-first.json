@@ -1,0 +1,21 @@
+{
+  "manifestVersion": 1,
+  "component": "kansoku",
+  "dependencies": [],
+  "migrations": [
+    {
+      "name": "0001_events_raw",
+      "description": "Reviewed complete source file 0001_events_raw.sql",
+      "steps": [
+        {
+          "name": "statement-01",
+          "file": "steps/0001_events_raw/statement-01.sql"
+        },
+        {
+          "name": "statement-02",
+          "file": "steps/0001_events_raw/statement-02.sql"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
--- | Explicitly ordered ClickHouse migration definitions. All constructors validate.
+-- | Ordered definitions, scoped execution, inspection, recovery and adoption.
 module ClickHouseMigrate
-  ( module ClickHouseMigrate.Definition,
+  ( module ClickHouseMigrate.Adoption,
+    module ClickHouseMigrate.Definition,
     module ClickHouseMigrate.Plan,
     module ClickHouseMigrate.Error,
     module ClickHouseMigrate.Target,
@@ -38,6 +39,7 @@ module ClickHouseMigrate
   )
 where
 
+import ClickHouseMigrate.Adoption
 import ClickHouseMigrate.Definition
 import ClickHouseMigrate.Error
 import ClickHouseMigrate.Plan

@@ -95,7 +95,7 @@ class NativeServer:
             deadline = time.monotonic() + 30
             while time.monotonic() < deadline:
                 if self.process.poll() is not None:
-                    raise RuntimeError('Owned server exited before readiness')
+                    raise RuntimeError(f'Owned server exited before readiness: {self.process.returncode}')
                 try:
                     with urllib.request.urlopen(self.endpoint + '/ping', timeout=.2) as response:
                         if response.read() == b'Ok.\n':
@@ -121,7 +121,7 @@ class NativeServer:
         return f'http://127.0.0.1:{self.port}'
 
     def query(self, sql):
-        request = urllib.request.Request(self.endpoint + '/?default_format=JSONEachRow&wait_end_of_query=1', data=sql.encode(), headers={'Authorization': AUTH}, method='POST')
+        request = urllib.request.Request(self.endpoint + '/?default_format=JSONEachRow&wait_end_of_query=1&async_insert=0&mutations_sync=1&alter_sync=1&fsync_metadata=1&max_result_rows=0&max_result_bytes=0&result_overflow_mode=throw&read_overflow_mode=throw', data=sql.encode(), headers={'Authorization': AUTH}, method='POST')
         with urllib.request.urlopen(request, timeout=10) as response:
             return [json.loads(line) for line in response.read().splitlines() if line.strip()]
 
@@ -159,6 +159,33 @@ class NativeServer:
             shutil.rmtree(self.root)
 
 
+def leading_sql(body):
+    """Classify without recording bodies; account for legal leading comments."""
+    while True:
+        body = body.lstrip()
+        if body.startswith((b'--', b'//', b'#!', b'# ')):
+            ends = [index for mark in (b'\r', b'\n') if (index := body.find(mark)) >= 0]
+            if not ends:
+                return b''
+            body = body[min(ends) + 1:]
+        elif body.startswith(b'/*'):
+            depth, cursor = 1, 2
+            while depth and cursor < len(body):
+                if body[cursor:cursor + 2] == b'/*':
+                    depth += 1
+                    cursor += 2
+                elif body[cursor:cursor + 2] == b'*/':
+                    depth -= 1
+                    cursor += 2
+                else:
+                    cursor += 1
+            if depth:
+                return b''
+            body = body[cursor:]
+        else:
+            return body.upper()
+
+
 class FaultProxy:
     def __init__(self, target, tls=False):
         self.target = target
@@ -194,9 +221,10 @@ class FaultProxy:
                 with proxy.lock:
                     stage = None
                     step = None
-                    if body.startswith(b'CREATE DATABASE IF NOT EXISTS '):
+                    header = leading_sql(body)
+                    if header.startswith(b'CREATE DATABASE IF NOT EXISTS ') and header.endswith(b' ENGINE=ATOMIC'):
                         stage = 'ddl-database'
-                    elif body.startswith(b'CREATE TABLE IF NOT EXISTS '):
+                    elif header.startswith(b'CREATE TABLE IF NOT EXISTS ') and b'(SEQUENCE UINT64, EVENT_ID UUID, LEDGER_ID UUID, EVENT STRING)' in header:
                         stage = 'ddl-table'
                     elif b'FORMAT JSONEachRow\n' in body:
                         try:
@@ -207,7 +235,7 @@ class FaultProxy:
                             step = (context.get('step') or {}).get('name')
                         except (ValueError, KeyError, TypeError):
                             pass
-                    if stage is None and body.lstrip().startswith((b'CREATE ', b'ALTER ', b'INSERT ', b'DROP ', b'TRUNCATE ', b'RENAME ')):
+                    if stage is None and header.startswith((b'CREATE ', b'ALTER ', b'INSERT ', b'DROP ', b'TRUNCATE ', b'RENAME ', b'EXCHANGE ')):
                         stage = 'application-sql'
                     mode = proxy.mode
                     if proxy.stage is not None and stage != proxy.stage:
@@ -323,6 +351,9 @@ class FaultProxy:
         self.http.shutdown()
         self.http.server_close()
         self.thread.join(timeout=2)
+        with self.lock:
+            evidence = {'receivedCount': len(self.events), 'events': list(self.events)}
+        (self.target.root / f'proxy-{self.http.server_port}-events.json').write_text(json.dumps(evidence, indent=2) + '\n')
 
 
 def serve(matrix, entry_id):

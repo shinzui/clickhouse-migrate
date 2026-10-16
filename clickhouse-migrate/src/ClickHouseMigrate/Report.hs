@@ -3,6 +3,7 @@
 module ClickHouseMigrate.Report where
 
 import ClickHouseMigrate.ExclusiveAccess (AccessDescription, AccessError)
+import ClickHouseMigrate.Internal.AdoptionTypes (AdoptionError)
 import ClickHouseMigrate.Ledger (AppendReceipt, AttemptId, AuditContext, EvidenceLevel, LedgerError, LedgerPosition, RequestEvidence, TransportError)
 import ClickHouseMigrate.Prelude
 import ClickHouseMigrate.Target (LedgerId, QueryId, ServerIdentity, TargetKey)
@@ -162,6 +163,7 @@ data RunError
   | VerificationNotCurrent
   | AuditTooLarge
   | LedgerRequired
+  | AdoptionRejected !AdoptionError
   | ExistingBindingRequired
   | StalePosition !LedgerPosition !(Maybe LedgerPosition)
   | AttemptMismatch !AttemptId !(Maybe AttemptId)

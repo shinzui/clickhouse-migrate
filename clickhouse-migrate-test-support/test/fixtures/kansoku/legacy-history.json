@@ -1,0 +1,127 @@
+[
+  {
+    "filename": "0001_events_raw.sql",
+    "appliedAt": "2020-01-01T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0002_identity.sql",
+    "appliedAt": "2020-01-02T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0003_rollups.sql",
+    "appliedAt": "2020-01-03T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0004_events_raw_v2.sql",
+    "appliedAt": "2020-01-04T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0005_final_free_resolution.sql",
+    "appliedAt": "2020-01-05T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0006_rollups_v2.sql",
+    "appliedAt": "2020-01-06T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0007_drop_events_raw_v1.sql",
+    "appliedAt": "2020-01-07T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0008_account_scoped_metrics.sql",
+    "appliedAt": "2020-01-08T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0009_typed_properties.sql",
+    "appliedAt": "2020-01-09T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0010_resolved_event_properties.sql",
+    "appliedAt": "2020-01-10T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0011_events_raw_identifiers.sql",
+    "appliedAt": "2020-01-11T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0012_identity_signals.sql",
+    "appliedAt": "2020-01-12T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0013_retire_identity_map.sql",
+    "appliedAt": "2020-01-13T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0014_experiment_exposures.sql",
+    "appliedAt": "2020-01-14T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0015_experiment_exposure_string_casts.sql",
+    "appliedAt": "2020-01-15T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0016_events_raw_schema_version.sql",
+    "appliedAt": "2020-01-16T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0017_replay_safe_sources.sql",
+    "appliedAt": "2020-01-17T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0018_conservative_identity_resolution.sql",
+    "appliedAt": "2020-01-18T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0019_web_enrichment.sql",
+    "appliedAt": "2020-01-19T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0020_replay_safe_sessions.sql",
+    "appliedAt": "2020-01-20T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0021_governed_current_user_traits.sql",
+    "appliedAt": "2020-01-21T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0022_applied_retention_policy.sql",
+    "appliedAt": "2020-01-22T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0023_stable_reader_surface.sql",
+    "appliedAt": "2020-01-23T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0024_cohort_members.sql",
+    "appliedAt": "2020-01-24T00:00:00Z",
+    "evidence": "operator-attestation"
+  },
+  {
+    "filename": "0025_organization_analytics.sql",
+    "appliedAt": "2020-01-25T00:00:00Z",
+    "evidence": "operator-attestation"
+  }
+]

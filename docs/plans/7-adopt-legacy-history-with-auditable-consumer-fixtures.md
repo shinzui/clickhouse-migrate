@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-16T05:03:30Z
       mode: "update"
       note: "Specify fresh-ledger adoption APIs, expected state, evidence and delayed-append recovery."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T15:34:24Z
+      mode: "implement"
+      note: "Implement source-neutral adoption on the accepted scoped runner and capture immutable consumer evidence."
 ---
 
 # Adopt legacy history with auditable consumer fixtures
@@ -43,12 +48,16 @@ An application can review and adopt a complete legacy prefix without running its
 ## Progress
 
 
-- [ ] M1 — Pure adoption planning validates the complete mapping and preserves evidence strength.
+- [x] M1 — Pure adoption planning validates the complete mapping and preserves evidence strength.
 - [ ] M2 — Audited apply/resume and immutable consumer fixtures pass interruption, conflict and subsequent-migration tests.
+
+M1 accepted 2026-10-16: the opaque source-neutral request/plan API, whole-prefix validation, evidence-strength checks and two independent complete-input digest vectors pass. Public native early adoption and the complete consumer replay/adoption comparison pass. M2's append/callback/cancellation/late-entry matrix now passes in Cabal; final Nix, archive, public-invariant and regression qualification remains before whole-child completion.
 
 ## Surprises & Discoveries
 
+2026-10-16: The exact consumer revision 138d9a316931bbf46781757a29ab6c7fdd90f870 contains 25 files / 253 statements. Its native reviewed mapping has 257 steps: two standalone SELECT assertions each become explicit Memory-table prepare/INSERT SELECT/cleanup steps; one mutations_sync=2 override is removed in favor of the immutable qualified local policy. Originals and contiguous source ranges remain exact, with every native adaptation and hash recorded separately. Local atomic exchanges and replacement views are qualified as narrow DDL forms rather than rewritten into non-atomic renames/drops.
 
+2026-10-16: The first real multi-statement source file runs as one native migration with two observed steps and a real application table. Full native replay completed, exposing an instrumentation defect: the fault proxy did not count SQL preceded by comments and confused generic CREATE IF NOT EXISTS with bootstrap DDL. The proxy now skips leading lexical trivia and recognizes exact internal bootstrap forms. After fixing the instrumentation, the complete comparison passes: native 257-step replay, independent original 253-statement replay, matching schema observations, complete adoption without application SQL, and one subsequent native migration.
 
 
 ## Decision Log

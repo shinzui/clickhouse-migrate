@@ -1,5 +1,7 @@
 module Main (main) where
 
+import AdoptionFaults (adoptionFaultCases)
+import AdoptionIntegration (adoptionEarlyCases)
 import ClickHouseMigrate.ExclusiveAccess qualified as Access
 import ClickHouseMigrate.Ledger qualified as Ledger
 import ClickHouseMigrate.Prelude
@@ -7,6 +9,7 @@ import ClickHouseMigrate.Target qualified as Target
 import ClickHouseMigrate.TestSupport.ExclusiveAccess (hostLocalExclusiveAccess)
 import ClickHouseMigrate.TestSupport.FaultProxy
 import ClickHouseMigrate.TestSupport.Server
+import ConsumerFixtures (consumerFixtureCases)
 import Control.Concurrent (forkFinally, killThread, newEmptyMVar, putMVar, takeMVar, threadDelay, tryReadMVar)
 import Control.Exception (bracket, finally, throwIO)
 import Data.Aeson (FromJSON, Key, Object, Result (..), Value (..), fromJSON, object, (.=))
@@ -51,14 +54,16 @@ main = do
 
 integrationMain :: [String] -> IO ()
 integrationMain args = do
-  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
-  finished <- timeout 180000000 $ withCandidateServer "lts-native" $ \server -> do
+  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"], ["adoption"], ["consumer"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
+  finished <- timeout (if args == ["consumer"] then 600000000 else 180000000) $ withCandidateServer "lts-native" $ \server -> do
     putStrLn ("Candidate ClickHouse " ++ Text.unpack (serverVersion server))
     case args of
       [] -> transportCases driver server
       ["transport"] -> transportCases driver server
       ["completion"] -> completionCases driver server
       ["ledger"] -> ledgerCases driver server
+      ["consumer"] -> consumerFixtureCases server
+      ["adoption"] -> adoptionEarlyCases server >> adoptionFaultCases server
       ["runner"] -> runnerEarlyCases server >> runnerValidationCases server
       ["repair"] -> repairEarlyCases server >> repairBoundaryCases server
       ["survivors"] -> survivingWorkCases server

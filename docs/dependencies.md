@@ -217,3 +217,29 @@ and `pkgs/development/haskell-modules/generic-builder.nix` (artifact URIs pendin
 no matching registry project). The builder enables test compilation for doCheck;
 its Setup build executable path and postInstall hook are exercised by the native
 output. No dependency pin or managed Seihou file changes are needed.
+
+
+## Source-neutral adoption and captured consumer
+
+Adoption reuses the existing SHA-256, bytestring builder, canonical ledger JSON,
+scoped transport and report dependencies. Its digest encoding has independent
+Python/Haskell fixtures in test/vectors/adoption-v1.json. The test-support integration
+component alone depends on the existing embed package to compile captured components;
+its production library does not acquire an embedding dependency.
+
+Before recursive fixture globs, inspected `mori://haskell/cabal`, project-relative
+`cabal/doc/cabal-package-description-file.rst` and
+`cabal/Cabal/src/Distribution/Simple/Glob.hs` (file-level URIs pending).
+Cabal's recursive final-parent ** globs are available since specification 2.4;
+the package declares 3.12. Captured SQL/JSON/shell evidence is packaged as test-support
+data; tests use the generated package data-directory API. No new bound/pin is needed.
+
+Before qualifying local exchanges and replacement views, checked the official
+[EXCHANGE](https://clickhouse.com/docs/reference/statements/exchange) and
+[CREATE VIEW](https://clickhouse.com/docs/reference/statements/create/view)
+references. Native captured replay exercises exact Atomic EXCHANGE pairs and
+CREATE OR REPLACE VIEW responses on the pinned candidate. The lexer exception is
+limited to this exact view header and one fully qualified exchange pair; protected
+settings, standalone SELECT and replacement-table/ALTER forms remain excluded.
+The capture records explicit assertion/local-policy adaptations, without editing
+original source or claiming historical checksum evidence from current file hashes.

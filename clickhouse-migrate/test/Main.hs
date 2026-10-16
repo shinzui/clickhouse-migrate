@@ -1,5 +1,6 @@
 module Main (main) where
 
+import AdoptionTests (adoptionTests)
 import ClickHouseMigrate
 import ClickHouseMigrate.Internal.Checksum qualified as Checksum
 import Control.Monad (forM_, unless)
@@ -33,6 +34,7 @@ isPlanError _ _ = False
 
 main :: IO ()
 main = do
+  adoptionTests
   ledgerTests
   exclusiveTests
   targetValidation
