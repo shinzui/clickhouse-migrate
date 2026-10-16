@@ -20,6 +20,7 @@ import ClickHouseMigrate.Internal.Identity (freshUuid)
 import ClickHouseMigrate.Internal.LedgerCodec (encodeEvent)
 import ClickHouseMigrate.Internal.LedgerStore qualified as Store
 import ClickHouseMigrate.Internal.LedgerTypes qualified as L
+import ClickHouseMigrate.Internal.Preflight (validateRecoveryCapacity, validateRecoveryEvent)
 import ClickHouseMigrate.Internal.Projection (resolvedStep)
 import ClickHouseMigrate.Internal.RepairTypes
 import ClickHouseMigrate.Internal.Reporting qualified as Reporting
@@ -112,19 +113,41 @@ repair context@(MutationContext (T.TargetConfig target _ _ _ binding _ _) _ _ _)
             pure (L.AcceptStep index, Just index, Just query)
         next <- freshUuid
         bound <- contextAt definition selection
-        appendEvent runtime (Just next) (L.AuthorizeRecovery (L.Recovery action expected current next quiet)) bound
+        let L.LedgerPosition _ number _ = L.position projection
+            pending = [index | (index, checkpoint) <- zip [0 ..] checkpoints, checkpoint == L.NeverStarted]
+            needed = case action of L.Resume -> 2 * toInteger (length pending) + 2; L.RetryStep _ -> 3; _ -> 2
+        either abort pure (validateRecoveryCapacity number needed)
+        authorization <- prepareEvent runtime projection (Just next) (L.AuthorizeRecovery (L.Recovery action expected current next quiet)) bound
+        authorized <- preparedProjection R.RecoveryAuthorizationEvent projection authorization
+        following <- case action of
+          L.AcceptStep index -> do
+            event <- prepareEvent runtime authorized (Just next) (L.AcceptCompletion index (L.Evidence L.OperatorAttestation (Ledger.auditReferences audit))) bound
+            _ <- preparedProjection R.RecoveryAcceptanceEvent authorized event
+            pure (Just event)
+          L.Finalize -> do
+            completion <- contextAt definition Nothing
+            event <- prepareEvent runtime authorized (Just next) L.CompleteMigration completion
+            _ <- preparedProjection R.RecoveryCompletionEvent authorized event
+            pure (Just event)
+          L.Resume -> checkExecutionMetadata runtime definition next pending True >> pure Nothing
+          L.RetryStep index -> checkExecutionMetadata runtime definition next [index] False >> pure Nothing
+        appendPreparedEvent runtime authorization
         emit runtime Event.RecoveryAuthorized (Just definition) selection query
-        case action of
-          L.Resume -> do
+        case (action, following) of
+          (L.Resume, _) -> do
             mapM_ (\(index, (checkpoint, step)) -> when (checkpoint == L.NeverStarted) (executeStep runtime definition next index step)) (zip [0 ..] (zip checkpoints (NE.toList (Plan.migrationSteps migration))))
             finishMigration runtime definition next
-          L.RetryStep index -> case drop index (NE.toList (Plan.migrationSteps migration)) of
+          (L.RetryStep index, _) -> case drop index (NE.toList (Plan.migrationSteps migration)) of
             step : _ -> executeStep runtime definition next index step
             _ -> abort R.UnexpectedRuntimeFailure
-          L.AcceptStep index -> do
-            appendEvent runtime (Just next) (L.AcceptCompletion index (L.Evidence L.OperatorAttestation (Ledger.auditReferences audit))) bound
+          (L.AcceptStep index, Just event) -> do
+            appendPreparedEvent runtime event
             emit runtime Event.StepAccepted (Just definition) (Just index) query
-          L.Finalize -> finishMigration runtime definition next
+          (L.Finalize, Just event) -> do
+            emit runtime Event.BeforeMigrationComplete (Just definition) Nothing Nothing
+            appendPreparedEvent runtime event
+            emit runtime Event.MigrationCompleted (Just definition) Nothing Nothing
+          _ -> abort R.UnexpectedRuntimeFailure
   where
     checkReceipt projection (L.AppendReceipt receiptTarget ledger number identity digest _) = do
       let L.LedgerPosition actual _ _ = L.position projection
@@ -135,6 +158,25 @@ repair context@(MutationContext (T.TargetConfig target _ _ _ binding _ _) _ _ _)
         [event] | L.eventId event == identity && eventNumber event == number && Checksum.digestHex (Checksum.digest (encodeEvent event)) == digest -> pure ()
         _ -> abort (R.RepairNotAllowed R.ConflictingAppend)
     eventNumber (L.LedgerEvent number _ _ _ _ _ _ _ _ _) = number
+
+-- SQL outcomes are not known yet. Bound every possible generated envelope using
+-- maximal sequence digits, timestamp precision and safe numeric failure fields.
+checkExecutionMetadata :: Runtime -> L.Definition -> Text -> [Int] -> Bool -> IO ()
+checkExecutionMetadata runtime definition attempt indices completion = do
+  projection <- runtimeProjection runtime
+  let L.LedgerPosition ledger _ _ = L.position projection
+      uuid = "00000000-0000-4000-8000-000000000000"
+      query = "chm-" <> uuid
+      check kind body context = either abort pure (validateRecoveryEvent kind (L.LedgerEvent maxBound uuid ledger (runtimeRunId runtime) (Just attempt) "2026-10-16T00:00:00.999999999999Z" (runtimeAudit runtime) "0.1.0.0" context body))
+  mapM_
+    ( \index -> do
+        context <- contextAt definition (Just index)
+        check R.RecoveryStepStartEvent (L.StartStep index query) context
+        check R.RecoveryStepSuccessEvent (L.SucceedStep index query) context
+        check R.RecoveryStepFailureEvent (L.FailStep index query (L.FailureEvidence "UnexpectedResponse" (Just 599) (Just maxBound))) context
+    )
+    indices
+  when completion $ contextAt definition Nothing >>= check R.RecoveryCompletionEvent L.CompleteMigration
 
 selectedStep :: L.Projection -> L.Definition -> [L.StepState] -> R.StepAttempt -> IO (Int, T.QueryId)
 selectedStep projection definition checkpoints requested@(R.StepAttempt _ name query) = do

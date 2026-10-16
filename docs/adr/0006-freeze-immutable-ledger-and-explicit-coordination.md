@@ -73,3 +73,9 @@ job must admit no mutating successor until all predecessor requests drain.
 The host-local marker is more conservative and requires explicit evidence even
 for later entry after client exit. Fsync configuration/process-kill tests
 do not establish power-loss or storage-failure durability.
+
+Execution order now follows [ADR 0010](0010-separate-component-catalog-from-execution-schedule.md),
+which preserves the catalog and immutable global prefix.
+
+[ADR 0011](0011-read-complete-history-with-bounded-rows.md) removes the aggregate
+response ceiling while retaining full-history validation and bounded raw rows.

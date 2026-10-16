@@ -31,7 +31,7 @@ Commands and safety inputs:
 
 | command | required inputs / behavior |
 | --- | --- |
-| `plan [--json]` | Offline compiled definitions and hashes |
+| `plan [--json]` | Offline compiled definitions, hashes and explicit execution schedule |
 | `status`, `history` | Remote observation; optional `--guarded` |
 | `verify` | Optional `--require-current`, `--guarded`; pending is compatible, not current; no schema-equality proof |
 | `up` | `--expect-target`, `--actor`, `--reason`; explicit `--initialize-ledger UUID` only for first use |

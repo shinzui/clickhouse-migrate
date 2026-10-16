@@ -83,7 +83,7 @@ inspection provider True = maybe (Left MissingExclusiveAccess) (Right . I.Guarde
 
 -- Offline plan deliberately does not force the environment argument.
 handleCommand :: CommandEnvironment -> MigrationPlan -> Command -> IO CommandResult
-handleCommand _ plan PlanCommand = pure (CommandResult "plan" (Right (PlanReport (planReport plan))))
+handleCommand _ plan PlanCommand = pure (CommandResult "plan" (Right (PlanReport (planReport plan) [(componentNameText (migrationIdComponent identity), migrationNameText (migrationIdName identity)) | view <- NE.toList (inspectSchedule plan), let identity = migrationId view])))
 handleCommand environment plan command =
   let name = commandName command
       reject = pure . CommandResult name . Left . CommandRejected

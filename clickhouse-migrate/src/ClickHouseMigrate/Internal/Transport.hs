@@ -5,7 +5,7 @@ import ClickHouseMigrate.Prelude
 import ClickHouseMigrate.Target (QueryId, ServerIdentity)
 import Data.Aeson (Object)
 
-data RequestKind = Command | JsonRows deriving stock (Eq, Show)
+data RequestKind = Command | JsonRows | JsonRowStream deriving stock (Eq, Show)
 
 data ResponsePayload = CommandAccepted | Rows ![Object] deriving stock (Eq, Show)
 

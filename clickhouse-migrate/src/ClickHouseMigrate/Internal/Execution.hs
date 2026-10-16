@@ -9,7 +9,8 @@ import ClickHouseMigrate.Internal.Identity (diagnosticTime, freshUuid)
 import ClickHouseMigrate.Internal.LedgerCodec (contextFor, definitions)
 import ClickHouseMigrate.Internal.LedgerStore qualified as Store
 import ClickHouseMigrate.Internal.LedgerTypes qualified as L
-import ClickHouseMigrate.Internal.Preflight (preflight)
+import ClickHouseMigrate.Internal.Preflight (preflight, validateRecoveryEvent)
+import ClickHouseMigrate.Internal.Projection (appendProjection)
 import ClickHouseMigrate.Internal.Reporting qualified as Reporting
 import ClickHouseMigrate.Internal.RuntimeTypes
 import ClickHouseMigrate.Internal.ServerPolicy (TargetCheckError (..), withTransportChecked)
@@ -185,16 +186,31 @@ emitAt (MutationContext _ _ sink _) identity latest phase definition index query
 emit :: Runtime -> Event.EventPhase -> Maybe L.Definition -> Maybe Int -> Maybe T.QueryId -> IO ()
 emit (Runtime context _ _ _ _ _ identity latest _) = emitAt context identity latest
 
+-- Frozen deterministic metadata is reused after recovery preparation.
+data PreparedEvent = PreparedEvent !L.LedgerEvent
+
+prepareEvent :: Runtime -> L.Projection -> Maybe Text -> L.EventBody -> Maybe L.EventContext -> IO PreparedEvent
+prepareEvent runtime projection attempt body context = do
+  let L.LedgerPosition ledger number _ = L.position projection
+  when (number == maxBound) (abort (R.LedgerFailed L.LedgerLimitExceeded))
+  identity <- freshUuid
+  time <- diagnosticTime
+  pure (PreparedEvent (L.LedgerEvent (number + 1) identity ledger (runtimeRunId runtime) attempt time (runtimeAudit runtime) "0.1.0.0" context body))
+
+preparedProjection :: R.RecoveryEventKind -> L.Projection -> PreparedEvent -> IO L.Projection
+preparedProjection kind projection (PreparedEvent event) = do
+  either abort pure (validateRecoveryEvent kind event)
+  either (abort . R.LedgerFailed) pure (appendProjection projection event)
+
+appendPreparedEvent :: Runtime -> PreparedEvent -> IO ()
+appendPreparedEvent runtime (PreparedEvent event) = mask $ \restore -> do
+  _ <- restore (callStore (Store.append (runtimeStore runtime) event))
+  refresh runtime
+
 appendEvent :: Runtime -> Maybe Text -> L.EventBody -> Maybe L.EventContext -> IO ()
 appendEvent runtime attempt body context = do
   projection <- runtimeProjection runtime
-  let L.LedgerPosition ledger number _ = L.position projection
-  identity <- freshUuid
-  time <- diagnosticTime
-  let event = L.LedgerEvent (number + 1) identity ledger (runtimeRunId runtime) attempt time (runtimeAudit runtime) "0.1.0.0" context body
-  mask $ \restore -> do
-    _ <- restore (callStore (Store.append (runtimeStore runtime) event))
-    refresh runtime
+  prepareEvent runtime projection attempt body context >>= appendPreparedEvent runtime
 
 contextAt :: L.Definition -> Maybe Int -> IO (Maybe L.EventContext)
 contextAt definition index = Just <$> either (const (abort R.UnexpectedRuntimeFailure)) pure (contextFor definition index)
@@ -261,4 +277,4 @@ finishMigration runtime definition attempt = do
   emit runtime Event.MigrationCompleted (Just definition) Nothing Nothing
 
 orderedMigrations :: Plan.MigrationPlan -> [(L.Definition, Plan.MigrationView)]
-orderedMigrations plan = zip (definitions plan) [migration | component <- NE.toList (Plan.inspectPlan plan), migration <- NE.toList (Plan.componentMigrations component)]
+orderedMigrations plan = zip (definitions plan) (NE.toList (Plan.inspectSchedule plan))

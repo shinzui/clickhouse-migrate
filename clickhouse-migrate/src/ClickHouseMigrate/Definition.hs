@@ -13,6 +13,7 @@ module ClickHouseMigrate.Definition
     componentNameText,
     migrationNameText,
     stepNameText,
+    migrationIdFromNames,
     migrationIdComponent,
     migrationIdName,
     sqlStep,
@@ -57,6 +58,10 @@ migrationNameText (MigrationName value) = value
 
 stepNameText :: StepName -> Text
 stepNameText (StepName value) = value
+
+-- | A schedule identity from already validated local names.
+migrationIdFromNames :: ComponentName -> MigrationName -> MigrationId
+migrationIdFromNames = MigrationId
 
 migrationIdComponent :: MigrationId -> ComponentName
 migrationIdComponent (MigrationId component _) = component

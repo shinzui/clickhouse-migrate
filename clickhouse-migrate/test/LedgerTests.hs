@@ -3,9 +3,12 @@ module LedgerTests (ledgerTests) where
 import ClickHouseMigrate
 import ClickHouseMigrate.Internal.LedgerCodec qualified as Codec
 import ClickHouseMigrate.Internal.LedgerTypes qualified as L
+import ClickHouseMigrate.Internal.Preflight (validateRecoveryCapacity, validateRecoveryEvent)
 import ClickHouseMigrate.Internal.Projection qualified as Projection
 import ClickHouseMigrate.Ledger qualified as Ledger
+import ClickHouseMigrate.Report qualified as R
 import Control.Monad (forM_, unless)
+import Data.Aeson (object, (.=))
 import Data.ByteString qualified as BS
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Set qualified as Set
@@ -32,6 +35,7 @@ ledgerTests = do
   c <- right (migrationComponent "app" Set.empty (m :| []))
   plan <- right (migrationPlan (c :| []))
   definition <- case Codec.definitions plan of [value] -> pure value; _ -> fail "Expected one test definition"
+  recoveryEnvelopeTests target ledger definition
   let attempt = uuid 100
       event n a body = L.LedgerEvent n (uuid n) ledger (uuid 98) a "2026-10-16T00:00:00Z" audit "0.1.0.0" (eventContext body) body
       eventContext body = case body of
@@ -130,3 +134,34 @@ ledgerTests = do
 
 uuid :: Word64 -> Text
 uuid n = "00000000-0000-4000-8000-" <> Text.justifyRight 12 '0' (Text.pack (show n))
+
+recoveryEnvelopeTests :: TargetKey -> LedgerId -> L.Definition -> IO ()
+recoveryEnvelopeTests target ledger definition = do
+  assert "deterministic recovery capacity" (validateRecoveryCapacity (maxBound - 2) 2 == Right ())
+  assert "capacity rejected before authorization" (validateRecoveryCapacity (maxBound - 1) 2 == Left (R.LedgerFailed L.LedgerLimitExceeded))
+  let makeAudit actor reason count = right (Ledger.auditContext actor reason (replicate 15 (Text.replicate 2048 "x") ++ [Text.replicate count "x"]))
+      context = either (error . show) id (Codec.contextFor definition (Just 0))
+      envelope audit body = L.LedgerEvent 5 (uuid 5) ledger (uuid 90) (Just (uuid 91)) "2026-10-16T00:00:00.123456789012Z" audit "0.1.0.0" (Just context) body
+      acceptance audit = envelope audit (L.AcceptCompletion 0 (L.Evidence L.OperatorAttestation (Ledger.auditReferences audit)))
+  base <- makeAudit "op" "r" 1
+  let remaining = Codec.maxEventBytes - BS.length (Codec.encodeEvent (acceptance base))
+      actor = if odd remaining then "ops" else "op"
+      count = 1 + remaining `div` 2
+  exactAudit <- makeAudit actor "r" count
+  tooLargeAudit <- makeAudit actor "rr" count
+  let exact = acceptance exactAudit
+      over = acceptance tooLargeAudit
+  assert "exact canonical recovery byte bound" (BS.length (Codec.encodeEvent exact) == Codec.maxEventBytes && validateRecoveryEvent R.RecoveryAcceptanceEvent exact == Right ())
+  assert "bound plus one typed error" (BS.length (Codec.encodeEvent over) == Codec.maxEventBytes + 1 && validateRecoveryEvent R.RecoveryAcceptanceEvent over == Left (R.RecoveryEventTooLarge R.RecoveryAcceptanceEvent))
+  assert "canonical size roundtrip" (Codec.decodeEvent (Codec.encodeEvent exact) == Right exact)
+  -- Even a worst possible JSON escape expansion of every event byte fits the
+  -- default row limit. Valid canonical event bytes are a subset of this bound.
+  let worstRow = Codec.encodeValue (object ["sequence" .= ("18446744073709551615" :: Text), "event_id" .= uuid 5, "ledger_id" .= uuid 99, "event" .= Text.replicate Codec.maxEventBytes "\SOH"])
+  assert "default accommodates worst escaped row" (BS.length worstRow < 1048576)
+  forM_ ["雪", "\"", "\\", "x\n"] $ \unit -> do
+    audit <- right (Ledger.auditContext "op" "r" (replicate 16 (Text.replicate 1024 unit)))
+    assert "UTF-8/JSON escaping counted" (validateRecoveryEvent R.RecoveryAcceptanceEvent (acceptance audit) == Left (R.RecoveryEventTooLarge R.RecoveryAcceptanceEvent))
+  outer <- right (Ledger.auditContext "op" "r" (replicate 16 (Text.replicate 2048 "x")))
+  quiet <- right (Ledger.attestQuiescence target outer)
+  let authorization = envelope outer (L.AuthorizeRecovery (L.Recovery (L.AcceptStep 0) (L.LedgerPosition ledger 4 (uuid 4)) (uuid 92) (uuid 91) quiet))
+  assert "combined independently valid audits" (validateRecoveryEvent R.RecoveryAuthorizationEvent authorization == Left (R.RecoveryEventTooLarge R.RecoveryAuthorizationEvent))

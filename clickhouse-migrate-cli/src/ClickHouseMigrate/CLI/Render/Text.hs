@@ -15,7 +15,7 @@ renderText result@(CommandResult command outcome) = Text.unlines $ case outcome 
   Left _ -> [command <> ": error", "Safe failure detail (schemaVersion 1; latest acknowledged report, local observations and secondary errors):", Encoding.decodeUtf8 (renderJson result)]
   Right report ->
     (command <> ": ok") : case report of
-      PlanReport components -> concatMap componentLines components
+      PlanReport components schedule -> ["Execution order:"] ++ ["  " <> number ordinal <> " " <> component <> "/" <> migrationName | (ordinal, (component, migrationName)) <- zip [0 ..] schedule] ++ concatMap componentLines components
       StatusReport (R.InspectionReport history migrations issues) -> historyLines history ++ migrationLines migrations ++ ["Compatibility issues: " <> number (length issues)]
       HistoryReport history -> historyLines history ++ eventLines history
       VerificationReport (R.VerificationReport (R.InspectionReport history migrations _) current) -> ["Compatible: yes", "Current: " <> if current then "yes" else "no (pending definitions)"] ++ historyLines history ++ migrationLines migrations

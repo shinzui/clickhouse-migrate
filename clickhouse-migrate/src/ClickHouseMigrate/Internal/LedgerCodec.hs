@@ -1,6 +1,7 @@
 -- | Strict bounded version-one event codec; values are JSON data, never SQL.
 module ClickHouseMigrate.Internal.LedgerCodec
-  ( encodeEvent,
+  ( maxEventBytes,
+    encodeEvent,
     decodeEvent,
     eventValue,
     definitionValue,
@@ -39,6 +40,9 @@ encodeValue = \case
   Object members -> "{" <> BS.intercalate "," [encodeValue (String (Key.toText key)) <> ":" <> encodeValue value | (key, value) <- sortOn (Key.toText . fst) (KM.toList members)] <> "}"
   Array values -> "[" <> BS.intercalate "," (foldr (\value rest -> encodeValue value : rest) [] values) <> "]"
   scalar -> Lazy.toStrict (Aeson.encode scalar)
+
+maxEventBytes :: Int
+maxEventBytes = 65536
 
 encodeEvent :: LedgerEvent -> ByteString
 encodeEvent = encodeValue . eventValue
@@ -149,7 +153,15 @@ recoveryStep :: RecoveryAction -> Maybe Int
 recoveryStep = \case RetryStep step -> Just step; AcceptStep step -> Just step; _ -> Nothing
 
 definitions :: Plan.MigrationPlan -> [Definition]
-definitions plan = zipWith bind [0 ..] [(index, component, migration) | (index, component) <- zip [0 ..] (NE.toList (Plan.inspectPlan plan)), migration <- NE.toList (Plan.componentMigrations component)]
+definitions plan =
+  zipWith
+    bind
+    [0 ..]
+    [ (index, component, migration)
+    | migration <- NE.toList (Plan.inspectSchedule plan),
+      (index, component) <- zip [0 ..] (NE.toList (Plan.inspectPlan plan)),
+      Plan.componentViewName component == Def.migrationIdComponent (Plan.migrationId migration)
+    ]
   where
     bind ordinal (index, component, migration) =
       Definition
@@ -166,7 +178,7 @@ definitionsDigest values = Checksum.digestHex (Checksum.digest (encodeValue (Aes
 
 decodeEvent :: ByteString -> Either LedgerError LedgerEvent
 decodeEvent bytes
-  | BS.length bytes > 65536 = Left LedgerLimitExceeded
+  | BS.length bytes > maxEventBytes = Left LedgerLimitExceeded
   | otherwise = do
       value <- either (const (Left InvalidEvent)) Right (eitherDecodeStrict' bytes)
       event <- either (const (Left InvalidEvent)) Right (parseEither parseEvent value)
@@ -247,7 +259,7 @@ validated f = either (const (fail "invalid value")) pure . f
 
 validateEvent :: LedgerEvent -> Either LedgerError ()
 validateEvent event@(LedgerEvent sequenceNumber eventId ledger run attempt occurred audit runner context body) = do
-  require (sequenceNumber > 0 && BS.length (encodeEvent event) <= 65536 && not (Text.null runner) && Text.length runner <= 128)
+  require (sequenceNumber > 0 && BS.length (encodeEvent event) <= maxEventBytes && not (Text.null runner) && Text.length runner <= 128)
   uuid eventId
   uuid run
   mapM_ uuid attempt

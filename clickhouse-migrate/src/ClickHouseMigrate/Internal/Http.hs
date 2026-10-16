@@ -1,5 +1,5 @@
 -- | Dedicated direct HTTP resources, bounded full responses, and no replay.
-module ClickHouseMigrate.Internal.Http (Http, withHttp, withHttpAdmission, withHttpAdmissionChecked, withHttpFinalizer, probeConnection, submit) where
+module ClickHouseMigrate.Internal.Http (Http, withHttp, withHttpAdmission, withHttpAdmissionChecked, withHttpFinalizer, probeConnection, submit, readJsonRowStream) where
 
 import ClickHouseMigrate.Internal.TargetTypes
 import ClickHouseMigrate.Internal.Transport hiding (request)
@@ -134,10 +134,15 @@ submit (Http (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials user p
       result <- try @SomeException $ timeout micros $ do
         request <- makeRequest endpoint user password micros identity kind sql
         HTTP.withResponse request manager $ \response -> do
-          bytes <- readBounded maxBytes (HTTP.responseBody response)
-          pure $ case bytes of
-            Left () -> SubmissionUncertain (safeError ResponseTooLarge)
-            Right body -> classify kind (statusCode (HTTP.responseStatus response)) (lookup "X-ClickHouse-Exception-Code" (HTTP.responseHeaders response)) body
+          let status = statusCode (HTTP.responseStatus response)
+              exceptionHeader = lookup "X-ClickHouse-Exception-Code" (HTTP.responseHeaders response)
+          if kind == JsonRowStream && status == 200 && isNothing exceptionHeader
+            then readJsonRowStream maxBytes (HTTP.brRead (HTTP.responseBody response))
+            else do
+              bytes <- readBounded maxBytes (HTTP.responseBody response)
+              pure $ case bytes of
+                Left () -> SubmissionUncertain (safeError ResponseTooLarge)
+                Right body -> classify kind status exceptionHeader body
       didSubmit <- readIORef submitted
       case result of
         Left exception | isJust (fromException exception :: Maybe SomeAsyncException) -> throwIO exception
@@ -157,6 +162,41 @@ readBounded limit reader = loop 0 []
           if BS.length chunk > limit - size
             then pure (Left ())
             else loop (size + BS.length chunk) (chunk : chunks)
+
+-- | One bounded raw row at a time; no decoded prefix escapes before framed EOF.
+-- The newline delimiter is excluded from the byte bound; CR in CRLF is included.
+-- Fragments avoid quadratic copying when a row arrives in many small chunks.
+readJsonRowStream :: Int -> IO ByteString -> IO TransportOutcome
+readJsonRowStream limit readChunk = loop 0 [] []
+  where
+    failure code = SubmissionUncertain (TransportError code (Just 200) Nothing)
+    row bytes
+      | BS.all (`elem` [9, 13, 32]) bytes = Right Nothing
+      | BS.isPrefixOf "Code: " bytes = Left (classify JsonRows 200 Nothing bytes)
+      | otherwise = do
+          _ <- either (const (Left (failure UnexpectedResponse))) Right (Encoding.decodeUtf8' bytes)
+          case eitherDecodeStrict' bytes :: Either String Object of
+            Left _ -> Left (failure UnexpectedResponse)
+            Right value -> Right (Just value)
+    finish chunks rows = case row (BS.concat (reverse chunks)) of
+      Left problem -> pure problem
+      Right value -> pure (AcknowledgedSuccess (Rows (reverse (maybe rows (: rows) value))))
+    loop size chunks rows = do
+      chunk <- readChunk
+      if BS.null chunk then finish chunks rows else consume size chunks rows chunk
+    consume size chunks rows chunk =
+      let (piece, rest) = BS.break (== 10) chunk
+       in if BS.length piece > limit - size
+            then pure (failure ResponseTooLarge)
+            else
+              if BS.null rest
+                then loop (size + BS.length piece) (piece : chunks) rows
+                else case row (BS.concat (reverse (piece : chunks))) of
+                  Left problem -> pure problem
+                  Right value ->
+                    let nextRows = maybe rows (: rows) value
+                        remaining = BS.tail rest
+                     in if BS.null remaining then loop 0 [] nextRows else consume 0 [] nextRows remaining
 
 classify :: RequestKind -> Int -> Maybe ByteString -> ByteString -> TransportOutcome
 classify kind status exceptionHeader body
@@ -210,7 +250,7 @@ makeRequest endpoint user password micros identity kind sql = do
                 ("wait_end_of_query", Just "1"),
                 ("default_format", Just "JSONEachRow")
               ]
-                ++ if kind == JsonRows
+                ++ if kind /= Command
                   then
                     [ ("max_rows_to_read", Just "0"),
                       ("max_bytes_to_read", Just "0"),

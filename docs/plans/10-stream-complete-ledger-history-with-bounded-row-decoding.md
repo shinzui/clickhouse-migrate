@@ -11,6 +11,12 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T18:00:59Z
+  revisions:
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T18:48:18Z
+      mode: "implement"
+      note: "Implement framed complete row stream and native large-history acceptance"
 ---
 
 # Stream complete ledger history with bounded row decoding
@@ -31,15 +37,20 @@ of truncated or corrupt history.
 ## Progress
 
 
-- [ ] M1: A private streamed-row transport passes split/chunk/late-error tests and the original large-audit history read with default limits.
-- [ ] M2: History above 16 MiB is usable through public inspection, execution, recovery and adoption; all rows remain subject to strict projection validation.
-- [ ] M3: Native truncation, cancellation and oversized-row cases preserve uncertainty and block dependent writes; contracts and focused regression suites pass.
+- [x] M1 (2026-10-16; all row byte splits and original native 27-event read): A private streamed-row transport passes split/chunk/late-error tests and the original large-audit history read with default limits.
+- [x] M2 (2026-10-16; 18,655,408-byte native history and 17,906,583-byte adoption history): History above 16 MiB is usable through public inspection, execution, recovery and adoption; all rows remain subject to strict projection validation.
+- [x] M3 (2026-10-16; native precise stream failures, deadlines/cancellation and transport/ledger/runtime regressions): Native truncation, cancellation and oversized-row cases preserve uncertainty and block dependent writes; contracts and focused regression suites pass.
 
 ## Surprises & Discoveries
 
 
-None beyond the captured review baseline. The existing reproduction crosses the
-1 MiB default, not the 16 MiB maximum; M2 must establish the latter explicitly.
+The original 12-step reproduction now returns all 27 events. A public interleaved
+run produces 389 distinct logical events and over 18.65 MB of response data, with
+its largest raw row 50,876 bytes. An interrupted 360-entry adoption batch exceeds
+17.9 MB and resumes without duplicate entries or application SQL. No private test
+seeding was needed. Native fault selection must use numeric sequence maxima:
+the SELECT's string alias can order physical rows lexicographically, while the
+existing projection correctly sorts and validates numeric sequence values.
 
 ## Decision Log
 
@@ -58,8 +69,20 @@ and cancellation remain active.
 ## Outcomes & Retrospective
 
 
-Not implemented. Record measured response bytes, row count, native results and the
-accepted complete-read contract when the work completes.
+Complete streamed ledger reads work at default limits for the original 27-event
+reproduction, a 389-event native history (18,655,395 response bytes; largest row
+50,876 bytes), and an interrupted/committed 360-entry adoption batch (17,906,573
+response bytes). Status, history, require-current verification, pending up,
+recovery, adoption resume and identical committed adoption all pass. Exact physical
+duplicates retain their logical position; late sequence/identity conflicts,
+truncated framing, trailing errors and oversized rows reject the whole read and
+permit no mutation. Deadlines and asynchronous cancellation retain their meanings.
+
+The private Rows boundary, complete projection, ordinary response limits and
+persisted formats remain intact. [ADR 0011](../adr/0011-read-complete-history-with-bounded-rows.md)
+records bounded raw rows and retained-history memory costs. The focused native
+transport, ledger, runner, repair, adoption and failure-boundary groups pass. The
+MasterPlan's final verification record remains a separate closing step.
 
 ## Context and Orientation
 
@@ -169,6 +192,7 @@ before changing request/body-reader behavior; do not traverse the Nix store.
 ```bash
 nix develop --builders ''
 just test-unit
+just test-review-remediation
 just test-transport
 just test-ledger
 just test-runner
@@ -180,10 +204,11 @@ just check-docs
 ```
 
 Add pure decoder tests in `clickhouse-migrate/test/Main.hs` or a dedicated unit
-module, and register it in the Cabal file. Add the first large-history native case
-to `clickhouse-migrate-test-support/test/LedgerIntegration.hs`; public consumer
-cases belong in `RunnerIntegration.hs`, `RepairIntegration.hs` and the existing
-adoption suites. The integration driver and test-support fault proxy remain
+module, and register it in the Cabal file. The large-history native cases and shared public consumers live in
+`clickhouse-migrate-test-support/test/ReviewRemediation.hs`, selected by
+`just test-review-remediation`. That group owns the original reproduction,
+large native/adoption histories, pending execution, recovery and stream faults;
+existing ledger, runner, repair and adoption groups supply the remaining regressions. The integration driver and test-support fault proxy remain
 private. Test recipes own all processes and data roots.
 
 Expected native evidence includes:

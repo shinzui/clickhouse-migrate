@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "command": "plan",
+  "status": "ok",
+  "result": {
+    "kind": "plan",
+    "checksumFormat": "sha256-v1",
+    "completionPolicy": "clickhouse-migrate/local-sync-v1;async_insert=0;mutations_sync=1;alter_sync=1",
+    "components": [
+      {
+        "index": 0,
+        "name": "a",
+        "dependencies": [],
+        "migrations": [
+          {
+            "ordinal": 0,
+            "name": "one",
+            "description": null,
+            "checksum": "a1-hash",
+            "steps": []
+          },
+          {
+            "ordinal": 2,
+            "name": "two",
+            "description": "upgrade",
+            "checksum": "a2-hash",
+            "steps": []
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "name": "b",
+        "dependencies": [
+          "a"
+        ],
+        "migrations": [
+          {
+            "ordinal": 1,
+            "name": "one",
+            "description": null,
+            "checksum": "b1-hash",
+            "steps": []
+          }
+        ]
+      }
+    ],
+    "schedule": [
+      {
+        "ordinal": 0,
+        "component": "a",
+        "migration": "one"
+      },
+      {
+        "ordinal": 1,
+        "component": "b",
+        "migration": "one"
+      },
+      {
+        "ordinal": 2,
+        "component": "a",
+        "migration": "two"
+      }
+    ]
+  },
+  "error": null
+}

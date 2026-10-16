@@ -54,3 +54,9 @@ Pending definitions remain compatible; unresolved history blocks ordinary up.
 Accepted completion remains distinguishable from observed success after explicit
 finalization. Commands cannot prove external coordination or operator evidence,
 and a returned partial report is not guaranteed after asynchronous cancellation.
+
+Execution order now follows [ADR 0010](0010-separate-component-catalog-from-execution-schedule.md),
+which preserves the catalog and immutable global prefix.
+
+[ADR 0012](0012-prepare-recovery-metadata-before-authorization.md) requires complete
+recovery metadata validation before authorization, preserving this uncertainty contract.

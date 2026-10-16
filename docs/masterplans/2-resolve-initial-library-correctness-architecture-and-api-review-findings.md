@@ -10,6 +10,12 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T18:00:52Z
+  revisions:
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T18:43:36Z
+      mode: "implement"
+      note: "Implement and validate review remediation children and combined gate"
 ---
 
 # Resolve initial library correctness architecture and API review findings
@@ -66,9 +72,9 @@ No cross-repository architectural decision is needed to define these repairs.
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 9 | Allow component upgrades with an explicit migration schedule | [ExecPlan 9](../plans/9-allow-component-upgrades-with-an-explicit-migration-schedule.md) | None | None | Not Started |
-| 10 | Stream complete ledger history with bounded row decoding | [ExecPlan 10](../plans/10-stream-complete-ledger-history-with-bounded-row-decoding.md) | None | None | Not Started |
-| 11 | Validate complete recovery events before mutation | [ExecPlan 11](../plans/11-validate-complete-recovery-events-before-mutation.md) | None | None | Not Started |
+| 9 | Allow component upgrades with an explicit migration schedule | [ExecPlan 9](../plans/9-allow-component-upgrades-with-an-explicit-migration-schedule.md) | None | None | In Progress |
+| 10 | Stream complete ledger history with bounded row decoding | [ExecPlan 10](../plans/10-stream-complete-ledger-history-with-bounded-row-decoding.md) | None | None | Complete |
+| 11 | Validate complete recovery events before mutation | [ExecPlan 11](../plans/11-validate-complete-recovery-events-before-mutation.md) | None | None | Complete |
 
 Each child owns one finding, respectively REV-1/F1, REV-1/F2 and REV-1/F3. The
 historical review stays unchanged when fixes land; child progress and the final
@@ -87,7 +93,7 @@ flowchart TD
   E11 --> G
 ```
 
-All three children are ready to start. Their integration dependencies are shared
+The children have no blocking whole-child prerequisites. Their integration dependencies are shared
 history definitions, request evidence and failure reports, rather than missing
 prerequisite behavior. If implementation order changes, keep those contracts
 consistent and rerun the combined gate. Do not convert the default execution
@@ -140,15 +146,12 @@ compilation alone.
 ## Progress
 
 
-Planning is complete; all children are Not Started. REV-1 and its diagnostic
-harness/output are retained, the shared review profile is registered, and strict
-review validation is wired into local checks and CI. The combined native gate and
-post-fix verification review remain open. No library remediation is implemented
-by this planning change. Strict OKF checks for both documentation and reviews,
-Mori configuration validation, local document links/fences, and compilation of the
-retained diagnostic harness passed during authoring. REV-1 resolves through Mori;
-new plan artifact URIs remain awaiting plan ingestion, with local file links
-available throughout.
+EP-10 and EP-11 are Complete. EP-9's API, native upgrade/adoption/recovery and CLI
+gates pass; its final embedding rebuild qualification is running. The combined
+native gate passed with history above 16 MiB and unchanged-position recovery size
+rejection. All focused native transport, ledger, runner, repair, adoption,
+failure-boundary and surviving-work groups pass. Final aggregate checks and the
+post-fix verification record remain open. No external consumer cutover is implied.
 
 ## Surprises & Discoveries
 

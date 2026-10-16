@@ -76,7 +76,7 @@ data PlanMigration = PlanMigration !Text !(Maybe Text) !Text ![PlanStep] derivin
 data PlanComponent = PlanComponent !Text ![Text] ![PlanMigration] deriving stock (Eq, Show)
 
 data CommandReport
-  = PlanReport ![PlanComponent]
+  = PlanReport ![PlanComponent] ![(Text, Text)]
   | StatusReport !R.InspectionReport
   | HistoryReport !R.HistoryReport
   | VerificationReport !R.VerificationReport

@@ -3,10 +3,15 @@ module Main (main) where
 import AdoptionTests (adoptionTests)
 import ClickHouseMigrate
 import ClickHouseMigrate.Internal.Checksum qualified as Checksum
+import ClickHouseMigrate.Internal.Http (readJsonRowStream)
+import ClickHouseMigrate.Internal.LedgerCodec qualified as Codec
+import ClickHouseMigrate.Internal.Transport qualified as Transport
 import Control.Monad (forM_, unless)
+import Data.Aeson qualified as Aeson
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.Char (chr)
+import Data.IORef (atomicModifyIORef', newIORef)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.List.NonEmpty qualified as NE
 import Data.Set qualified as Set
@@ -37,6 +42,8 @@ main = do
   adoptionTests
   ledgerTests
   exclusiveTests
+  streamValidation
+  scheduleValidation
   targetValidation
   let sql = "CREATE TABLE app.events (id UInt64) ENGINE=MergeTree ORDER BY id"
   create <- right (sqlStep "create" sql)
@@ -148,3 +155,51 @@ targetValidation = do
   assert "bounded response allocation" (either (== InvalidHttpLimits) (const False) (httpLimits 1 16777217))
   assert "credential header injection" (either (== InvalidCredentials) (const False) (basicCredentials "user\r\nheader" "password"))
   assert "namespace cannot inject SQL" (ledgerNamespace "ledger; DROP DATABASE app" == Left InvalidLedgerNamespace)
+
+-- A library may append its own migration after another component has activated.
+scheduleValidation :: IO ()
+scheduleValidation = do
+  step <- right (sqlStep "x" "CREATE TABLE app.x (id UInt8) ENGINE=Memory")
+  one <- right (sqlMigration "one" (step :| []))
+  two <- right (sqlMigration "two" (step :| []))
+  a <- right (migrationComponent "a" Set.empty (one :| [two]))
+  b <- right (migrationComponent "b" (Set.singleton "a") (one :| []))
+  let ident c m = migrationIdFromNames <$> componentName c <*> migrationName m
+  a1 <- right (ident "a" "one")
+  a2 <- right (ident "a" "two")
+  b1 <- right (ident "b" "one")
+  unknown <- right (ident "a" "missing")
+  explicit <- right (scheduledMigrationPlan (a :| [b]) (a1 :| [b1, a2]))
+  ordinary <- right (migrationPlan (a :| [b]))
+  frozen <- BS.readFile "test/vectors/schedule-default-v1.json"
+  assert "frozen ordinary descriptors/checksums" (Codec.encodeValue (Aeson.toJSON (map Codec.definitionValue (Codec.definitions ordinary))) <> "\n" == frozen)
+  assert "explicit order" (map migrationId (NE.toList (inspectSchedule explicit)) == [a1, b1, a2])
+  assert "schedule keeps catalog and checksum views" (inspectPlan explicit == inspectPlan ordinary)
+  forM_ [(MissingScheduledMigration, [a1, b1]), (UnknownScheduledMigration, [a1, b1, unknown]), (DuplicateScheduledMigration, [a1, b1, a2, a1]), (MigrationOrderChanged, [a2, a1, b1]), (DependencyNotActivated, [b1, a1, a2])] $ \(code, ids) ->
+    assert "invalid schedule" (isPlanError code (scheduledMigrationPlanFromList [a, b] ids))
+  assert "empty schedule" (isPlanError EmptySchedule (scheduledMigrationPlanFromList [a, b] []))
+
+streamValidation :: IO ()
+streamValidation = do
+  let run bound chunks = do
+        ref <- newIORef (filter (not . BS.null) chunks)
+        readJsonRowStream bound (atomicModifyIORef' ref (\case [] -> ([], ""); x : xs -> (xs, x)))
+      bytes = Encoding.encodeUtf8 "{\"value\":\"雪\\n\\\"\"}"
+      success count = \case Transport.AcknowledgedSuccess (Transport.Rows rows) -> length rows == count; _ -> False
+  expected <- run 1024 [bytes]
+  forM_ [0 .. BS.length bytes] $ \i -> do
+    actual <- run 1024 [BS.take i bytes, BS.drop i bytes]
+    assert "every row byte split" (actual == expected)
+  forM_ [[bytes <> "\n" <> bytes <> "\n"], [" \t\n", bytes, "\r\n", bytes], map BS.singleton (BS.unpack (bytes <> "\n" <> bytes))] $ \chunks ->
+    assert "stream multiple/blank/CRLF rows" . success 2 =<< run 1024 chunks
+  assert "exact row bound" . success 1 =<< run (BS.length bytes) [bytes <> "\n"]
+  assert "no aggregate byte bound" . success 2 =<< run (BS.length bytes) [bytes <> "\n" <> bytes]
+  invalidUtf8 <- run 1024 [bytes <> "\n{\"value\":\"" <> BS.singleton 255 <> "\"}"]
+  assert "invalid row UTF-8 discards prefix" (case invalidUtf8 of Transport.SubmissionUncertain (Transport.TransportError Transport.UnexpectedResponse _ _) -> True; _ -> False)
+  oversized <- run (BS.length bytes - 1) [bytes]
+  assert "row bound plus one" (case oversized of Transport.SubmissionUncertain (Transport.TransportError Transport.ResponseTooLarge _ _) -> True; _ -> False)
+  partial <- run 1024 [bytes <> "\n{\"value\":"]
+  assert "no partial final row" (not (success 1 partial))
+  late <- run 1024 [bytes <> "\nCode: 999. synthetic failure\n"]
+  assert "late error discards rows" (case late of Transport.ObservedServerFailure (Transport.TransportError Transport.ServerRejected _ (Just 999)) -> True; _ -> False)
+  assert "empty stream" . success 0 =<< run 1024 []

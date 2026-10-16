@@ -235,6 +235,8 @@ class FaultProxy:
                             step = (context.get('step') or {}).get('name')
                         except (ValueError, KeyError, TypeError):
                             pass
+                    if header.startswith(b'SELECT TOSTRING(SEQUENCE) AS SEQUENCE, TOSTRING(EVENT_ID)'):
+                        stage = 'history-read'
                     if stage is None and header.startswith((b'CREATE ', b'ALTER ', b'INSERT ', b'DROP ', b'TRUNCATE ', b'RENAME ', b'EXCHANGE ')):
                         stage = 'application-sql'
                     mode = proxy.mode
@@ -278,6 +280,9 @@ class FaultProxy:
                     status = response.status
                 finally:
                     upstream.close()
+                with proxy.lock:
+                    proxy.events[event_index]['responseBytes'] = len(data)
+                    proxy.events[event_index]['maxRowBytes'] = max(map(len, data.splitlines()), default=0)
                 if mode == 'drop':
                     self.close_connection = True
                     return
@@ -303,6 +308,25 @@ class FaultProxy:
                         if 'is_remote' in row:
                             row['is_remote'], row['type'] = 1, 'ObjectStorage'
                     data = b''.join(json.dumps(row).encode() + b'\n' for row in rows)
+                if mode == 'append-late-error':
+                    data += b'Code: 999. DB::Exception: SQL_SECRET_MARKER (SYNTHETIC_ERROR)\n'
+                if mode == 'oversized-history-row':
+                    data += b'{"oversized":"' + b'x' * 1048577 + b'"}\n'
+                if mode in ['history-gap', 'history-identity-conflict', 'history-duplicate-conflict']:
+                    rows = [json.loads(line) for line in data.splitlines() if line.strip()]
+                    extra = dict(max(rows, key=lambda row: int(row['sequence'])))
+                    event = json.loads(extra['event'])
+                    if mode == 'history-gap':
+                        event['sequence'] = int(event['sequence']) + 2
+                        event['eventId'] = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+                    elif mode == 'history-identity-conflict':
+                        event['sequence'] = int(event['sequence']) + 1
+                    else:
+                        event['audit']['actor'] = 'conflicting-operator'
+                    extra['sequence'], extra['event_id'] = str(event['sequence']), event['eventId']
+                    extra['event'] = json.dumps(event, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+                    rows.append(extra)
+                    data = b''.join(json.dumps(row, ensure_ascii=False).encode() + b'\n' for row in rows)
                 if mode == 'late-error':
                     status, data = 200, b'Code: 999. DB::Exception: SQL_SECRET_MARKER (SYNTHETIC_ERROR)\n'
                 self.send_response(status)

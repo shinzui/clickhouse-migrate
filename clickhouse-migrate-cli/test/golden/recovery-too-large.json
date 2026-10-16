@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "command": "repair.accept-step",
+  "status": "error",
+  "result": null,
+  "error": {
+    "category": "run",
+    "primary": {
+      "code": "recovery-event-too-large",
+      "event": "acceptance"
+    },
+    "secondary": [],
+    "report": {
+      "runId": "run-fixture",
+      "target": "test",
+      "access": {
+        "strategy": "fixture",
+        "scope": "owned target"
+      },
+      "acquired": true,
+      "history": {
+        "target": "test",
+        "server": null,
+        "ledger": {
+          "kind": "initialized",
+          "ledgerId": "00000000-0000-0000-0000-000000000001"
+        },
+        "position": "chm1:00000000-0000-0000-0000-000000000001:5:00000000-0000-0000-0000-000000000001",
+        "access": {
+          "mode": "guarded-observation",
+          "provider": {
+            "strategy": "fixture",
+            "scope": "owned target"
+          }
+        },
+        "events": [],
+        "migrations": [
+          {
+            "definition": {
+              "ordinal": 0,
+              "componentIndex": 0,
+              "component": "app",
+              "dependencies": [],
+              "migration": "one",
+              "checksum": "migration-hash",
+              "steps": [
+                {
+                  "name": "create",
+                  "checksum": "create-hash"
+                },
+                {
+                  "name": "insert",
+                  "checksum": "insert-hash"
+                }
+              ]
+            },
+            "state": "in-progress",
+            "attempt": "00000000-0000-0000-0000-000000000001",
+            "steps": [
+              {
+                "name": "create",
+                "checksum": "create-hash",
+                "state": "observed-success",
+                "attempt": {
+                  "ownerAttempt": "00000000-0000-0000-0000-000000000001",
+                  "step": "create",
+                  "queryId": "query-1"
+                },
+                "evidence": null
+              },
+              {
+                "name": "insert",
+                "checksum": "insert-hash",
+                "state": "uncertain",
+                "attempt": {
+                  "ownerAttempt": "00000000-0000-0000-0000-000000000001",
+                  "step": "insert",
+                  "queryId": "query-2"
+                },
+                "evidence": null
+              }
+            ]
+          }
+        ],
+        "unresolved": true
+      },
+      "migrations": [
+        {
+          "definition": {
+            "ordinal": 0,
+            "componentIndex": 0,
+            "component": "app",
+            "dependencies": [],
+            "migration": "one",
+            "checksum": "migration-hash",
+            "steps": [
+              {
+                "name": "create",
+                "checksum": "create-hash"
+              },
+              {
+                "name": "insert",
+                "checksum": "insert-hash"
+              }
+            ]
+          },
+          "state": "in-progress",
+          "attempt": "00000000-0000-0000-0000-000000000001",
+          "steps": [
+            {
+              "name": "create",
+              "checksum": "create-hash",
+              "state": "observed-success",
+              "attempt": {
+                "ownerAttempt": "00000000-0000-0000-0000-000000000001",
+                "step": "create",
+                "queryId": "query-1"
+              },
+              "evidence": null
+            },
+            {
+              "name": "insert",
+              "checksum": "insert-hash",
+              "state": "uncertain",
+              "attempt": {
+                "ownerAttempt": "00000000-0000-0000-0000-000000000001",
+                "step": "insert",
+                "queryId": "query-2"
+              },
+              "evidence": null
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "step": {
+            "component": "app",
+            "migration": "one",
+            "step": "insert",
+            "migrationChecksum": "migration-hash",
+            "stepChecksum": "insert-hash"
+          },
+          "queryId": "query-2",
+          "evidence": {
+            "outcome": "submission-uncertain",
+            "transport": {
+              "code": "response-interrupted",
+              "httpStatus": null,
+              "serverCode": null
+            }
+          }
+        }
+      ],
+      "initializedLedgerId": "00000000-0000-0000-0000-000000000001"
+    }
+  }
+}

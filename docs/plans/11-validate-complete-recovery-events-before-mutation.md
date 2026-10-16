@@ -11,6 +11,12 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T18:00:59Z
+  revisions:
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T18:52:04Z
+      mode: "implement"
+      note: "Prepare complete recovery envelopes before authorization and preserve original position on size rejection"
 ---
 
 # Validate complete recovery events before mutation
@@ -30,9 +36,9 @@ existing explicit recovery and acknowledgement rules.
 ## Progress
 
 
-- [ ] M1: Full recovery envelopes are prepared and size-validated with typed failures before the first append, including authorization and accepted completion.
-- [ ] M2: The public native oversized-accept reproduction leaves position and attempt unchanged; valid replacement evidence succeeds against the original position.
-- [ ] M3: All recovery variants, error renderers, boundary regressions and user/ADR contracts pass without weakening uncertain-write handling.
+- [x] M1 (2026-10-16; exact 65,536/65,537-byte checks and combined native recovery): Full recovery envelopes are prepared and size-validated with typed failures before the first append, including authorization and accepted completion.
+- [x] M2 (2026-10-16; native original-position rejection and replacement, events 3 to 3): The public native oversized-accept reproduction leaves position and attempt unchanged; valid replacement evidence succeeds against the original position.
+- [x] M3 (2026-10-16; all recovery variants, byte boundaries, CLI goldens and uncertain-write regressions): All recovery variants, error renderers, boundary regressions and user/ADR contracts pass without weakening uncertain-write handling.
 
 ## Surprises & Discoveries
 
@@ -40,7 +46,11 @@ existing explicit recovery and acknowledgement rules.
 The baseline review accepted the public evidence/request constructors and ordinary
 preflight, then observed `LedgerFailed InvalidEvent` after a new
 `recovery-authorized` event. The defect is validation ordering, not permission to
-roll back an already-recorded event.
+roll back an already-recorded event. Actual prepared authorization and acceptance
+are now projected together before submission. UTF-8, escaped references and
+independently valid combined audits demonstrate why character counts are not an
+event bound. Required sequence capacity is checked using Integer arithmetic to
+avoid wrapping UInt64 before any authorization.
 
 ## Decision Log
 
@@ -58,8 +68,24 @@ sizes without inventing successful outcomes.
 ## Outcomes & Retrospective
 
 
-Not implemented. Record exact before/after positions, accepted boundary sizes and
-safe error payloads when the work completes.
+Actual authorization and deterministic acceptance/finalization metadata are
+prepared, size-validated and projected before the first append. Retry/resume
+conservatively bound their possible observation envelopes, and sequence capacity
+uses overflow-safe arithmetic. Submission reuses frozen metadata through the
+existing masked acknowledgement and receipt path.
+
+The native public reproduction now rejects oversized acceptance with
+RecoveryEventTooLarge RecoveryAcceptanceEvent and preserves events (3,3), the
+position, current attempt and selected step. No SQL or recovery acknowledgement
+callback occurs; smaller evidence accepts against the original token. Oversized
+quiescence and combined audits reject authorization for all applicable actions.
+Exact 65,536-byte events pass and 65,537-byte events reject; UTF-8 and JSON escapes
+are counted. CLI JSON/text retain safe typed details. Existing interrupted
+recovery, dependent append loss, cancellation and surviving-work regressions pass.
+
+[ADR 0012](../adr/0012-prepare-recovery-metadata-before-authorization.md)
+records preparation-before-authorization without weakening uncertainty. The same
+replacement-evidence path passes against the MasterPlan's history above 16 MiB.
 
 ## Context and Orientation
 
@@ -172,6 +198,7 @@ nix develop --builders ''
 just test-unit
 just check-public-invariants
 just test-repair
+just test-review-remediation
 just test-failure-boundaries
 just test-cli
 just check-docs

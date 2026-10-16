@@ -26,6 +26,7 @@ import FailureBoundaries (failureBoundaryCases)
 import LedgerIntegration (ledgerFaultCases)
 import RepairBoundaries (repairBoundaryCases)
 import RepairIntegration (repairEarlyCases)
+import ReviewRemediation (remediationCases)
 import RunnerIntegration (runnerEarlyCases, runnerValidationCases)
 import SurvivingWork (runnerChild, survivingWorkCases)
 import System.Environment (getArgs, getEnv, getEnvironment, getExecutablePath, lookupEnv)
@@ -55,7 +56,7 @@ main = do
 
 integrationMain :: [String] -> IO ()
 integrationMain args = do
-  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"], ["adoption"], ["consumer"], ["cli"], ["example"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
+  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"], ["adoption"], ["consumer"], ["cli"], ["example"], ["remediation"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
   finished <- timeout (if args == ["consumer"] then 600000000 else 180000000) $ withCandidateServer "lts-native" $ \server -> do
     putStrLn ("Candidate ClickHouse " ++ Text.unpack (serverVersion server))
     case args of
@@ -67,6 +68,7 @@ integrationMain args = do
       ["cli"] -> cliCases server
       ["example"] -> exampleCases server
       ["adoption"] -> adoptionEarlyCases server >> adoptionFaultCases server
+      ["remediation"] -> remediationCases server
       ["runner"] -> runnerEarlyCases server >> runnerValidationCases server
       ["repair"] -> repairEarlyCases server >> repairBoundaryCases server
       ["survivors"] -> survivingWorkCases server

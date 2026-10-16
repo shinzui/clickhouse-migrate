@@ -60,3 +60,6 @@ original-source replay plus adoption must be qualified independently. A source
 replay defect remains an explicit consumer prerequisite, never a reason to rewrite
 original evidence. The actual external runner replacement remains a separate
 initiative gate after the CLI integration example.
+
+Execution order now follows [ADR 0010](0010-separate-component-catalog-from-execution-schedule.md),
+which preserves the catalog and immutable global prefix.

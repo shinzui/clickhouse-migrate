@@ -113,3 +113,7 @@ haddock:
 
 qualify-distributions:
     python3 scripts/qualify-distributions.py
+
+# REV-1 public reproductions and the combined MasterPlan 2 native gate.
+test-review-remediation:
+    cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=remediation

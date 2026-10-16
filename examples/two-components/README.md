@@ -60,3 +60,10 @@ No shared developer database is touched. Recovery requires controlled external d
 `--progress` writes safe events to stderr; `--sql-diagnostics` is explicit authored
 SQL disclosure to stderr. Default JSON/text exclude SQL and credentials. Synchronous
 failures return complete safe JSON; async cancellation/termination may return none.
+
+The application owns an explicit schedule: catalog.0001, analytics.0001. If a
+second catalog release adds 0002, keep those two entries and append catalog.0002
+to the schedule. Keep its authored catalog migration list as 0001, 0002. Use
+`migrationIdFromNames` and `scheduledMigrationPlanFromList` as in `app/app/Main.hs`;
+embedding continues to export only each library's component. Do not regenerate
+execution order by flattening components after upgrading a library.

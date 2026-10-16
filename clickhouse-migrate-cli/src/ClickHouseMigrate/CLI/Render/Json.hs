@@ -33,17 +33,17 @@ resultValue (CommandResult command result) =
 
 reportValue :: CommandReport -> Value
 reportValue = \case
-  PlanReport components -> object ["kind" .= ("plan" :: Text), "checksumFormat" .= Plan.checksumFormatName Plan.ChecksumV1, "completionPolicy" .= Encoding.decodeUtf8 Plan.completionPolicy, "components" .= componentsValue 0 0 components]
+  PlanReport components schedule -> object ["kind" .= ("plan" :: Text), "checksumFormat" .= Plan.checksumFormatName Plan.ChecksumV1, "completionPolicy" .= Encoding.decodeUtf8 Plan.completionPolicy, "components" .= componentsValue schedule 0 components, "schedule" .= [object ["ordinal" .= ordinal, "component" .= component, "migration" .= migration] | (ordinal, (component, migration)) <- zip [0 :: Int ..] schedule]]
   StatusReport report -> object ["kind" .= ("status" :: Text), "report" .= inspectionValue report]
   HistoryReport report -> object ["kind" .= ("history" :: Text), "report" .= historyValue report]
   VerificationReport (R.VerificationReport report current) -> object ["kind" .= ("verification" :: Text), "compatible" .= True, "current" .= current, "report" .= inspectionValue report]
   RunReport report -> object ["kind" .= ("run" :: Text), "report" .= runValue report]
   AdoptionPlanReport observation summary entries -> object ["kind" .= ("adoption-plan" :: Text), "observation" .= historyValue observation, "batch" .= adoptionValue summary, "entries" .= [object ["definition" .= definitionValue definition, "evidence" .= evidenceValue evidence] | (definition, evidence) <- entries]]
 
-componentsValue :: Int -> Int -> [PlanComponent] -> [Value]
+componentsValue :: [(Text, Text)] -> Int -> [PlanComponent] -> [Value]
 componentsValue _ _ [] = []
-componentsValue componentIndex ordinal (PlanComponent name dependencies migrations : rest) =
-  object ["index" .= componentIndex, "name" .= name, "dependencies" .= dependencies, "migrations" .= [object ["ordinal" .= (ordinal + index), "name" .= migration, "description" .= description, "checksum" .= checksum, "steps" .= [object ["index" .= stepIndex, "name" .= step, "checksum" .= digest] | (stepIndex, PlanStep step digest) <- zip [0 :: Int ..] steps]] | (index, PlanMigration migration description checksum steps) <- zip [0 ..] migrations]] : componentsValue (componentIndex + 1) (ordinal + length migrations) rest
+componentsValue schedule componentIndex (PlanComponent name dependencies migrations : rest) =
+  object ["index" .= componentIndex, "name" .= name, "dependencies" .= dependencies, "migrations" .= [object ["ordinal" .= lookup (name, migration) (zip schedule [0 :: Int ..]), "name" .= migration, "description" .= description, "checksum" .= checksum, "steps" .= [object ["index" .= stepIndex, "name" .= step, "checksum" .= digest] | (stepIndex, PlanStep step digest) <- zip [0 :: Int ..] steps]] | PlanMigration migration description checksum steps <- migrations]] : componentsValue schedule (componentIndex + 1) rest
 
 definitionValue :: R.DefinitionSummary -> Value
 definitionValue (R.DefinitionSummary ordinal componentIndex component dependencies migration checksum steps) = object ["ordinal" .= ordinal, "componentIndex" .= componentIndex, "component" .= component, "dependencies" .= dependencies, "migration" .= migration, "checksum" .= checksum, "steps" .= [object ["name" .= name, "checksum" .= digest] | (name, digest) <- steps]]
@@ -190,6 +190,7 @@ runErrorCode = \case
   R.CallbackFailed _ -> "callback-failed"
   R.IncompatibleHistory _ -> "incompatible-history"
   R.VerificationNotCurrent -> "verification-not-current"
+  R.RecoveryEventTooLarge _ -> "recovery-event-too-large"
   R.AuditTooLarge -> "audit-too-large"
   R.LedgerRequired -> "ledger-required"
   R.AdoptionRejected problem -> adoptionErrorCode problem
@@ -218,6 +219,7 @@ runErrorValue failure = object (("code" .= runErrorCode failure) : fields failur
       R.CallbackFailed phase -> ["callback" .= callbackValue phase]
       R.IncompatibleHistory issues -> ["issues" .= map issueValue issues]
       R.VerificationNotCurrent -> []
+      R.RecoveryEventTooLarge kind -> ["event" .= recoveryEventKind kind]
       R.AuditTooLarge -> []
       R.LedgerRequired -> []
       R.AdoptionRejected _ -> []
@@ -229,3 +231,12 @@ runErrorValue failure = object (("code" .= runErrorCode failure) : fields failur
       R.PriorQueriesActive queries -> ["queryIds" .= map T.queryIdText queries]
       R.CleanupFailed -> []
       R.UnexpectedRuntimeFailure -> []
+
+recoveryEventKind :: R.RecoveryEventKind -> Text
+recoveryEventKind = \case
+  R.RecoveryAuthorizationEvent -> "authorization"
+  R.RecoveryAcceptanceEvent -> "acceptance"
+  R.RecoveryCompletionEvent -> "completion"
+  R.RecoveryStepStartEvent -> "step-start"
+  R.RecoveryStepSuccessEvent -> "step-success"
+  R.RecoveryStepFailureEvent -> "step-failure"

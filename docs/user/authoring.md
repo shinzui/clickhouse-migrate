@@ -21,12 +21,24 @@ are scoped to a component; step names are scoped to a migration.
 
 The [two-component example](../../examples/two-components/README.md) compiles separate
 catalog and analytics libraries. Each exports `component :: MigrationComponent`;
-the application composes `migrationPlan (Catalog.component :| [Analytics.component])`.
+the application supplies `scheduledMigrationPlan` with the component catalog and a
+complete ordered `NonEmpty MigrationId`. Use `migrationIdFromNames` with validated
+component and migration names to identify entries.
 Analytics declares a dependency on catalog. The application may append its own
 component after both. Core checks the complete recorded global prefix, including
 component order/dependencies, migration identities and all named step checksums.
 Changing descriptions is harmless; modifying applied identity/order/SQL is not.
 Append a new migration rather than editing an applied one.
+
+`migrationPlan` remains the convenience for concatenating the catalog. With an
+explicit schedule, A.one, B.one, A.two can execute even though A owns both one and
+two. Keep the entire applied schedule unchanged and append new identities. Every
+catalog migration must occur exactly once and each component's subsequence must
+retain authored order. Dependencies constrain first activation: B cannot first
+appear until A has appeared. Later upgrade prerequisites belong to the application
+schedule; a library must communicate any required later migration to its caller.
+`inspectPlan` returns the stable catalog; `inspectSchedule` returns execution order.
+Changing catalog positions or dependencies still breaks recorded compatibility.
 
 Write exactly one qualified local statement per step. A step may contain literal
 or comment semicolons; the [SQL envelope](contracts/sql-envelope-v1.md) distinguishes

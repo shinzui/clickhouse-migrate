@@ -18,7 +18,7 @@ data Migration = Migration !MigrationName !(Maybe Text) !(NonEmpty SqlStep) deri
 
 data MigrationComponent = MigrationComponent !ComponentName !(Set ComponentName) !(NonEmpty Migration) deriving stock (Eq)
 
-data MigrationPlan = MigrationPlan !(NonEmpty ComponentView) deriving stock (Eq)
+data MigrationPlan = MigrationPlan !(NonEmpty ComponentView) !(NonEmpty MigrationView) deriving stock (Eq)
 
 data ChecksumFormat = ChecksumV1 deriving stock (Eq, Ord, Show)
 

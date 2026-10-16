@@ -85,3 +85,29 @@ observed SQL success. Verify before returning to ordinary up.
 
 These are library workflows. Application-owned configuration, coordination,
 logging, exception handling and process exit remain the caller's responsibility.
+
+## Complete history reads
+
+History uses one complete JSONEachRow SELECT with server partial-result modes
+disabled. The HTTP byte limit bounds each raw row, excluding the LF delimiter
+(and including CR in CRLF), rather than the total ledger response. Ordinary metadata
+and command responses retain their total-body limit. Default limits and the 16 MiB
+configuration cap are unchanged. Full HTTP framing and every row must validate
+before any prefix is usable; late errors, oversized rows, corrupt suffixes,
+truncation and cancellation stop dependent mutation. Configured deadlines still
+apply to the whole request. Decoded events, projections and reports retain all
+history, so total retained memory grows with history size.
+
+## Recovery metadata preparation
+
+After validating a fresh guarded position and selected attempt, recovery prepares
+its complete authorization and deterministic acceptance/finalization events before
+its first append. Size accounting uses canonical UTF-8/JSON bytes, including
+repeated accepted references and the separate quiescence audit. Retry and resume
+check conservative bounds for generated start, success, failure and completion
+metadata; they do not predict SQL results. Required sequence capacity is checked
+before authorization. Oversized events return `recovery-event-too-large` with a
+safe event role, preserving the original position and attempt. Supply smaller
+reviewed evidence in a new explicit request; successful requests retain evidence
+verbatim. Once a valid event is submitted, existing uncertainty, receipts and
+external quiescence rules still apply.

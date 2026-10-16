@@ -21,7 +21,7 @@ not guarantee a final document. A missing document never proves non-submission.
 Every result has all five fields:
 
 ```json
-{"schemaVersion":1,"command":"plan","status":"ok","result":{"kind":"plan","checksumFormat":"sha256-v1","completionPolicy":"clickhouse-migrate/local-sync-v1;async_insert=0;mutations_sync=1;alter_sync=1","components":[]},"error":null}
+{"schemaVersion":1,"command":"plan","status":"ok","result":{"kind":"plan","checksumFormat":"sha256-v1","completionPolicy":"clickhouse-migrate/local-sync-v1;async_insert=0;mutations_sync=1;alter_sync=1","components":[],"schedule":[]},"error":null}
 ```
 
 The empty components above illustrate the envelope only: a valid compiled plan is
@@ -40,7 +40,9 @@ The executable reference encoders are `CLI/Render/Json.hs`; frozen independent
 fixtures are [malformed](../../../clickhouse-migrate-cli/test/golden/malformed.json),
 [partial SQL failure](../../../clickhouse-migrate-cli/test/golden/partial.json),
 [delayed ledger acknowledgement](../../../clickhouse-migrate-cli/test/golden/delayed-ledger.json)
-and [operator acceptance](../../../clickhouse-migrate-cli/test/golden/accepted.json).
+[operator acceptance](../../../clickhouse-migrate-cli/test/golden/accepted.json),
+[interleaved schedule](../../../clickhouse-migrate-cli/test/golden/schedule.json) and
+[recovery size rejection](../../../clickhouse-migrate-cli/test/golden/recovery-too-large.json).
 They are synthetic display fixtures; native tests separately establish report semantics.
 The encoders use exhaustive constructor matches with incomplete patterns as errors.
 
@@ -48,7 +50,7 @@ The encoders use exhaustive constructor matches with incomplete patterns as erro
 
 | `result.kind` | Additional fields |
 | --- | --- |
-| `plan` | `checksumFormat`, `completionPolicy`, `components` |
+| `plan` | `checksumFormat`, `completionPolicy`, `components`, `schedule` |
 | `status` | `report`: inspection |
 | `history` | `report`: history |
 | `verification` | `compatible`: true, `current`: boolean, `report`: inspection |
@@ -58,7 +60,10 @@ The encoders use exhaustive constructor matches with incomplete patterns as erro
 A plan component is `{index,name,dependencies,migrations}`. A migration is
 `{ordinal,name,description,checksum,steps}`; description is string or null. A step
 is `{index,name,checksum}`. Component index, migration ordinal and step index are
-zero-based. Ordinals span all components. Names/dependencies and exact bytes determine
+zero-based. Ordinals follow the execution schedule independently of catalog grouping.
+The additive `schedule` array contains `{ordinal,component,migration}` in execution
+order. Component migrations retain catalog grouping and their actual scheduled
+ordinal. Text plan output prints execution order before the catalog. Names/dependencies and exact bytes determine
 checksums; descriptions are advisory. No SQL bodies or file paths are rendered.
 
 A definition is `{ordinal,componentIndex,component,dependencies,migration,checksum,steps}`;
@@ -166,3 +171,10 @@ documented and tested explicitly; consumers should fail safely on unknown codes 
 never infer recovery authorization from them. Checksums, ledger, adoption input and
 CLI result versions evolve independently. No JSON decoder can construct core runtime
 capabilities, validated definitions or writable ledger events.
+
+Recovery preparation can return `{code:"recovery-event-too-large",event:kind}`,
+where kind is `authorization`, `acceptance`, `completion`, `step-start`,
+`step-success` or `step-failure`. It contains no audit text or SQL. The retained
+history snapshot is the last acknowledged observation; a local preparation
+rejection preserves its position and active attempt. Text errors include this
+same safe structured detail.

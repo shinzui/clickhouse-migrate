@@ -44,7 +44,15 @@ main = do
       authorization = Just (L.authorizeInitialization key ledger audit)
       decode = decodeAdoptionInput key (L.ExpectAbsent key) authorization quiet audit
   offline <- handleCommand (error "Offline plan forced configuration") plan PlanCommand
-  assert "offline plan missing" (case offline of CommandResult "plan" (Right (PlanReport [_])) -> True; _ -> False)
+  assert "offline plan missing" (case offline of CommandResult "plan" (Right (PlanReport [_] [("app", "one")])) -> True; _ -> False)
+  let two = right (sqlMigration "two" (step :| []))
+      a = right (migrationComponent "a" Set.empty (migration :| [two]))
+      b = right (migrationComponent "b" (Set.singleton "a") (migration :| []))
+      identity c m = migrationIdFromNames (right (componentName c)) (right (migrationName m))
+      scheduled = right (scheduledMigrationPlan (a :| [b]) (identity "a" "one" :| [identity "b" "one", identity "a" "two"]))
+  scheduledResult <- handleCommand (error "Offline schedule forced environment") scheduled PlanCommand
+  assert "CLI schedule order wrong" (case scheduledResult of CommandResult _ (Right (PlanReport _ [("a", "one"), ("b", "one"), ("a", "two")])) -> True; _ -> False)
+  assert "Text omits execution schedule" ("0 a/one\n  1 b/one\n  2 a/two" `Text.isInfixOf` renderText scheduledResult)
   assert "offline plan leaked SQL" (not ("secret_fixture" `Text.isInfixOf` Encoding.decodeUtf8 (renderJson offline)))
   let auditArgs = ["--expect-target", "test", "--actor", "fixture actor", "--reason", "fixture reason"]
       recoveryArgs = auditArgs ++ ["--expect-position", Text.unpack positionText, "--attempt", Text.unpack uuid, "--evidence", "fixture/drain", "--quiescent", "--pending-append", Text.unpack receiptText]
@@ -69,10 +77,10 @@ main = do
         expected = JSON.eitherDecodeStrict' bytes :: Either String JSON.Value
     assert ("JSON golden mismatch: " ++ name) (actual == expected && either (const False) (const True) expected)
     forM_ [renderJson result, Encoding.encodeUtf8 (renderText result)] $ \rendered -> assert "Sensitive SQL or credentials escaped" (not (BS.isInfixOf "SQL_SECRET_MARKER" rendered) && not (BS.isInfixOf "secret-password" rendered))
-  putStrLn "CLI: offline environment unforced; all commands parsed; fail-closed policy/access; strict adoption decoding; four schemaVersion 1 golden results"
+  putStrLn "CLI: offline environment unforced; all commands parsed; fail-closed policy/access; strict adoption decoding; six schemaVersion 1 golden results"
 
 goldenCases :: [(String, CommandResult)]
-goldenCases = [("malformed", CommandResult "parse" (Left (CommandRejected InvalidArguments))), ("partial", CommandResult "up" (Left (RunFailed (R.RunFailure (R.SqlFailed reference query L.UncertainSubmission problem) run [R.AccessCleanup Access.AccessReleaseFailed])))), ("delayed-ledger", CommandResult "up" (Left (RunFailed (R.RunFailure (R.LedgerRequestFailed L.UncertainSubmission problem (Just receipt)) run [R.RecordingError (R.LedgerFailed L.OutstandingRequests)])))), ("accepted", CommandResult "status" (Right (StatusReport (R.InspectionReport history [accepted] []))))]
+goldenCases = [("schedule", CommandResult "plan" (Right (PlanReport [PlanComponent "a" [] [PlanMigration "one" Nothing "a1-hash" [], PlanMigration "two" (Just "upgrade") "a2-hash" []], PlanComponent "b" ["a"] [PlanMigration "one" Nothing "b1-hash" []]] [("a", "one"), ("b", "one"), ("a", "two")]))), ("recovery-too-large", CommandResult "repair.accept-step" (Left (RunFailed (R.RunFailure (R.RecoveryEventTooLarge R.RecoveryAcceptanceEvent) run [])))), ("malformed", CommandResult "parse" (Left (CommandRejected InvalidArguments))), ("partial", CommandResult "up" (Left (RunFailed (R.RunFailure (R.SqlFailed reference query L.UncertainSubmission problem) run [R.AccessCleanup Access.AccessReleaseFailed])))), ("delayed-ledger", CommandResult "up" (Left (RunFailed (R.RunFailure (R.LedgerRequestFailed L.UncertainSubmission problem (Just receipt)) run [R.RecordingError (R.LedgerFailed L.OutstandingRequests)])))), ("accepted", CommandResult "status" (Right (StatusReport (R.InspectionReport history [accepted] []))))]
   where
     identity = right (ledgerId uuid)
     attempt = right (L.parseAttemptId uuid)

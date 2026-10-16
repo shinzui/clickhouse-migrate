@@ -49,7 +49,7 @@ separate secondary errors remain available together.
 
 ## Run
 
-`invalid-runtime-plan`, `ledger-namespace-in-sql`, `definition-too-large`, `target-failed`, `ledger-request-failed`, `initialization-failed`, `sql-failed`, `callback-failed`, `incompatible-history`, `verification-not-current`, `audit-too-large`, `ledger-required`, `existing-ledger-binding-required`, `stale-position`, `attempt-mismatch`, `step-attempt-mismatch`, `repair-not-allowed`, `prior-queries-active`, `cleanup-failed`, `unexpected-runtime-failure`.
+`invalid-runtime-plan`, `ledger-namespace-in-sql`, `definition-too-large`, `target-failed`, `ledger-request-failed`, `initialization-failed`, `sql-failed`, `callback-failed`, `incompatible-history`, `verification-not-current`, `audit-too-large`, `recovery-event-too-large`, `ledger-required`, `existing-ledger-binding-required`, `stale-position`, `attempt-mismatch`, `step-attempt-mismatch`, `repair-not-allowed`, `prior-queries-active`, `cleanup-failed`, `unexpected-runtime-failure`.
 
 ## Repair refusal reason
 
@@ -68,3 +68,10 @@ A delayed append may arrive after a NotObserved reconciliation.
 not a blind retry. `callback-failed` may follow completed SQL or a durable append.
 `cleanup-failed` cannot erase the primary effect/report. A secondary recording failure
 means the failure record itself did not receive a trustworthy acknowledgement.
+
+`recovery-event-too-large` identifies a prepared recovery event that exceeds the
+canonical 65,536-byte limit. Its safe `event` field is `authorization`, `acceptance`,
+`completion`, `step-start`, `step-success` or `step-failure`. No recovery append or
+application SQL has been submitted by the rejected request. Review smaller evidence
+and issue a new explicit request against the unchanged expected position. Evidence
+is never truncated. Corrupt stored events continue to use ledger errors.

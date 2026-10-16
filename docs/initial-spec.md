@@ -166,6 +166,11 @@ Smart constructors must validate:
 - duplicate components, missing dependencies, self-dependencies, and cycles;
 - that every dependency occurs before its dependent in the supplied plan.
 
+This original grouping design is superseded by
+[ADR 0010](adr/0010-separate-component-catalog-from-execution-schedule.md): the
+catalog remains stable while an explicit complete schedule owns execution order.
+Dependencies constrain first activation; applications order later upgrades.
+
 The application chooses component order. Validation must not silently
 topologically sort it. Each component's migration order and each migration's
 step order are exactly the supplied order. Names and timestamps do not imply

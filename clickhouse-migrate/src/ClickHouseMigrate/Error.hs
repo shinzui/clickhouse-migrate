@@ -37,6 +37,12 @@ data PlanErrorCode
   | MissingDependency
   | SelfDependency
   | DependencyCycle
+  | EmptySchedule
+  | UnknownScheduledMigration
+  | DuplicateScheduledMigration
+  | MissingScheduledMigration
+  | MigrationOrderChanged
+  | DependencyNotActivated
   | DependencyAfterDependent
   deriving stock (Eq, Ord, Show)
 

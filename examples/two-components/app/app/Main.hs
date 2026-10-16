@@ -3,7 +3,6 @@ module Main (main) where
 import ClickHouseMigrate
 import ClickHouseMigrate.CLI
 import ClickHouseMigrate.Event qualified as E
-import ClickHouseMigrate.Prelude
 import ClickHouseMigrate.TestSupport.ExclusiveAccess (hostLocalExclusiveAccess)
 import Control.Applicative ((<**>))
 import Control.Exception (IOException, try)
@@ -31,7 +30,9 @@ main = do
       _ -> emit JsonOutput (CommandResult "parse" (Left (CommandRejected InvalidArguments)))
     O.CompletionInvoked _ -> emit JsonOutput (CommandResult "parse" (Left (CommandRejected InvalidArguments)))
     O.Success (AppOptions progress rawSql (Invocation format command)) -> do
-      plan <- either (const (fail "Invalid compiled example plan")) pure (migrationPlan (Catalog.component :| [Analytics.component]))
+      let identity c m = migrationIdFromNames <$> componentName c <*> migrationName m
+      order <- either (const (fail "Invalid schedule identity")) pure (traverse (uncurry identity) [("catalog", "0001"), ("analytics", "0001")])
+      plan <- either (const (fail "Invalid compiled example plan")) pure (scheduledMigrationPlanFromList [Catalog.component, Analytics.component] order)
       -- Offline plan never reads configuration or even constructs a provider.
       environment <- if requiresTarget command then loadEnvironment command progress rawSql else pure (Right (commandEnvironment Nothing Nothing E.quietEvents E.redactedDiagnostics AdministrativeCommands))
       result <- case environment of Left problem -> pure (CommandResult (commandName command) (Left (CommandRejected problem))); Right configured -> handleCommand configured plan command

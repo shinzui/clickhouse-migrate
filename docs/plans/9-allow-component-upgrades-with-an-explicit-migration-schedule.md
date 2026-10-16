@@ -11,6 +11,12 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T18:00:59Z
+  revisions:
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T18:43:36Z
+      mode: "implement"
+      note: "Implement explicit application schedule and its native consumers"
 ---
 
 # Allow component upgrades with an explicit migration schedule
@@ -31,14 +37,16 @@ migrations as an unordered set.
 ## Progress
 
 
-- [ ] M1: Validated schedule API represents A.one, B.one, A.two and preserves existing default-plan descriptors and checksums.
-- [ ] M2: A public native upgrade applies only A.two, and inspection, recovery and adoption use the same schedule.
+- [x] M1 (2026-10-16; unit tests and unchanged independent checksum vectors): Validated schedule API represents A.one, B.one, A.two and preserves existing default-plan descriptors and checksums.
+- [x] M2 (2026-10-16; native runner, adoption and interrupted ordinal-2 recovery): A public native upgrade applies only A.two, and inspection, recovery and adoption use the same schedule.
 - [ ] M3: CLI/example consumers expose execution order correctly; negative regressions, public invariants and user/ADR contracts pass.
 
 ## Surprises & Discoveries
 
 
-None beyond the captured review baseline.
+Native adoption and repair both consume the centralized definition schedule
+without separate state-machine changes. The interleaved fixture confirms that
+ordinal 2 retains component index 0.
 
 ## Decision Log
 
@@ -59,8 +67,15 @@ application author; this change does not introduce a versioned dependency langua
 ## Outcomes & Retrospective
 
 
-Not implemented. Record the accepted upgrade trace and durable ADR change here
-when the work completes.
+The explicit schedule API, descriptor mapping, CLI schedule output and application
+example are implemented. Native A.one/B.one history accepts only appended A.two;
+repetition is a no-op and changed prefixes fail before SQL. Adoption maps the real
+prefix and interrupted recovery selects ordinal 2/component index 0. Independent
+checksum vectors and public invariant checks pass. Final embedding rebuild
+qualification and the post-fix verification record remain pending.
+
+[ADR 0010](../adr/0010-separate-component-catalog-from-execution-schedule.md)
+records the durable catalog/schedule and dependency-activation decisions.
 
 ## Context and Orientation
 
@@ -166,9 +181,11 @@ just test-embedding
 just check-docs
 ```
 
-Add assertions to `clickhouse-migrate/test/Main.hs` and `LedgerTests.hs`; add the
-upgrade and recovery cases to `clickhouse-migrate-test-support/test/RunnerIntegration.hs`
-and `RepairIntegration.hs`, and schedule mapping cases to `AdoptionIntegration.hs`.
+Assertions live in `clickhouse-migrate/test/Main.hs`, including the independently
+encoded `clickhouse-migrate/test/vectors/schedule-default-v1.json` descriptor
+fixture. The public upgrade, adoption-prefix and interrupted recovery checks share
+`clickhouse-migrate-test-support/test/RunnerIntegration.hs:scheduleUpgrade`.
+Existing repair and adoption suites continue to verify their state machines.
 The existing test recipes select owned disposable fixtures; use no persistent
 database. CLI unit tests live in `clickhouse-migrate-cli/test/Main.hs`. Update the
 public consumer fixture `clickhouse-migrate/test/public/Valid.hs` to compile the

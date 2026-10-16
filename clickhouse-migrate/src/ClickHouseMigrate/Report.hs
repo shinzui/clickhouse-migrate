@@ -148,6 +148,10 @@ data CallbackPhase = EventCallback !Text | SqlDiagnosticCallback deriving stock 
 
 data RepairReason = NoActiveMigration | AdoptionInProgress | UncertainStepRemains | NoPendingSteps | SelectedStepIsResolved | StepsNotResolved | ConflictingAppend | WrongQuiescenceTarget deriving stock (Eq, Show)
 
+-- | Safe event roles, never user evidence or SQL text.
+data RecoveryEventKind = RecoveryAuthorizationEvent | RecoveryAcceptanceEvent | RecoveryCompletionEvent | RecoveryStepStartEvent | RecoveryStepSuccessEvent | RecoveryStepFailureEvent
+  deriving stock (Eq, Ord, Show)
+
 data RunError
   = InvalidRuntimePlan !StepReference
   | LedgerNamespaceInSql !StepReference
@@ -161,6 +165,7 @@ data RunError
   | CallbackFailed !CallbackPhase
   | IncompatibleHistory ![CompatibilityIssue]
   | VerificationNotCurrent
+  | RecoveryEventTooLarge !RecoveryEventKind
   | AuditTooLarge
   | LedgerRequired
   | AdoptionRejected !AdoptionError

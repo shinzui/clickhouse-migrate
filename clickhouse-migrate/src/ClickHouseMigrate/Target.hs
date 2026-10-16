@@ -91,6 +91,9 @@ basicCredentials user password
   | Text.null user || Text.any (`elem` (":\r\n\0" :: String)) user || Text.any (== '\0') password = Left InvalidCredentials
   | otherwise = Right (Credentials (Encoding.encodeUtf8 user) (Encoding.encodeUtf8 password))
 
+-- | Deadline and raw-byte bound. Ordinary responses are bounded in total;
+-- complete ledger reads apply this byte bound per JSON row (excluding LF).
+-- Decoded history and reports still retain memory proportional to history size.
 httpLimits :: Int -> Int -> Either TargetError HttpLimits
 httpLimits timeoutMicros maxBytes
   | timeoutMicros > 0 && timeoutMicros <= 300000000 && maxBytes > 0 && maxBytes <= 16777216 = Right (HttpLimits timeoutMicros maxBytes)

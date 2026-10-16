@@ -51,10 +51,13 @@ checkAccess :: Guard -> IO ()
 checkAccess guard = checkGuard guard >>= either (abort . AccessProblem) pure
 
 readRows :: Maybe Guard -> Transport -> ByteString -> IO [Object]
-readRows guard transport sql = do
+readRows = readRowsKind JsonRows
+
+readRowsKind :: RequestKind -> Maybe Guard -> Transport -> ByteString -> IO [Object]
+readRowsKind kind guard transport sql = do
   mapM_ checkAccess guard
   identity <- newQueryId
-  outcome <- request transport identity JsonRows sql
+  outcome <- request transport identity kind sql
   case outcome of
     AcknowledgedSuccess (Rows rows) -> pure rows
     _ -> abort (RequestProblem outcome Nothing)
@@ -141,7 +144,7 @@ load guard transport (TargetConfig target _ _ namespace binding _ _) = do
       if not table
         then pure EmptyNamespace
         else do
-          rows <- readRows guard transport (Schema.readQuery namespace)
+          rows <- readRowsKind JsonRowStream guard transport (Schema.readQuery namespace)
           if null rows
             then pure EmptyNamespace
             else do
@@ -203,7 +206,7 @@ initialize guard transport (TargetConfig target _ _ namespace _ _ _) ledger audi
   (_, exists) <- shape (Just guard) transport namespace
   unless exists (abort (LedgerProblem InvalidLedgerSchema))
   -- Even under exclusivity do not write over preexisting nonempty history.
-  rows <- readRows (Just guard) transport (Schema.readQuery namespace)
+  rows <- readRowsKind JsonRowStream (Just guard) transport (Schema.readQuery namespace)
   unless (null rows) (abort (LedgerProblem MissingInitialization))
   appendOnce guard transport target namespace first
   checked (project target [first])

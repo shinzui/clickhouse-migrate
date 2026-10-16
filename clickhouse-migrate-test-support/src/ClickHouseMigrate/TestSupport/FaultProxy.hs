@@ -24,7 +24,7 @@ import Control.Exception (bracket)
 import Data.Aeson (Value, object, (.=))
 import Data.Aeson qualified
 
-data FaultMode = Pass | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | DelayFirstResponse | HoldBeforeForward | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | WeakenedStorage | SwitchIdentityAfterResponse
+data FaultMode = Pass | AppendLateError | OversizedHistoryRow | HistoryGap | HistoryIdentityConflict | HistoryDuplicateConflict | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | DelayFirstResponse | HoldBeforeForward | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | WeakenedStorage | SwitchIdentityAfterResponse
   deriving stock (Eq, Show)
 
 data FaultProxy = FaultProxy !Fixture !Int !Text
@@ -60,6 +60,11 @@ redirectTo (FaultProxy fixture identity _) endpoint = void $ fixtureRpc fixture 
 
 modeName :: FaultMode -> Text
 modeName Pass = "pass"
+modeName AppendLateError = "append-late-error"
+modeName OversizedHistoryRow = "oversized-history-row"
+modeName HistoryGap = "history-gap"
+modeName HistoryIdentityConflict = "history-identity-conflict"
+modeName HistoryDuplicateConflict = "history-duplicate-conflict"
 modeName DropResponse = "drop"
 modeName TruncateResponse = "truncate"
 modeName LateError = "late-error"
@@ -85,11 +90,12 @@ proxyConnections (FaultProxy fixture identity _) = fixtureRpc fixture (object ["
 
 -- SQL bodies are inspected privately only to select a protocol stage; they are
 -- never included in proxy events or diagnostics.
-data LedgerStage = DatabaseCreation | TableCreation | Initialization | MigrationStart | StepStart | StepSuccess | MigrationCompletion | FailureRecording | RecoveryAuthorization | StepAcceptance | AdoptionStart | AdoptionEntry | AdoptionCompletion
+data LedgerStage = HistoryRead | DatabaseCreation | TableCreation | Initialization | MigrationStart | StepStart | StepSuccess | MigrationCompletion | FailureRecording | RecoveryAuthorization | StepAcceptance | AdoptionStart | AdoptionEntry | AdoptionCompletion
   deriving stock (Eq, Show)
 
 stageName :: LedgerStage -> Text
 stageName = \case
+  HistoryRead -> "history-read"
   DatabaseCreation -> "ddl-database"
   TableCreation -> "ddl-table"
   Initialization -> "initialized"

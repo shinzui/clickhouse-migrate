@@ -1,10 +1,12 @@
 module RunnerIntegration (runnerEarlyCases, runnerValidationCases, fixture, fixtureWithLimits, provider, planFor, scalar, assert, right, field, fromJson) where
 
 import ClickHouseMigrate
+import ClickHouseMigrate.Adoption qualified as Adoption
 import ClickHouseMigrate.Event qualified as Event
 import ClickHouseMigrate.ExclusiveAccess qualified as Access
 import ClickHouseMigrate.Inspection qualified as Inspect
 import ClickHouseMigrate.Ledger qualified as Ledger
+import ClickHouseMigrate.Repair qualified as Repair
 import ClickHouseMigrate.Report qualified as R
 import ClickHouseMigrate.Runner qualified as Run
 import ClickHouseMigrate.TestSupport.FaultProxy
@@ -16,6 +18,7 @@ import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString qualified as BS
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (isJust)
 import Data.Set qualified as Set
 import Data.Text qualified as Text
@@ -67,6 +70,7 @@ scalar server sql = do
 
 runnerEarlyCases :: Server -> IO ()
 runnerEarlyCases server = do
+  scheduleUpgrade server
   audit <- right (Ledger.auditContext "runner fixture" "explicit isolated first run" ["owned server and controlled parent job"])
   access <- provider
   -- Required first producer/consumer check, before the full crash matrix.
@@ -189,3 +193,73 @@ runnerValidationCases server = do
     stages <- mapM (field "stage") requests :: IO [Maybe Text.Text]
     assert "Validation failures submitted application SQL" (length (filter (== Just "application-sql") stages) == 2)
     putStrLn "runtime validation: pure namespace preflight; absent observation without initialization; changed dependencies/order/unknown stored item/corruption refuse SQL"
+
+-- Public producer/consumer proof, including original-prefix rejection.
+scheduleUpgrade :: Server -> IO ()
+scheduleUpgrade server = do
+  access <- provider
+  audit <- right (Ledger.auditContext "schedule fixture" "append earlier component upgrade" ["owned disposable server"])
+  ledger <- newLedgerId
+  let label = "schedule_upgrade"
+  config <- fixture server label (serverEndpoint server) FirstUse
+  bound <- fixture server label (serverEndpoint server) (ExistingLedger ledger)
+  key <- right (targetKey ("runner-tests/" <> label))
+  stepA <- right (sqlStep "create" "CREATE TABLE default.schedule_a (id UInt8) ENGINE=Memory")
+  stepB <- right (sqlStep "create" "CREATE TABLE default.schedule_b (id UInt8) ENGINE=Memory")
+  stepA2 <- right (sqlStep "insert" "INSERT INTO default.schedule_a VALUES (2)")
+  a1 <- right (sqlMigration "one" (stepA :| []))
+  b1 <- right (sqlMigration "one" (stepB :| []))
+  a2 <- right (sqlMigration "two" (stepA2 :| []))
+  a <- right (migrationComponent "a" Set.empty (a1 :| []))
+  upgraded <- right (migrationComponent "a" Set.empty (a1 :| [a2]))
+  b <- right (migrationComponent "b" (Set.singleton "a") (b1 :| []))
+  initial <- right (migrationPlan (a :| [b]))
+  let ident c m = migrationIdFromNames <$> componentName c <*> migrationName m
+  ids <- mapM (right . uncurry ident) [("a", "one"), ("b", "one"), ("a", "two")]
+  full <- right (scheduledMigrationPlanFromList [upgraded, b] ids)
+  let context target = Run.mutationContext target access Event.quietEvents Event.redactedDiagnostics
+  _ <- Run.up (context config) (Run.upOptions audit (Just (Ledger.authorizeInitialization key ledger audit))) initial >>= right
+  -- Old grouping would put A.two before the already-recorded B.one.
+  grouped <- right (migrationPlan (upgraded :| [b]))
+  refused <- Run.up (context bound) (Run.upOptions audit Nothing) grouped
+  assert "changed prefix accepted" (case refused of Left (R.RunFailure (R.IncompatibleHistory _) _ _) -> True; _ -> False)
+  result <- Run.up (context bound) (Run.upOptions audit Nothing) full >>= right
+  assert "upgrade reran old migrations" (case result of R.RunReport _ _ _ _ _ _ observations _ -> length observations == 1)
+  count <- scalar server "SELECT toUInt32(count()) AS value FROM default.schedule_a"
+  assert "A.two missing or replayed" (count == 1)
+  repeated <- Run.up (context bound) (Run.upOptions audit Nothing) full >>= right
+  assert "repeat submitted SQL" (case repeated of R.RunReport _ _ _ _ _ _ observations _ -> null observations)
+  _ <- Inspect.verify Inspect.Observe bound (Inspect.verifyOptions True) full >>= right
+  putStrLn "schedule: A.one B.one preserved; only appended A.two executes; changed prefix refused; repeat no-op; require-current passes"
+
+  -- Adoption maps the explicit prefix A.one, B.one, leaving A.two pending.
+  adoptLedger <- newLedgerId
+  let adoptLabel = "schedule_adoption"
+  adoptConfig <- fixture server adoptLabel (serverEndpoint server) FirstUse
+  adoptBound <- fixture server adoptLabel (serverEndpoint server) (ExistingLedger adoptLedger)
+  adoptKey <- right (targetKey ("runner-tests/" <> adoptLabel))
+  quiet <- right (Ledger.attestQuiescence adoptKey audit)
+  let views = take 2 (NE.toList (inspectSchedule full))
+  rows <- mapM (\name -> right (Adoption.legacyRow name "2020-01-01T00:00:00Z" Nothing)) ["a.sql", "b.sql"]
+  mappings <- mapM (\(name, view) -> right (Adoption.attestedMapping name (componentNameText (migrationIdComponent (migrationId view))) "one" (migrationChecksumHex (migrationChecksum view)) ["reviewed schedule prefix"])) (zip ["a.sql", "b.sql"] views)
+  request <- case (rows, mappings) of
+    (r : rs, m : ms) -> right (Adoption.adoptionRequest adoptKey (Ledger.ExpectAbsent adoptKey) (Just (Ledger.authorizeInitialization adoptKey adoptLedger audit)) quiet audit "schedule-fixture" "immutable-prefix" (r :| rs) (m :| ms))
+    _ -> fail "Missing adoption fixture"
+  observed <- Inspect.status Inspect.Observe adoptConfig full >>= right
+  adoption <- right (Adoption.planAdoption full observed request)
+  _ <- Adoption.applyAdoption (context adoptConfig) full adoption >>= right
+  let stop (Event.RunEvent phase _ component migration _ _ _) = when (phase == Event.BeforeSql && component == Just "a" && migration == Just "two") (fail "interrupt appended schedule migration")
+  stopped <- Run.up (Run.mutationContext adoptBound access stop Event.redactedDiagnostics) (Run.upOptions audit Nothing) full
+  (position, attempt, selected) <- case stopped of
+    Left (R.RunFailure (R.CallbackFailed _) (R.RunReport _ _ _ _ (R.HistoryReport _ _ _ (Just position) _ _ _ _) [_, _, R.MigrationSummary (R.DefinitionSummary 2 0 "a" _ "two" _ _) _ (Just attempt) [R.StepSummary _ _ _ (Just selected) _]] _ _) _) -> pure (position, attempt, selected)
+    _ -> fail "Interleaved recovery selected wrong definition"
+  evidence <- right (Repair.recoveryEvidence audit quiet [])
+  retry <- right (Repair.retryStepRequest position attempt selected evidence)
+  retried <- Repair.repair (context adoptBound) full retry >>= right
+  (nextPosition, nextAttempt) <- case retried of
+    R.RunReport _ _ _ _ (R.HistoryReport _ _ _ (Just position') _ _ _ _) [_, _, R.MigrationSummary _ _ (Just attempt') _] _ _ -> pure (position', attempt')
+    _ -> fail "Missing recovered schedule migration"
+  finalize <- right (Repair.finalizeRequest nextPosition nextAttempt evidence)
+  _ <- Repair.repair (context adoptBound) full finalize >>= right
+  _ <- Inspect.verify Inspect.Observe adoptBound (Inspect.verifyOptions True) full >>= right
+  putStrLn "schedule: adoption maps A.one B.one; interrupted A.two repairs ordinal 2/component 0 and finalizes"

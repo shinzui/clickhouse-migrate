@@ -9,8 +9,9 @@ import ClickHouseMigrate.Report qualified as R
 import ClickHouseMigrate.Runner qualified as Run
 import ClickHouseMigrate.TestSupport.FaultProxy
 import ClickHouseMigrate.TestSupport.Server
-import Control.Monad (when)
+import Control.Monad (forM_, when)
 import Data.Aeson (Value)
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Set qualified as Set
 import Data.Text qualified as Text
@@ -60,6 +61,7 @@ applicationCount proxy = do
 
 repairEarlyCases :: Server -> IO ()
 repairEarlyCases server = do
+  oversizedRecovery server
   access <- provider
   audit <- right (Ledger.auditContext "runner fixture" "explicit first use" ["owned server; parent serializes whole job"])
   withFaultProxy server $ \proxy -> do
@@ -89,6 +91,11 @@ repairEarlyCases server = do
     assert "Retry submitted other SQL" . (== 2) =<< applicationCount proxy
     stale <- Repair.repair context plan retry
     assert "Old retry request accepted after checkpoint moved" (case stale of Left (R.RunFailure (R.StalePosition _ _) _ _) -> True; _ -> False)
+    oversized <- right (Ledger.auditContext "operator" "combined recovery audits" (replicate 16 (Text.replicate 2048 "x")))
+    oversizedQuiet <- right (Ledger.attestQuiescence key oversized)
+    oversizedEvidence <- right (Repair.recoveryEvidence oversized oversizedQuiet [])
+    refusedResume <- right (Repair.resumeRequest after active oversizedEvidence) >>= Repair.repair context plan
+    assert "resume authorized oversized metadata" (case refusedResume of Left (R.RunFailure (R.RecoveryEventTooLarge R.RecoveryAuthorizationEvent) _ _) -> True; _ -> False)
     resumed <- right (Repair.resumeRequest after active evidence) >>= Repair.repair context plan >>= right
     let R.RunReport _ _ _ _ _ migrations _ _ = resumed
     assert "Resume continued another migration" (case migrations of [R.MigrationSummary _ R.Applied _ _, R.MigrationSummary _ R.Pending _ _] -> True; _ -> False)
@@ -133,3 +140,60 @@ repairEarlyCases server = do
     let R.RunReport _ _ _ _ _ finalMigrations _ _ = final
     assert "Finalization erased acceptance evidence" (case finalMigrations of [R.MigrationSummary _ R.Applied _ [_, R.StepSummary _ _ R.StepAccepted _ _]] -> True; _ -> False)
     putStrLn "repair: accept records attestation without SQL/continuation; explicit finalize submits no SQL and preserves accepted-vs-observed evidence"
+
+-- REV-1/F3: authorization must not precede acceptance envelope validation.
+oversizedRecovery :: Server -> IO ()
+oversizedRecovery server = withFaultProxy server $ \proxy -> do
+  access <- provider
+  audit <- right (Ledger.auditContext "review fixture" "before SQL interruption" ["owned server"])
+  ledger <- newLedgerId
+  let label = "repair_oversized"
+  config <- fixture server label (proxyEndpoint proxy) FirstUse
+  bound <- fixture server label (proxyEndpoint proxy) (ExistingLedger ledger)
+  key <- right (targetKey ("runner-tests/" <> label))
+  create <- right (sqlStep "create" "CREATE TABLE default.repair_oversized (id UInt8) ENGINE=Memory")
+  one <- right (sqlMigration "one" (create :| []))
+  component <- right (migrationComponent "app" Set.empty (one :| []))
+  plan <- right (migrationPlan (component :| []))
+  let stop (Event.RunEvent phase _ _ _ _ _ _) = when (phase == Event.BeforeSql) (fail "review interruption")
+  stopped <- Run.up (Run.mutationContext config access stop Event.redactedDiagnostics) (Run.upOptions audit (Just (Ledger.authorizeInitialization key ledger audit))) plan
+  initial <- case stopped of Left (R.RunFailure (R.CallbackFailed _) report _) -> pure report; _ -> fail "Expected interrupted single step"
+  (position, attempt, steps) <- checkpoint initial
+  step <- case steps of [R.StepSummary _ _ _ (Just exactStep) _] -> pure exactStep; _ -> fail "Missing selected step"
+  quiet <- right (Ledger.attestQuiescence key audit)
+  trace <- newIORef []
+  let sink (Event.RunEvent phase _ _ _ _ _ _) = modifyIORef' trace (++ [phase])
+      context = Run.mutationContext bound access sink Event.redactedDiagnostics
+  -- Authorization fits; duplicated accepted references do not.
+  big <- right (Ledger.auditContext "review" "oversized accepted evidence" (replicate 24 (Text.replicate 2000 "x")))
+  evidence <- right (Repair.recoveryEvidence big quiet [])
+  request <- right (Repair.acceptStepRequest position attempt step evidence)
+  before <- Inspect.history Inspect.Observe bound >>= right
+  rejected <- Repair.repair context plan request
+  assert "wrong size rejection" (case rejected of Left (R.RunFailure (R.RecoveryEventTooLarge R.RecoveryAcceptanceEvent) _ _) -> True; _ -> False)
+  after <- Inspect.history Inspect.Observe bound >>= right
+  assert "size rejection advanced original position/attempt" (before == after)
+  assert "rejected request submitted SQL" . (== 0) =<< applicationCount proxy
+  phases <- readIORef trace
+  assert "preparation failure emitted recovery acknowledgement" (Event.RecoveryAuthorized `notElem` phases && Event.StepAccepted `notElem` phases)
+  -- Combined outer/quiescence evidence must reject all action variants.
+  medium <- right (Ledger.auditContext "review" "two valid audits exceeding combined envelope" (replicate 16 (Text.replicate 2048 "x")))
+  largeQuiet <- right (Ledger.attestQuiescence key medium)
+  combined <- right (Repair.recoveryEvidence medium largeQuiet [])
+  forM_ [Repair.retryStepRequest position attempt step combined, Repair.acceptStepRequest position attempt step combined] $ \input -> do
+    result <- right input >>= Repair.repair context plan
+    assert "oversized authorization not typed" (case result of Left (R.RunFailure (R.RecoveryEventTooLarge R.RecoveryAuthorizationEvent) _ _) -> True; _ -> False)
+  hugeQuietAudit <- right (Ledger.auditContext "operator" "oversized quiescence only" (replicate 32 (Text.replicate 2048 "x")))
+  hugeQuiet <- right (Ledger.attestQuiescence key hugeQuietAudit)
+  hugeEvidence <- right (Repair.recoveryEvidence audit hugeQuiet [])
+  refusedQuiet <- right (Repair.acceptStepRequest position attempt step hugeEvidence) >>= Repair.repair context plan
+  assert "oversized quiescence not rejected" (case refusedQuiet of Left (R.RunFailure (R.RecoveryEventTooLarge R.RecoveryAuthorizationEvent) _ _) -> True; _ -> False)
+  replacement <- right (Repair.recoveryEvidence audit quiet []) >>= right . Repair.acceptStepRequest position attempt step
+  accepted <- Repair.repair context plan replacement >>= right
+  (nextPosition, nextAttempt, _) <- checkpoint accepted
+  final <- right (Repair.finalizeRequest nextPosition nextAttempt combined) >>= Repair.repair context plan
+  assert "finalize authorized oversized metadata" (case final of Left (R.RunFailure (R.RecoveryEventTooLarge R.RecoveryAuthorizationEvent) _ _) -> True; _ -> False)
+  _ <- right (Repair.finalizeRequest nextPosition nextAttempt =<< Repair.recoveryEvidence audit quiet []) >>= Repair.repair context plan >>= right
+  _ <- Inspect.verify Inspect.Observe bound (Inspect.verifyOptions True) plan >>= right
+  assert "accept/finalize submitted application SQL" . (== 0) =<< applicationCount proxy
+  putStrLn "recovery size: oversized acceptance preserves (3,3) events, position and attempt; combined audits reject authorization; replacement against original position accepts and finalizes without SQL"

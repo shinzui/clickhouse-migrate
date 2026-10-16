@@ -22,9 +22,15 @@ libraryB = do
 
 main :: IO ()
 main = case (libraryA, libraryB) of
-  (Right a, Right b) -> case migrationPlan (a :| [b]) of
-    Right p
-      | map (componentNameText . componentViewName) (NE.toList (inspectPlan p)) == ["library-a", "library-b"] ->
-          mapM_ (print . migrationChecksumHex . migrationChecksum) (concatMap (NE.toList . componentMigrations) (NE.toList (inspectPlan p)))
-    _ -> fail "Public plan composition failed"
+  (Right a, Right b) -> case do
+    ca <- componentName "library-a"
+    cb <- componentName "library-b"
+    name <- migrationName "0001"
+    pure [migrationIdFromNames ca name, migrationIdFromNames cb name] of
+    Right ids -> case scheduledMigrationPlanFromList [a, b] ids of
+      Right p
+        | map (componentNameText . componentViewName) (NE.toList (inspectPlan p)) == ["library-a", "library-b"] ->
+            mapM_ (print . migrationChecksumHex . migrationChecksum) (concatMap (NE.toList . componentMigrations) (NE.toList (inspectPlan p)))
+      _ -> fail "Public plan composition failed"
+    _ -> fail "Public schedule identity failed"
   _ -> fail "Public authoring failed"

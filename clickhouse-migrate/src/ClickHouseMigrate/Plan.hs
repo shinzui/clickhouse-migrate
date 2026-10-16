@@ -3,6 +3,9 @@ module ClickHouseMigrate.Plan
   ( MigrationPlan,
     migrationPlan,
     migrationPlanFromList,
+    scheduledMigrationPlan,
+    scheduledMigrationPlanFromList,
+    inspectSchedule,
     inspectPlan,
     ComponentView,
     componentViewName,
@@ -35,6 +38,7 @@ import ClickHouseMigrate.Error
 import ClickHouseMigrate.Internal.Checksum qualified as Checksum
 import ClickHouseMigrate.Internal.Types
 import ClickHouseMigrate.Prelude
+import Control.Monad (foldM)
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
@@ -67,11 +71,55 @@ migrationPlan components = do
           late -> bad DependencyAfterDependent (name : late)
     )
     ordered
-  pure (MigrationPlan (fmap bindComponent components))
+  let catalog = fmap bindComponent components
+  pure (MigrationPlan catalog (catalog >>= componentMigrations))
 
 -- | Parsing boundary for application formats which represent empty lists.
 migrationPlanFromList :: [MigrationComponent] -> Either PlanError MigrationPlan
 migrationPlanFromList = maybe (Left (PlanError EmptyPlan [])) migrationPlan . NE.nonEmpty
+
+-- | Complete application-owned order. Dependencies constrain first activation;
+-- later upgrades follow the explicit schedule, retaining each library's order.
+scheduledMigrationPlan :: NonEmpty MigrationComponent -> NonEmpty MigrationId -> Either PlanError MigrationPlan
+scheduledMigrationPlan components schedule = do
+  ordinary <- migrationPlan components
+  let catalog = inspectPlan ordinary
+      authored = NE.toList (inspectSchedule ordinary)
+      byId = Map.fromList [(migrationId view, view) | view <- authored]
+      ids = NE.toList schedule
+      named identity = [componentNameText (migrationIdComponent identity), migrationNameText (migrationIdName identity)]
+      reject kind identity = Left (PlanError kind (named identity))
+  resolved <- traverse (\identity -> maybe (reject UnknownScheduledMigration identity) Right (Map.lookup identity byId)) schedule
+  _ <- foldM (\seen identity -> if Set.member identity seen then reject DuplicateScheduledMigration identity else Right (Set.insert identity seen)) Set.empty ids
+  mapM_ (\view -> unless (migrationId view `elem` ids) (reject MissingScheduledMigration (migrationId view))) authored
+  mapM_
+    ( \component -> do
+        let name = componentViewName component
+            local = filter ((== name) . migrationIdComponent) ids
+        unless (local == map migrationId (NE.toList (componentMigrations component))) (Left (PlanError MigrationOrderChanged [componentNameText name]))
+    )
+    catalog
+  let dependencies = Map.fromList [(componentViewName c, componentDependencies c) | c <- NE.toList catalog]
+  _ <-
+    foldM
+      ( \active identity -> do
+          let name = migrationIdComponent identity
+              missing = Map.findWithDefault Set.empty name dependencies `Set.difference` active
+          unless (Set.member name active || Set.null missing) (Left (PlanError DependencyNotActivated (map componentNameText (name : Set.toAscList missing))))
+          Right (Set.insert name active)
+      )
+      Set.empty
+      ids
+  pure (MigrationPlan catalog resolved)
+
+scheduledMigrationPlanFromList :: [MigrationComponent] -> [MigrationId] -> Either PlanError MigrationPlan
+scheduledMigrationPlanFromList components schedule = do
+  catalog <- maybe (Left (PlanError EmptyPlan [])) Right (NE.nonEmpty components)
+  order <- maybe (Left (PlanError EmptySchedule [])) Right (NE.nonEmpty schedule)
+  scheduledMigrationPlan catalog order
+
+inspectSchedule :: MigrationPlan -> NonEmpty MigrationView
+inspectSchedule (MigrationPlan _ schedule) = schedule
 
 cyclicRemainder :: Map.Map ComponentName (Set ComponentName) -> [ComponentName]
 cyclicRemainder graph
@@ -92,7 +140,7 @@ bindComponent (MigrationComponent component deps migrations) = ComponentView com
     encodeStep migration (SqlStep step sql) = Checksum.encodeStepV1 (componentNameText component) (migrationNameText migration) (stepNameText step) sql
 
 inspectPlan :: MigrationPlan -> NonEmpty ComponentView
-inspectPlan (MigrationPlan components) = components
+inspectPlan (MigrationPlan components _) = components
 
 componentViewName :: ComponentView -> ComponentName
 componentViewName (ComponentView name _ _) = name
