@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-16T05:03:30Z
       mode: "update"
       note: "Align CLI result contracts and release checks with runtime cancellation and private test driver."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T16:34:42Z
+      mode: "implement"
+      note: "Implement reusable CLI, application-owned examples and native release qualification on completed core/adoption APIs."
 ---
 
 # Deliver reusable CLI documentation and release qualification
@@ -43,20 +48,56 @@ Applications can mount reusable migration commands around their compiled plan, o
 ## Progress
 
 
-- [ ] M1 — Reusable command parsing/handling and schemaVersion 1 JSON pass offline and guarded integration cases.
+- [x] M1 — Reusable command parsing/handling and schemaVersion 1 JSON pass offline and guarded integration cases.
 - [ ] M2 — A two-component executable example, published contracts, compatibility matrix and release gates pass with the production dependency closure isolated from test tools.
 
 ## Surprises & Discoveries
+
+- Cabal-built suite executables invoked directly need the package data-directory
+  override; `cabal test` supplies it, while Nix-installed artifacts use installed
+  data. The first early invocation failed before starting a server because this
+  override was absent. Diagnostics identified the missing Python fixture path;
+  corrected direct recipes and reran both new groups successfully.
+- FirstUse without initialization authorization reports InitializationNotAuthorized;
+  a missing recurring ExistingLedger reports LedgerRequired. The CLI test now
+  exercises the intended recurring-binding case rather than asserting the wrong code.
+- Cabal's core graph transitively includes the standard Haskell process library via
+  http-client -> streaming-commons. Released Cabal/source evidence confirms this
+  unconditional dependency. Actual fixture/optional-tool isolation remains required;
+  a broad claim that no process library exists would be false (ADR 0009).
 
 
 
 
 ## Decision Log
 
+- Use optparse >=0.18.1 && <0.20 after released-source/API review of both actual
+  dependency sets. Keep parsing/dispatch/rendering independent of application
+  environment/streams/exit, repeat validation in the handler, and retain core errors.
+- Freeze explicit schemaVersion 1 encoders, decimal-string UInt64 sequences, four
+  independent golden fixtures and exhaustive constructor matches. Preserve adoption
+  planning observations and primary/secondary execution evidence; never catch async
+  cancellation as an ordinary command result.
+- Add read-only target/binding/provider-description accessors, two independent
+  embedded libraries and a private executable using the conservative host-local
+  development adapter. No accessor exposes credentials or a live guard.
+- Run the same twelve owned native groups against Cabal, Nix and extracted sibling
+  archives. Narrow future CI to native arm64 macOS; user deferred Linux builders and
+  the repository is not remotely available. No external action is implied.
+- Distill these decisions and the precise process-library boundary in ADR 0009.
+
 
 
 
 ## Outcomes & Retrospective
+
+M1 passes the CLI unit suite (every parser command, malformed/duplicate evidence,
+offline environment unforced, policy/provider refusal and four JSON goldens) and the
+native CLI group (inspection/current distinction, explicit init, all repair/adoption
+handlers, stale state, partial JSON, delayed append receipt and async propagation).
+The native executable group also passes composed offline/fresh/no-op/inspection,
+finalize and adoption commands, separate streams and killed-subprocess controlled
+drain. Final Nix/distribution/closure/package release qualification remains M2 work.
 
 
 

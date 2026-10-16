@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "command": "parse",
+  "status": "error",
+  "result": null,
+  "error": {
+    "category": "command",
+    "primary": {
+      "code": "invalid-arguments"
+    },
+    "secondary": [],
+    "report": null
+  }
+}

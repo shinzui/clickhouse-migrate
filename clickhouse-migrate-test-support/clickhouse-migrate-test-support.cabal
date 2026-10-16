@@ -4,7 +4,7 @@ version: 0.1.0.0
 synopsis: Isolated server fixtures for ClickHouse migration tests
 description:
   Isolated server fixtures for ClickHouse migration tests.
-  Part of the clickhouse-migrate workspace; initial implementation in progress.
+  Validated public APIs with explicit application-owned configuration and scope.
 
 license: BSD-3-Clause
 license-file: LICENSE
@@ -81,6 +81,7 @@ test-suite clickhouse-migrate-integration
   other-modules:
     AdoptionFaults
     AdoptionIntegration
+    CLIIntegration
     ConsumerFixtures
     FailureBoundaries
     LedgerIntegration
@@ -93,6 +94,7 @@ test-suite clickhouse-migrate-integration
   autogen-modules: Paths_clickhouse_migrate_test_support
   ghc-options: -threaded
   build-depends:
+    clickhouse-migrate-cli ==0.1.*,
     clickhouse-migrate-embed ==0.1.*,
     clickhouse-migrate-test-support,
     containers >=0.7 && <0.9,

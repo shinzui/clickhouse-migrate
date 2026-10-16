@@ -2,20 +2,20 @@ default:
     @just --list
 
 build:
-    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- build all
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- build all
 
 check-packages:
     #!/usr/bin/env bash
     set -euo pipefail
-    for package in clickhouse-migrate clickhouse-migrate-embed clickhouse-migrate-cli clickhouse-migrate-test-support; do
+    for package in clickhouse-migrate clickhouse-migrate-embed clickhouse-migrate-cli clickhouse-migrate-test-support examples/two-components/catalog examples/two-components/analytics examples/two-components/app; do
       (cd "$package" && cabal check)
     done
 
 # Behavioral suites are added by their owning implementation plans.
 test-unit:
-    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- test all --test-show-details=direct
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- test clickhouse-migrate-unit clickhouse-migrate-embed-test clickhouse-migrate-cli-test --test-show-details=direct
 
-test-integration: test-transport test-completion-policy test-ledger test-exclusive-access test-runner test-repair test-failure-boundaries
+test-integration: test-release-matrix
 
 format:
     nix fmt
@@ -76,3 +76,29 @@ test-adoption:
 
 test-consumer-fixtures:
     cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest.json --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest-first.json -- test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=consumer
+
+# Build all live-test artifacts with every embedded input declared.
+build-qualification:
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest.json --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest-first.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- build clickhouse-migrate-test-support:test:clickhouse-migrate-integration clickhouse-migrate:exe:clickhouse-migrate-test-driver clickhouse-migrate-example -fintegration -finternal-test-driver
+
+test-release-matrix: build-qualification
+    python3 scripts/test-release-matrix.py
+
+test-cli:
+    cabal test clickhouse-migrate-cli-test --test-show-details=direct
+
+test-example: build-qualification
+    #!/usr/bin/env bash
+    set -euo pipefail
+    example=$(cabal list-bin clickhouse-migrate-example)
+    suite=$(cabal list-bin clickhouse-migrate-integration -fintegration)
+    clickhouse_migrate_test_support_datadir="$PWD/clickhouse-migrate-test-support" CLICKHOUSE_MIGRATE_EXAMPLE="$example" "$suite" example
+
+check-production-closure:
+    python3 scripts/check-production-closure.py
+
+haddock:
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- haddock all
+
+qualify-distributions:
+    python3 scripts/qualify-distributions.py

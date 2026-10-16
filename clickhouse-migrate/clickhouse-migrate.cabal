@@ -4,7 +4,7 @@ version: 0.1.0.0
 synopsis: Core definitions and execution for ClickHouse migrations
 description:
   Core definitions and execution for ClickHouse migrations.
-  Part of the clickhouse-migrate workspace; initial implementation in progress.
+  Validated public APIs with explicit application-owned configuration and scope.
 
 license: BSD-3-Clause
 license-file: LICENSE

@@ -1,0 +1,33 @@
+cabal-version: 3.12
+name: clickhouse-migrate-example-analytics
+version: 0.1.0.0
+synopsis: Private composed migration example component
+description: Private workspace example, not intended for publication.
+license: BSD-3-Clause
+license-file: LICENSE
+author: shinzui
+maintainer: shinzui@users.noreply.github.com
+category: Database
+build-type: Simple
+extra-doc-files: README.md
+extra-source-files:
+  migrations/*.json
+  migrations/*.sql
+
+tested-with: ghc ==9.12.4
+
+library
+  default-language: GHC2024
+  default-extensions:
+    DeriveAnyClass
+    DuplicateRecordFields
+    OverloadedLabels
+    OverloadedStrings
+
+  ghc-options: -Wall
+  hs-source-dirs: src
+  exposed-modules: Example.Analytics
+  build-depends:
+    base >=4.21 && <4.22,
+    clickhouse-migrate ==0.1.*,
+    clickhouse-migrate-embed ==0.1.*,

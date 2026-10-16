@@ -27,6 +27,8 @@ module ClickHouseMigrate.Target
     defaultHttpLimits,
     TargetConfig,
     targetConfig,
+    configuredTargetKey,
+    configuredLedgerBinding,
     TargetError (..),
     ServerIdentity,
     identityServerId,
@@ -143,3 +145,11 @@ identityHostName (ServerIdentity _ _ value) = value
 -- this value before submission and retain it after interrupted initialization.
 newLedgerId :: IO LedgerId
 newLedgerId = LedgerId <$> freshUuid
+
+-- | Read-only nonsecret configuration identity for application adapters.
+configuredTargetKey :: TargetConfig -> TargetKey
+configuredTargetKey (TargetConfig key _ _ _ _ _ _) = key
+
+-- | Binding mode is explicit; this accessor grants no initialization authority.
+configuredLedgerBinding :: TargetConfig -> LedgerBinding
+configuredLedgerBinding (TargetConfig _ _ _ _ binding _ _) = binding

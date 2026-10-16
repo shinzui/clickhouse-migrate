@@ -4,7 +4,7 @@ version: 0.1.0.0
 synopsis: Compile-time embedding for ClickHouse migration definitions
 description:
   Compile-time embedding for ClickHouse migration definitions.
-  Part of the clickhouse-migrate workspace; initial implementation in progress.
+  Validated public APIs with explicit application-owned configuration and scope.
 
 license: BSD-3-Clause
 license-file: LICENSE

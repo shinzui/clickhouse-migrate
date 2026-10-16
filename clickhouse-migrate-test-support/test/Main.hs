@@ -2,6 +2,7 @@ module Main (main) where
 
 import AdoptionFaults (adoptionFaultCases)
 import AdoptionIntegration (adoptionEarlyCases)
+import CLIIntegration (cliCases, exampleCases)
 import ClickHouseMigrate.ExclusiveAccess qualified as Access
 import ClickHouseMigrate.Ledger qualified as Ledger
 import ClickHouseMigrate.Prelude
@@ -54,7 +55,7 @@ main = do
 
 integrationMain :: [String] -> IO ()
 integrationMain args = do
-  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"], ["adoption"], ["consumer"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
+  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"], ["adoption"], ["consumer"], ["cli"], ["example"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
   finished <- timeout (if args == ["consumer"] then 600000000 else 180000000) $ withCandidateServer "lts-native" $ \server -> do
     putStrLn ("Candidate ClickHouse " ++ Text.unpack (serverVersion server))
     case args of
@@ -63,6 +64,8 @@ integrationMain args = do
       ["completion"] -> completionCases driver server
       ["ledger"] -> ledgerCases driver server
       ["consumer"] -> consumerFixtureCases server
+      ["cli"] -> cliCases server
+      ["example"] -> exampleCases server
       ["adoption"] -> adoptionEarlyCases server >> adoptionFaultCases server
       ["runner"] -> runnerEarlyCases server >> runnerValidationCases server
       ["repair"] -> repairEarlyCases server >> repairBoundaryCases server

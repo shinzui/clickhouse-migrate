@@ -1,47 +1,61 @@
 # clickhouse-migrate
 
-A Haskell migration toolkit for a directly pinned ClickHouse server. The initial
-implementation is tracked in [MasterPlan 1](docs/masterplans/1-bootstrap-the-initial-clickhouse-migration-library.md).
-Pure validated definitions, ordered composition, checksum v1 and compile-time
-manifest embedding are implemented.
-Runtime migration operations are not implemented yet.
+A Haskell migration toolkit for one directly pinned ClickHouse server. Libraries
+own validated ordered components; applications compose a plan, supply administrative
+coordination and mount reusable commands. SQL is embedded at compilation or supplied
+as validated bytes. Runtime migration-file discovery and automatic uncertain replay
+are deliberately absent.
 
-The workspace contains `clickhouse-migrate` (core), `clickhouse-migrate-embed`
-(compile-time definitions), `clickhouse-migrate-cli` (application-mounted commands),
-and `clickhouse-migrate-test-support` (isolated server and fault fixtures).
-The core dependency closure excludes the optional packages.
+The four independently packaged libraries are core `clickhouse-migrate`, optional
+`clickhouse-migrate-embed`, optional `clickhouse-migrate-cli`, and isolated
+`clickhouse-migrate-test-support`. The core library excludes the optional packages
+and test harnesses. A [two-library executable example](examples/two-components/README.md)
+demonstrates composition and application-owned configuration/output/exit policy.
 
-Enter the pinned GHC 9.12.4 environment with `nix develop`, then run:
+Start with [authoring and composition](docs/authoring.md), [CLI integration](docs/cli.md),
+[operations and recovery](docs/operations.md), and [legacy adoption](docs/adoption.md).
+Versioned contracts cover [checksums](docs/contracts/checksum-v1.md),
+[SQL envelopes](docs/contracts/sql-envelope-v1.md), [manifests](docs/contracts/manifest-v1.md),
+[ledger](docs/contracts/ledger-v1.md), [adoption](docs/contracts/adoption-v1.md),
+[JSON results](docs/contracts/json-v1.md) and [error codes](docs/error-codes.md).
+
+Use the pinned native GHC 9.12.4 environment:
 
 ```bash
+nix develop --builders ''
 just build
 just check-packages
 just test-unit
 just check-public-invariants
-just sdist
+just test-embedding
+just test-release-matrix
+just check-production-closure
+just haddock
+just qualify-distributions
 just check-format
+nix flake check --builders ''
 ```
 
-`nix flake check` builds all packages and checks formatting. CI is configured for the same
-compiler and formatting gates on Linux and macOS. Linux execution is currently
-deferred; only local macOS checks have run. Behavioral suites will use
-`clickhouse-migrate-unit`, `clickhouse-migrate-embed-test`,
-`clickhouse-migrate-cli-test`, and `clickhouse-migrate-integration`. The core suite checks validation, SQL boundaries and independent checksum vectors.
-The embedding suite compares compiled and ordinary construction; `just test-embedding`
-checks incremental rebuilds and public manifest/path failures.
+Only the exact Apple Silicon macOS ClickHouse artifact in the
+[compatibility matrix](docs/compatibility.md) is qualified. Linux builders and remote
+CI execution are deferred. Test recipes own new server processes, credentials,
+temporary roots and ports; they never use a persistent application database. The
+optional process-compose service is a developer convenience, not qualification.
+`just build` and embedding tests use the content-qualified wrapper to catch inputs
+whose modification times were preserved.
 
-Embedding consumers should use the content-qualified build command described in
-[manifest v1](docs/contracts/manifest-v1.md). It fingerprints explicitly declared
-manifest/SQL inputs before Cabal can skip GHC based on unchanged timestamps. `just test-integration` currently reports
-that the isolated fixture has not been implemented.
+The manual core `internal-test-driver` flag defaults off. The optional Nix
+`integration-tests`, `internal-test-driver` and `example` outputs compile qualification
+artifacts; default checks never start a server. Production boundary checks inspect
+Cabal component and Nix metadata only. The HTTP stack transitively includes the
+standard Haskell process library; no process/server fixture tool is installed in
+the core output. See ADR 0009 for that distinction.
 
-The manual `internal-test-driver` core Cabal flag defaults to off. EP-4 will supply
-the private executable used by the test-support integration suite; production
-packages never expose private transport or ledger operations.
+Seihou owns `flake.nix`, `flake.lock` and `nix/*.nix`; project extensions live in
+`flake.module.nix`. Stage new files before evaluating a flake and use `seihou diff`
+to check managed-file drift. Do not regenerate shared pins.
 
-Seihou owns `flake.nix`, `flake.lock`, and `nix/*.nix`; project wiring lives in
-`flake.module.nix`. Stage new flake files before Nix evaluation. Do not regenerate
-the shared lock or edit generated pins. `seihou diff` checks
-managed-file drift. The optional process-compose ClickHouse service is a local
-convenience on default ports; builds do not start it. Qualification tests will
-own isolated server processes and ports.
+[Release evidence](docs/release-evidence.md) maps the initial specification to tests
+and exclusions. [MasterPlan 1](docs/masterplans/1-bootstrap-the-initial-clickhouse-migration-library.md)
+tracks local implementation and a separate external consumer cutover gate. Building
+artifacts does not publish the project or complete that external gate.

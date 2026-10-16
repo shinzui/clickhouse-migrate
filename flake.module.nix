@@ -5,6 +5,9 @@
     let
       hs = pkgs.haskell.packages.ghc9124.override {
         overrides = hself: _hsuper: {
+          clickhouse-migrate-example-catalog = hself.callCabal2nix "clickhouse-migrate-example-catalog" ./examples/two-components/catalog { };
+          clickhouse-migrate-example-analytics = hself.callCabal2nix "clickhouse-migrate-example-analytics" ./examples/two-components/analytics { };
+          clickhouse-migrate-example = hself.callCabal2nix "clickhouse-migrate-example" ./examples/two-components/app { };
           clickhouse-migrate = hself.callCabal2nix "clickhouse-migrate" ./clickhouse-migrate { };
           clickhouse-migrate-embed = hself.callCabal2nix "clickhouse-migrate-embed" ./clickhouse-migrate-embed { };
           clickhouse-migrate-cli = hself.callCabal2nix "clickhouse-migrate-cli" ./clickhouse-migrate-cli { };
@@ -18,6 +21,7 @@
     {
       packages = packages // {
         default = hs.clickhouse-migrate;
+        example = hs.clickhouse-migrate-example;
         internal-test-driver = pkgs.haskell.lib.compose.enableCabalFlag "internal-test-driver" hs.clickhouse-migrate;
         # Compile/install the opt-in suite with Nix dependencies. Owned servers
         # run explicitly outside the build, never during default package checks.
@@ -25,7 +29,7 @@
           (old: {
             doCheck = true;
             # cabal2nix's default-off integration flag omits this test dependency.
-            testHaskellDepends = (old.testHaskellDepends or [ ]) ++ [ hs.clickhouse-migrate-embed ];
+            testHaskellDepends = (old.testHaskellDepends or [ ]) ++ [ hs.clickhouse-migrate-embed hs.clickhouse-migrate-cli ];
             checkPhase = ''
               runHook preCheck
               echo "Integration suite built; run the installed executable explicitly for native qualification."

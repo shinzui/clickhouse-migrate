@@ -3,6 +3,7 @@ module ClickHouseMigrate.ExclusiveAccess
   ( ExclusiveAccess,
     externallySerialized,
     AccessDescription,
+    exclusiveAccessDescription,
     accessStrategy,
     accessScope,
     rejectAccessAcquisition,
@@ -39,3 +40,7 @@ accessScope (AccessDescription _ scope) = scope
 -- | Reject acquisition with a safe typed code from a caller-owned provider.
 rejectAccessAcquisition :: AccessError -> IO a
 rejectAccessAcquisition = throwIO . AccessAcquisitionException
+
+-- | Read-only description; this does not acquire or expose a live guard.
+exclusiveAccessDescription :: ExclusiveAccess -> AccessDescription
+exclusiveAccessDescription (ExclusiveAccess description _ _ _ _) = description

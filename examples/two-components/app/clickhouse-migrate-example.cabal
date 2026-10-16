@@ -1,0 +1,38 @@
+cabal-version: 3.12
+name: clickhouse-migrate-example
+version: 0.1.0.0
+synopsis: Private two-component migration administrator example
+description: Private workspace executable, not intended for publication.
+license: BSD-3-Clause
+license-file: LICENSE
+author: shinzui
+maintainer: shinzui@users.noreply.github.com
+category: Database
+build-type: Simple
+extra-doc-files: README.md
+tested-with: ghc ==9.12.4
+
+executable clickhouse-migrate-example
+  default-language: GHC2024
+  default-extensions:
+    DeriveAnyClass
+    DuplicateRecordFields
+    OverloadedLabels
+    OverloadedStrings
+
+  ghc-options:
+    -Wall
+    -threaded
+
+  hs-source-dirs: app
+  main-is: Main.hs
+  build-depends:
+    base >=4.21 && <4.22,
+    bytestring >=0.12.2 && <0.13,
+    clickhouse-migrate ==0.1.*,
+    clickhouse-migrate-cli ==0.1.*,
+    clickhouse-migrate-example-analytics ==0.1.*,
+    clickhouse-migrate-example-catalog ==0.1.*,
+    clickhouse-migrate-test-support ==0.1.*,
+    optparse-applicative >=0.18.1 && <0.20,
+    text >=2.1 && <2.2,

@@ -1,0 +1,19 @@
+{
+  "manifestVersion": 1,
+  "component": "analytics",
+  "dependencies": [
+    "catalog"
+  ],
+  "migrations": [
+    {
+      "name": "0001",
+      "description": "Create analytics storage",
+      "steps": [
+        {
+          "name": "create",
+          "file": "create.sql"
+        }
+      ]
+    }
+  ]
+}

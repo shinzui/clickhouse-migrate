@@ -250,3 +250,38 @@ that dependency. The locked `mori://NixOS/nixpkgs`, project-relative
 `pkgs/development/haskell-modules/generic-builder.nix` (file URI pending), consumes
 this list only under doCheck. Native compilation must exercise the actual splice and package
 data before qualification; normal test-support/core library dependencies are unchanged.
+
+## Reusable CLI and closure metadata
+
+Before parser selection, Mori located `mori://pcapriotti/optparse-applicative`,
+project-relative `optparse-applicative/README.md`,
+`optparse-applicative/src/Options/Applicative/Builder.hs` and
+`optparse-applicative/src/Options/Applicative/Extra.hs` (file URIs pending).
+Hackage preferred metadata confirmed current release **0.19.0.0** on 2026-10-16;
+upstream tag source was inspected at 5377a34d280bf847588b443b25a581803f484259.
+The locked Nix set resolves **0.18.1.0**, whose released source was also inspected
+at 270a626f7a7225cdce9b025b427eb0c4378c39c7. Bound >=0.18.1 && <0.20 includes both;
+avoid 0.19-only parserOptionGroup. Parser uses hsubparser/info/helper, validated
+readers and execParserPure. Cabal resolves 0.19.0.0. Mori CLI recipes consulted:
+`mori://shinzui/haskell-jitsurei/docs/cli-overview`,
+`mori://shinzui/haskell-jitsurei/docs/cli-help-topics`, and
+`mori://shinzui/haskell-jitsurei/docs/cli-option-groups`.
+No fuzzy UI or runtime file-embedding dependencies were added.
+
+The strict evidence decoder reuses Aeson's already reviewed public token API across
+2.2.4.1/2.3.2.0; escaped duplicate keys are rejected before object construction.
+Other CLI bounds reuse the workspace's verified bytestring/text/containers evidence.
+The three private example packages reuse those same dependencies and no new pins.
+
+A Cabal library graph audit found `process` **1.6.26.1** transitively through
+http-client -> streaming-commons **0.2.3.1**. Mori search found no streaming-commons
+project. Inspected its [Hackage Cabal source](https://hackage-content.haskell.org/package/streaming-commons-0.2.3.1/streaming-commons.cabal)
+and released tarball: the library unconditionally depends on process and exposes
+both networking and process utilities. This is already an HTTP-stack dependency,
+not a fixture executable or a direct core process API. The production checker must
+report it accurately rather than claim its absence; ADR 0009 records the scope.
+No transport/TLS downgrade, vendored fork or dependency workaround was introduced.
+
+GitHub's [runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+was checked on 2026-10-16 before narrowing future CI to macos-14/arm64. Linux remains
+deferred. The repository is not available remotely and no CI execution is claimed.
