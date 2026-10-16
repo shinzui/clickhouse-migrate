@@ -48,3 +48,6 @@ The exact binary/platform matrix and identity limitations live in
 claim of power-loss durability, distributed affinity or exactly-once execution.
 Ledger recovery must prove all prior requests quiescent before reusing sequence
 numbers or issuing successor mutations; an empty read is insufficient.
+
+[ADR 0013](0013-retain-http-transport-and-revisit-clickhaskell.md) records the later
+ClickHaskell evaluation and the criteria for revisiting the transport choice.
