@@ -18,7 +18,12 @@ import Data.ByteString.Lazy qualified as Lazy
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Encoding
+import FailureBoundaries (failureBoundaryCases)
 import LedgerIntegration (ledgerFaultCases)
+import RepairBoundaries (repairBoundaryCases)
+import RepairIntegration (repairEarlyCases)
+import RunnerIntegration (runnerEarlyCases, runnerValidationCases)
+import SurvivingWork (runnerChild, survivingWorkCases)
 import System.Environment (getArgs, getEnv, getEnvironment, getExecutablePath, lookupEnv)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
@@ -40,12 +45,13 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
+    ["runner-child", endpoint, identity, label, ledger, root] -> runnerChild endpoint identity label ledger root
     ["exclusive-child", endpoint, identity, namespace, ledger, root, micros, evidence] -> exclusiveChild endpoint identity namespace ledger root micros evidence
     _ -> integrationMain args
 
 integrationMain :: [String] -> IO ()
 integrationMain args = do
-  driver <- if args == ["exclusive"] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
+  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
   finished <- timeout 180000000 $ withCandidateServer "lts-native" $ \server -> do
     putStrLn ("Candidate ClickHouse " ++ Text.unpack (serverVersion server))
     case args of
@@ -53,6 +59,10 @@ integrationMain args = do
       ["transport"] -> transportCases driver server
       ["completion"] -> completionCases driver server
       ["ledger"] -> ledgerCases driver server
+      ["runner"] -> runnerEarlyCases server >> runnerValidationCases server
+      ["repair"] -> repairEarlyCases server >> repairBoundaryCases server
+      ["survivors"] -> survivingWorkCases server
+      ["boundaries"] -> failureBoundaryCases server
       ["exclusive"] -> exclusiveCases server
       _ -> fail "Unknown integration group"
   case finished of Nothing -> fail "Integration watchdog expired"; Just () -> pure ()

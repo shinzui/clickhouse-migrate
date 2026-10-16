@@ -166,6 +166,8 @@ class FaultProxy:
         self.mode = 'pass'
         self.query_id = None
         self.stage = None
+        self.step = None
+        self.rules = []
         self.release = threading.Event()
         self.identity_spoof = False
         self.closed = False
@@ -191,6 +193,7 @@ class FaultProxy:
                 body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
                 with proxy.lock:
                     stage = None
+                    step = None
                     if body.startswith(b'CREATE DATABASE IF NOT EXISTS '):
                         stage = 'ddl-database'
                     elif body.startswith(b'CREATE TABLE IF NOT EXISTS '):
@@ -198,7 +201,10 @@ class FaultProxy:
                     elif b'FORMAT JSONEachRow\n' in body:
                         try:
                             payload = json.loads(body.split(b'FORMAT JSONEachRow\n', 1)[1])
-                            stage = json.loads(payload['event'])['kind']
+                            event = json.loads(payload['event'])
+                            stage = event['kind']
+                            context = event.get('context') or {}
+                            step = (context.get('step') or {}).get('name')
                         except (ValueError, KeyError, TypeError):
                             pass
                     if stage is None and body.lstrip().startswith((b'CREATE ', b'ALTER ', b'INSERT ', b'DROP ', b'TRUNCATE ', b'RENAME ')):
@@ -209,6 +215,11 @@ class FaultProxy:
                     query_id = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('query_id', [''])[0]
                     if proxy.query_id is not None and query_id != proxy.query_id:
                         mode = 'pass'
+                    if proxy.step is not None and step != proxy.step:
+                        mode = 'pass'
+                    for rule in proxy.rules:
+                        if rule['stage'] == stage and (rule.get('step') is None or rule['step'] == step):
+                            mode = rule['mode']
                     if mode == 'delay-first':
                         mode = 'delay' if not proxy.events else 'pass'
                     if mode == 'close-second':
@@ -346,7 +357,14 @@ def serve(matrix, entry_id):
                         proxy.mode = request['mode']
                         proxy.query_id = request.get('queryId')
                         proxy.stage = request.get('stage')
+                        proxy.step = request.get('step')
+                        proxy.rules.clear()
                         proxy.release.clear()
+                    result = None
+                elif operation == 'proxy-rule':
+                    proxy = server.proxies[request['id']]
+                    with proxy.lock:
+                        proxy.rules.append(request)
                     result = None
                 elif operation == 'proxy-release':
                     server.proxies[request['id']].release.set()

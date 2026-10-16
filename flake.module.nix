@@ -19,6 +19,22 @@
       packages = packages // {
         default = hs.clickhouse-migrate;
         internal-test-driver = pkgs.haskell.lib.compose.enableCabalFlag "internal-test-driver" hs.clickhouse-migrate;
+        # Compile/install the opt-in suite with Nix dependencies. Owned servers
+        # run explicitly outside the build, never during default package checks.
+        integration-tests = pkgs.haskell.lib.compose.overrideCabal
+          (old: {
+            doCheck = true;
+            checkPhase = ''
+              runHook preCheck
+              echo "Integration suite built; run the installed executable explicitly for native qualification."
+              runHook postCheck
+            '';
+            postInstall = (old.postInstall or "") + ''
+              mkdir -p "$out/bin"
+              cp dist/build/clickhouse-migrate-integration/clickhouse-migrate-integration "$out/bin/"
+            '';
+          })
+          (pkgs.haskell.lib.compose.enableCabalFlag "integration" hs.clickhouse-migrate-test-support);
       };
       checks = packages;
       haskellProject.extraDevPackages = [ pkgs.python3 pkgs.openssl ];

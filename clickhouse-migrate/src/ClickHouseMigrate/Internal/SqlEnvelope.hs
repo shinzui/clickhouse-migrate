@@ -1,5 +1,5 @@
 -- | Conservative lexical envelope; never a general SQL safety proof.
-module ClickHouseMigrate.Internal.SqlEnvelope (validateSql) where
+module ClickHouseMigrate.Internal.SqlEnvelope (validateSql, mentionsIdentifier) where
 
 import ClickHouseMigrate.Error
 import ClickHouseMigrate.Prelude
@@ -187,3 +187,16 @@ accepted (a : b : rest)
       | keyword "DATABASE" kind = case body of name : _ -> isName name; _ -> False
       | otherwise = False
 accepted _ = False
+
+-- Runtime ledger namespace isolation reuses the SAME literal/comment-aware scan.
+-- Quoted compound identifiers are conservatively split at dots. This is an
+-- identifier reservation, not a proof about arbitrary deeper SQL expressions.
+mentionsIdentifier :: Text -> ByteString -> Either DefinitionError Bool
+mentionsIdentifier name sql = do
+  text <- either (const (failure InvalidUtf8 Nothing)) Right (Encoding.decodeUtf8' sql)
+  tokens <- scan 0 (Text.unpack text)
+  let wanted = Text.toUpper name
+      matches (Token _ (Word value)) = wanted == value
+      matches (Token _ (Identifier value)) = wanted `elem` Text.splitOn "." value
+      matches _ = False
+  pure (any matches tokens)

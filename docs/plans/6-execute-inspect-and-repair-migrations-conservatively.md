@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-16T05:03:30Z
       mode: "update"
       note: "Define command signatures, partial failures, cancellation and explicit repair scope."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T14:30:09Z
+      mode: "implement"
+      note: "Implement runner, plan-aware inspection and explicit recovery on the accepted native ledger protocol."
 ---
 
 # Execute inspect and repair migrations conservatively
@@ -43,22 +48,30 @@ A caller can execute pending migrations, inspect compatible history and recover 
 ## Progress
 
 
-- [ ] M1 — Ordered up/status/verify/history operations pass normal runs and every crash boundary.
-- [ ] M2 — All four recovery operations and callback/access/cleanup failures preserve durable evidence and refuse stale or unquiesced actions.
+- [x] M1 — Ordered up/status/verify/history operations pass normal runs and every crash boundary.
+- [x] M2 — All four recovery operations and callback/access/cleanup failures preserve durable evidence and refuse stale or unquiesced actions.
+
+M1/M2 accepted 2026-10-16 on native Apple Silicon / ClickHouse 26.8.28.14 LTS. Public up/status/history/verify and every repair builder compile and run without private test access. The required first lost-second-response case passed before expansion. Full acceptance enumerates 18 ordinary observer boundaries, seven ordinary dependent append acknowledgements (including initialization and both steps), all four interrupted recovery authorizations both after acknowledgement and with response loss, acceptance/finalization append loss and the accepted-step observer boundary. Observed SQL errors preserve their primary error through uncertain failure recording and throwing observers; lease/release/diagnostic faults retain acknowledged state. Modified SQL, dependencies/order, unknown stored definitions, corrupt physical rows, missing recurring ledgers and dynamic namespace reservations refuse mutation. Retry is step-only, resume is migration-only, accept/finalize submit no SQL, stale/fabricated attempt owners fail, and accepted evidence remains distinct.
+
+An owned client process kill and asynchronous thread cancellation both leave a real blocked server mutation alive. Active query IDs refuse recovery even under deliberately false negative-test evidence, and the real host-local marker refuses successor entry after OS unlock. Externally established complete request/mutation drain then allows audited acceptance/finalization without replay. Cancellation is rethrown after cleanup.
+
+Validation: `just test-integration` groups pass in the Cabal harness (the initial combined run's pre-readiness fixture exit was retained and its remaining groups passed serially). All eight groups pass against the Nix-built public harness and Nix core driver. All four public runner/repair/boundaries/survivors groups pass from extracted sibling source archives at `/tmp/clickhouse-migrate-ep6-sdist-dq8qfii1`; direct execution sets Cabal's generated data-directory override to the extracted package. Package metadata, unit tests, twelve public invariant negatives, 24 independent checksum vectors, format checks, Seihou drift and all six native flake checks pass. Logs: `/tmp/clickhouse-migrate-ep6-{cabal-all,serial-final,nix-qualification,pure-final,flake,format-check}.log`. No Linux/remote or release qualification is claimed.
 
 ## Surprises & Discoveries
 
+2026-10-16: A migration's current attempt can change at recovery authorization before a new step query is submitted. A selected uncertain step must retain its original attempt owner; reports and validation preserve this distinction. Substituting the new migration attempt for the old step owner is rejected.
 
+2026-10-16: Stopping merges makes a real mutations_sync=1 query remain active deterministically. Both terminating an owned public-API client process and asynchronous cancellation leave server mutation work alive. The host-local persistent marker refuses successor entry until explicit evidence; a deliberately false attestation/overlapping negative-test provider is still rejected while the recorded query is positively active. After independently observed effects and complete request/mutation drain, accept/finalize preserve evidence without replay.
 
 
 ## Decision Log
 
-
+2026-10-16: Use configuration-only public command contexts, latest-acknowledged snapshots and separate transient SQL observations/secondary errors. Freeze this and the narrow repair scopes in [ADR 0007](../adr/0007-scope-commands-and-preserve-acknowledged-progress.md). Publish application-owned operational responsibilities in docs/operations.md. No new core dependency or wire-format change is needed.
 
 
 ## Outcomes & Retrospective
 
-
+Complete. Scoped commands use the accepted ledger wire format and preserve uncertainty at every tested boundary. ADR 0007 and docs/operations.md carry durable integration/recovery responsibilities. The next child can consume typed reports and private scoped runtime support for adoption; it must validate the entire adoption request before any initialization/adoption append. The optional Nix integration-tests output qualifies public consumers with the actual Nix dependency closure and does not start servers inside default package builds.
 
 
 ## Context and Orientation

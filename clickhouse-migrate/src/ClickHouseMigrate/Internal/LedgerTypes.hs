@@ -6,6 +6,8 @@ import ClickHouseMigrate.Target (LedgerId, QueryId, TargetKey)
 import Data.Word (Word64)
 
 -- Tokens contain observations, never authority to mutate.
+data AttemptId = AttemptId !Text deriving stock (Eq, Ord, Show)
+
 data AppendReceipt = AppendReceipt !TargetKey !LedgerId !Word64 !Text !Text !QueryId deriving stock (Eq, Show)
 
 data Reconciliation = PresentIdentical | Conflicting | NotObserved deriving stock (Eq, Show)

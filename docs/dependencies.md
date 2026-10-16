@@ -198,3 +198,22 @@ queries/negative fixtures. Explicit default storage policy and healthy writable
 Local disks are required; Atomic/MergeTree names can otherwise conceal unqualified
 remote storage. The native metadata spike independently confirms the normalized
 CREATE spelling and disk flags. No new Haskell dependency is needed.
+
+
+## Scoped runner and public native harness
+
+The runtime/inspection/recovery layer adds no new core dependency. Attempt IDs use
+validated UUID text and existing entropy; reports use the existing definition,
+transport, ledger and coordinator primitives. Public integration consumers use
+containers >=0.7 && <0.9, reusing the source/release evidence above.
+
+The optional `integration-tests` Nix output compiles and installs the real public
+API test executable against the Nix package closure, without starting a server in
+the build sandbox or adding live integration to default checks. Before using
+`overrideCabal`, `enableCabalFlag`, `doCheck`, custom `checkPhase` and `postInstall`,
+inspected the locked Nixpkgs revision d5dfd8e6716dde34398bc14bc87c10dece9c8c68:
+`mori://NixOS/nixpkgs`, project-relative `pkgs/development/haskell-modules/lib/compose.nix`
+and `pkgs/development/haskell-modules/generic-builder.nix` (artifact URIs pending;
+no matching registry project). The builder enables test compilation for doCheck;
+its Setup build executable path and postInstall hook are exercised by the native
+output. No dependency pin or managed Seihou file changes are needed.

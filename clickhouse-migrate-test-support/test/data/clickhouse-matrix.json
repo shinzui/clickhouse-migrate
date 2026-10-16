@@ -11,7 +11,7 @@
       "platform": "aarch64-darwin",
       "url": "https://github.com/ClickHouse/ClickHouse/releases/download/v26.8.28.14-lts/clickhouse-macos-aarch64",
       "sha256": "ab5a04de4a6b705e0f1f02e6a0e0a44feff8b4455b6dfcc4a03b7571f98fbb60",
-      "status": "ledger-qualified",
+      "status": "runner-qualified",
       "tagObject": "cb8b2f96f32feb4203ab9edbf4f03b274bbb6952"
     }
   ]

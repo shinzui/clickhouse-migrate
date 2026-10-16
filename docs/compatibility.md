@@ -1,6 +1,6 @@
 # Compatibility evidence
 
-The currently transport/ledger-qualified candidate is ClickHouse **26.8.28.14 LTS** on
+The currently transport/ledger/runner-qualified candidate is ClickHouse **26.8.28.14 LTS** on
 Apple Silicon macOS. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
 [test/compatibility/clickhouse-matrix.json](../test/compatibility/clickhouse-matrix.json).
@@ -11,8 +11,8 @@ On 2026-10-16, the upstream [security/support policy](https://github.com/ClickHo
 and [release](https://github.com/ClickHouse/ClickHouse/releases/tag/v26.8.28.14-lts)
 were checked before selecting the current LTS patch. The developer template's
 ClickHouse version is not release evidence. Linux execution is deferred by the
-user; this evidence makes no Linux or remote CI claim. Transport and ledger qualification are
-intermediate gates; runner, adoption-command and release qualification are still pending.
+user; this evidence makes no Linux or remote CI claim. Transport, ledger and runner qualification are
+intermediate gates; adoption-command and release qualification are still pending.
 
 Only this exact patch passes the runtime version allowlist. New patches and
 prereleases fail closed until independently qualified and explicitly added.
@@ -81,3 +81,18 @@ until every predecessor request is quiescent. The host-local development adapter
 leaves a persistent marker after clean release and process death, and requires an
 explicit target-bound external attestation before later entry. Neither an absent
 system.processes row nor an empty ledger read satisfies that responsibility.
+
+
+Runner qualification passes the public up/status/history/verify and four repair
+operations in both Cabal and Nix dependency closures, and from extracted sibling
+source distributions. `just test-runner`, `just test-repair` and
+`just test-failure-boundaries` enumerate observer and dependent-ledger response-loss
+boundaries, retained checkpoints, composite primary/secondary failures, incompatible
+prefixes, stale repair state and active-query refusal. Retry executes only its
+selected step; resume stops at its selected migration; accept/finalize execute no
+application SQL and retain attestation evidence. Both owned-process termination
+and asynchronous cancellation leave a real server mutation alive; external drain
+and explicit evidence are required before recovery. Ordinary up never consumes
+standing recovery authorization. ADR 0007 and operations.md describe these limits.
+The optional `integration-tests` Nix output installs this public harness for
+explicit native execution; it does not start a server during a Nix package build.

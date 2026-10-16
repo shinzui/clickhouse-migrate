@@ -15,7 +15,7 @@ check-packages:
 test-unit:
     cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- test all --test-show-details=direct
 
-test-integration: test-transport test-completion-policy test-ledger test-exclusive-access
+test-integration: test-transport test-completion-policy test-ledger test-exclusive-access test-runner test-repair test-failure-boundaries
 
 format:
     nix fmt
@@ -59,3 +59,13 @@ test-ledger:
 
 test-exclusive-access:
     cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=exclusive
+
+test-runner:
+    cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=runner
+
+test-repair:
+    cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=repair
+
+test-failure-boundaries:
+    cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=boundaries
+    cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=survivors

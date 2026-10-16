@@ -4,6 +4,8 @@ module ClickHouseMigrate.TestSupport.FaultProxy
     FaultMode (..),
     LedgerStage (..),
     setLedgerFault,
+    setLedgerStepFault,
+    addLedgerFault,
     releaseFault,
     withFaultProxy,
     withTlsFaultProxy,
@@ -83,7 +85,7 @@ proxyConnections (FaultProxy fixture identity _) = fixtureRpc fixture (object ["
 
 -- SQL bodies are inspected privately only to select a protocol stage; they are
 -- never included in proxy events or diagnostics.
-data LedgerStage = DatabaseCreation | TableCreation | Initialization | MigrationStart | StepStart | StepSuccess | MigrationCompletion | RecoveryAuthorization | StepAcceptance | AdoptionStart | AdoptionEntry | AdoptionCompletion
+data LedgerStage = DatabaseCreation | TableCreation | Initialization | MigrationStart | StepStart | StepSuccess | MigrationCompletion | FailureRecording | RecoveryAuthorization | StepAcceptance | AdoptionStart | AdoptionEntry | AdoptionCompletion
   deriving stock (Eq, Show)
 
 stageName :: LedgerStage -> Text
@@ -95,6 +97,7 @@ stageName = \case
   StepStart -> "step-started"
   StepSuccess -> "step-succeeded"
   MigrationCompletion -> "migration-completed"
+  FailureRecording -> "execution-failed"
   RecoveryAuthorization -> "recovery-authorized"
   StepAcceptance -> "step-accepted"
   AdoptionStart -> "adoption-started"
@@ -106,3 +109,11 @@ setLedgerFault (FaultProxy fixture identity _) stage mode = void $ fixtureRpc fi
 
 releaseFault :: FaultProxy -> IO ()
 releaseFault (FaultProxy fixture identity _) = void $ fixtureRpc fixture (object ["operation" .= ("proxy-release" :: Text), "id" .= identity])
+
+-- | Select a named step without exposing its SQL in recorded evidence.
+setLedgerStepFault :: FaultProxy -> LedgerStage -> Text -> FaultMode -> IO ()
+setLedgerStepFault (FaultProxy fixture identity _) stage step mode = void $ fixtureRpc fixture (object ["operation" .= ("proxy-mode" :: Text), "id" .= identity, "mode" .= modeName mode, "stage" .= stageName stage, "step" .= step])
+
+-- | Overlay a ledger fault while retaining a query-specific application fault.
+addLedgerFault :: FaultProxy -> LedgerStage -> FaultMode -> IO ()
+addLedgerFault (FaultProxy fixture identity _) stage mode = void $ fixtureRpc fixture (object ["operation" .= ("proxy-rule" :: Text), "id" .= identity, "mode" .= modeName mode, "stage" .= stageName stage])

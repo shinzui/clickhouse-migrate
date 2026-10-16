@@ -56,16 +56,23 @@ library
     ClickHouseMigrate
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
+    ClickHouseMigrate.Event
     ClickHouseMigrate.ExclusiveAccess
+    ClickHouseMigrate.Inspection
     ClickHouseMigrate.Ledger
     ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
+    ClickHouseMigrate.Repair
+    ClickHouseMigrate.Report
+    ClickHouseMigrate.Runner
     ClickHouseMigrate.Target
 
   other-modules:
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.EventTypes
     ClickHouseMigrate.Internal.Exclusive
     ClickHouseMigrate.Internal.ExclusiveTypes
+    ClickHouseMigrate.Internal.Execution
     ClickHouseMigrate.Internal.Http
     ClickHouseMigrate.Internal.Identity
     ClickHouseMigrate.Internal.LedgerCodec
@@ -73,7 +80,11 @@ library
     ClickHouseMigrate.Internal.LedgerStore
     ClickHouseMigrate.Internal.LedgerTypes
     ClickHouseMigrate.Internal.LedgerValidation
+    ClickHouseMigrate.Internal.Preflight
     ClickHouseMigrate.Internal.Projection
+    ClickHouseMigrate.Internal.RepairTypes
+    ClickHouseMigrate.Internal.Reporting
+    ClickHouseMigrate.Internal.RuntimeTypes
     ClickHouseMigrate.Internal.ServerPolicy
     ClickHouseMigrate.Internal.SqlEnvelope
     ClickHouseMigrate.Internal.TargetTypes
@@ -97,10 +108,14 @@ executable clickhouse-migrate-test-driver
     ClickHouseMigrate
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
+    ClickHouseMigrate.Event
     ClickHouseMigrate.ExclusiveAccess
+    ClickHouseMigrate.Inspection
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.EventTypes
     ClickHouseMigrate.Internal.Exclusive
     ClickHouseMigrate.Internal.ExclusiveTypes
+    ClickHouseMigrate.Internal.Execution
     ClickHouseMigrate.Internal.Http
     ClickHouseMigrate.Internal.Identity
     ClickHouseMigrate.Internal.LedgerCodec
@@ -108,7 +123,11 @@ executable clickhouse-migrate-test-driver
     ClickHouseMigrate.Internal.LedgerStore
     ClickHouseMigrate.Internal.LedgerTypes
     ClickHouseMigrate.Internal.LedgerValidation
+    ClickHouseMigrate.Internal.Preflight
     ClickHouseMigrate.Internal.Projection
+    ClickHouseMigrate.Internal.RepairTypes
+    ClickHouseMigrate.Internal.Reporting
+    ClickHouseMigrate.Internal.RuntimeTypes
     ClickHouseMigrate.Internal.ServerPolicy
     ClickHouseMigrate.Internal.SqlEnvelope
     ClickHouseMigrate.Internal.TargetTypes
@@ -117,6 +136,9 @@ executable clickhouse-migrate-test-driver
     ClickHouseMigrate.Ledger
     ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
+    ClickHouseMigrate.Repair
+    ClickHouseMigrate.Report
+    ClickHouseMigrate.Runner
     ClickHouseMigrate.Target
 
   if !flag(internal-test-driver)
@@ -134,10 +156,14 @@ test-suite clickhouse-migrate-unit
     ClickHouseMigrate
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
+    ClickHouseMigrate.Event
     ClickHouseMigrate.ExclusiveAccess
+    ClickHouseMigrate.Inspection
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.EventTypes
     ClickHouseMigrate.Internal.Exclusive
     ClickHouseMigrate.Internal.ExclusiveTypes
+    ClickHouseMigrate.Internal.Execution
     ClickHouseMigrate.Internal.Http
     ClickHouseMigrate.Internal.Identity
     ClickHouseMigrate.Internal.LedgerCodec
@@ -145,7 +171,11 @@ test-suite clickhouse-migrate-unit
     ClickHouseMigrate.Internal.LedgerStore
     ClickHouseMigrate.Internal.LedgerTypes
     ClickHouseMigrate.Internal.LedgerValidation
+    ClickHouseMigrate.Internal.Preflight
     ClickHouseMigrate.Internal.Projection
+    ClickHouseMigrate.Internal.RepairTypes
+    ClickHouseMigrate.Internal.Reporting
+    ClickHouseMigrate.Internal.RuntimeTypes
     ClickHouseMigrate.Internal.ServerPolicy
     ClickHouseMigrate.Internal.SqlEnvelope
     ClickHouseMigrate.Internal.TargetTypes
@@ -154,6 +184,9 @@ test-suite clickhouse-migrate-unit
     ClickHouseMigrate.Ledger
     ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
+    ClickHouseMigrate.Repair
+    ClickHouseMigrate.Report
+    ClickHouseMigrate.Runner
     ClickHouseMigrate.Target
     ExclusiveTests
     LedgerTests

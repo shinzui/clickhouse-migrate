@@ -1,7 +1,10 @@
 -- | Validated ledger observations and explicit administrative assertions.
 -- Assertions document caller evidence; they do not independently prove fencing.
 module ClickHouseMigrate.Internal.LedgerValidation
-  ( LedgerPosition,
+  ( AttemptId,
+    parseAttemptId,
+    attemptIdText,
+    LedgerPosition,
     ledgerPositionText,
     parseLedgerPosition,
     AppendReceipt,
@@ -106,3 +109,9 @@ quiescenceTarget (QuiescenceEvidence target _) = target
 
 appendQueryId :: AppendReceipt -> Target.QueryId
 appendQueryId (AppendReceipt _ _ _ _ _ query) = query
+
+parseAttemptId :: Text -> Either LedgerError AttemptId
+parseAttemptId value = either (const (Left InvalidPosition)) (const (Right (AttemptId value))) (Target.ledgerId value)
+
+attemptIdText :: AttemptId -> Text
+attemptIdText (AttemptId value) = value

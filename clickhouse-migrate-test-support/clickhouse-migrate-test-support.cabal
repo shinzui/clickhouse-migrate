@@ -73,9 +73,18 @@ test-suite clickhouse-migrate-integration
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
-  other-modules: LedgerIntegration
+  other-modules:
+    FailureBoundaries
+    LedgerIntegration
+    RepairBoundaries
+    RepairIntegration
+    RunnerIntegration
+    SurvivingWork
+
   ghc-options: -threaded
-  build-depends: clickhouse-migrate-test-support
+  build-depends:
+    clickhouse-migrate-test-support,
+    containers >=0.7 && <0.9,
 
   if !flag(integration)
     buildable: False
