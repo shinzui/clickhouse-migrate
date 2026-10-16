@@ -25,6 +25,12 @@ in  Schema.Project::{
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "clickhouse-migrate"
+        , dependencies =
+          [ Schema.Dependency.ByName "bytestring"
+          , Schema.Dependency.ByName "text"
+          , Schema.Dependency.ByName "containers"
+          , Schema.Dependency.ByName "cryptohash-sha256"
+          ]
         }
       , Schema.Package::{
         , name = "clickhouse-migrate-embed"

@@ -13,6 +13,10 @@ maintainer: shinzui@users.noreply.github.com
 category: Database
 build-type: Simple
 extra-doc-files: README.md
+extra-source-files:
+  test/public/*.hs
+  test/vectors/*.tsv
+
 tested-with: ghc ==9.12.4
 
 source-repository head
@@ -29,14 +33,27 @@ common common
     OverloadedStrings
 
   ghc-options: -Wall
-  build-depends: base >=4.21 && <4.22
+  build-depends:
+    base >=4.21 && <4.22,
+    bytestring >=0.12.2 && <0.13,
+    containers >=0.7 && <0.9,
+    cryptohash-sha256 >=0.11.102.1 && <0.12,
+    text >=2.1 && <2.2,
 
 library
   import: common
   hs-source-dirs: src
   exposed-modules:
     ClickHouseMigrate
+    ClickHouseMigrate.Definition
+    ClickHouseMigrate.Error
+    ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
+
+  other-modules:
+    ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.SqlEnvelope
+    ClickHouseMigrate.Internal.Types
 
 flag internal-test-driver
   description: Build private runtime qualification driver (supplied by EP-4)
@@ -53,3 +70,21 @@ executable clickhouse-migrate-test-driver
 
   if !flag(internal-test-driver)
     buildable: False
+
+test-suite clickhouse-migrate-unit
+  import: common
+  type: exitcode-stdio-1.0
+  hs-source-dirs:
+    test
+    src
+
+  main-is: Main.hs
+  other-modules:
+    ClickHouseMigrate
+    ClickHouseMigrate.Definition
+    ClickHouseMigrate.Error
+    ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.SqlEnvelope
+    ClickHouseMigrate.Internal.Types
+    ClickHouseMigrate.Plan
+    ClickHouseMigrate.Prelude

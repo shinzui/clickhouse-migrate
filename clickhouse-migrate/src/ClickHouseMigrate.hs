@@ -1,4 +1,11 @@
--- | Core definitions and execution for ClickHouse migrations.
---
--- This bootstrap module has no migration operations yet.
-module ClickHouseMigrate () where
+-- | Explicitly ordered ClickHouse migration definitions. All constructors validate.
+module ClickHouseMigrate
+  ( module ClickHouseMigrate.Definition,
+    module ClickHouseMigrate.Plan,
+    module ClickHouseMigrate.Error,
+  )
+where
+
+import ClickHouseMigrate.Definition
+import ClickHouseMigrate.Error
+import ClickHouseMigrate.Plan

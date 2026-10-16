@@ -47,3 +47,25 @@ and matching upstream tags on 2026-10-16: checkout v7.0.1
 (`3d3c42e5aac5ba805825da76410c181273ba90b1`), nix-installer-action v23
 (`3138316df39ed29be04236d7ffc686fa525866aa`), and cachix-action v17
 (`38b082610b782e7e93e209c35fd730d399dee866`). The workflow pins these commits.
+
+## Pure definition model — 2026-10-16
+
+Mori-located sources inspected before use:
+`mori://haskell/bytestring/packages/bytestring` (Builder field encoding),
+`mori://haskell/text/packages/text` (strict UTF-8 decode/encode),
+`mori://haskell/containers/packages/containers` (Map/Set graph validation), and
+`mori://haskell-hvr/cryptohash-sha256/packages/cryptohash-sha256` (pure strict
+ByteString `hash`, which returns raw digest bytes).
+
+Hackage preferred-version metadata and matching upstream tags were checked:
+bytestring 0.12.2.0 (tag `0.12.2.0`, `d984ad00644c0157bad04900434b9d36f23633c5`),
+text 2.1.4 (tag `2.1.4`, `423fd981e576bd17a8b5fa48d0ad6b9a0c370e77`),
+containers 0.8.1 (tag `v0.8.1`, `953428ad079d5708df696442f9bdeaccd1acfc6c`),
+and cryptohash-sha256 0.11.102.1 (tag `v0.11.102.1`,
+`89c1b9030989cc914d057061d90933628481abb2`). Chosen bounds are bytestring
+`>=0.12.2 && <0.13`, text `>=2.1 && <2.2`, containers `>=0.7 && <0.9`,
+and cryptohash-sha256 `>=0.11.102.1 && <0.12`. The lower containers/text
+bounds accommodate the pinned compiler's bundled libraries without a workaround.
+Cabal resolved/tested bytestring 0.12.2.0, text 2.1.4, containers 0.7 and
+cryptohash-sha256 0.11.102.1 on GHC 9.12.4. The Nix package set independently
+checks the same public bounds and runs the unit suite.

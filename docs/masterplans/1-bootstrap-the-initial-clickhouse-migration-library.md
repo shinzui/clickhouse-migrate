@@ -67,7 +67,7 @@ Use the fewest boundaries that preserve these acceptance differences. A single l
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 1 | Seihou tooling and package workspace | [docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md](../../docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md) | None | None | Complete |
-| 2 | Validated definitions and checksum v1 | [docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md](../../docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md) | EP-1 | None | Not Started |
+| 2 | Validated definitions and checksum v1 | [docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md](../../docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md) | EP-1 | None | Complete |
 | 3 | Compile-time manifest embedding | [docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md](../../docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md) | EP-2 | None | Not Started |
 | 4 | Direct HTTP transport and isolated fixtures | [docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md](../../docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md) | EP-2 | None | Not Started |
 | 5 | Immutable ledger and exclusive access | [docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md](../../docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md) | EP-2, EP-4 | None | Not Started |
@@ -122,7 +122,7 @@ Promote durable choices into local ADRs as their owning children implement them:
 ## Progress
 
 
-EP-1 is Complete under the user’s local-only validation scope: all four libraries, package metadata and source distributions pass, and local aarch64-darwin Nix checks and formatter rejection checks pass. Linux validation and remote CI remain deferred. EP-2 is next; later children remain Not Started pending their whole-child prerequisites.
+EP-1 and EP-2 are Complete under the user’s local-only validation scope. The workspace, validated definitions, conservative SQL envelope, checksum v1 and invariant-safe public views pass their local acceptance gates. The public composition and 24 independent checksum vectors pass, and all six local Nix checks pass. Linux validation and remote CI remain deferred. EP-3 is next; later children remain Not Started pending their whole-child prerequisites.
 
 The remaining initiative-level integration gate is the separate consumer cutover: record its canonical change reference and evidence that the old runner is retired, exclusive administration is established, the adopted native ledger verifies, and a subsequent native migration succeeds on an isolated existing-history fixture. EP-8 records the full section 19 acceptance mapping in `docs/release-evidence.md`; all claimed versions must pass before release qualification is complete.
 

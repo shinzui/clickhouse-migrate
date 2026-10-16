@@ -2,7 +2,8 @@
 
 A Haskell migration toolkit for a directly pinned ClickHouse server. The initial
 implementation is tracked in [MasterPlan 1](docs/masterplans/1-bootstrap-the-initial-clickhouse-migration-library.md).
-Migration operations are not implemented yet.
+Pure validated definitions, ordered composition and checksum v1 are implemented.
+Runtime migration operations are not implemented yet.
 
 The workspace contains `clickhouse-migrate` (core), `clickhouse-migrate-embed`
 (compile-time definitions), `clickhouse-migrate-cli` (application-mounted commands),
@@ -15,6 +16,7 @@ Enter the pinned GHC 9.12.4 environment with `nix develop`, then run:
 just build
 just check-packages
 just test-unit
+just check-public-invariants
 just sdist
 just check-format
 ```
@@ -23,8 +25,7 @@ just check-format
 compiler and formatting gates on Linux and macOS. Linux execution is currently
 deferred; only local macOS checks have run. Behavioral suites will use
 `clickhouse-migrate-unit`, `clickhouse-migrate-embed-test`,
-`clickhouse-migrate-cli-test`, and `clickhouse-migrate-integration`. No pass-only
-tests are installed for the scaffold. `just test-integration` currently reports
+`clickhouse-migrate-cli-test`, and `clickhouse-migrate-integration`. The core suite checks validation, SQL boundaries and independent checksum vectors. `just test-integration` currently reports
 that the isolated fixture has not been implemented.
 
 The manual `internal-test-driver` core Cabal flag defaults to off. EP-4 will supply

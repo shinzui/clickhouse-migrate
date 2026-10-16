@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-16T05:03:30Z
       mode: "update"
       note: "Specify bound public views, description construction and invariant-preserving embedding."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T11:30:00Z
+      mode: "implement"
+      note: "Implement invariant-safe definitions, conservative SQL envelope and byte-level checksum contract."
 ---
 
 # Define validated plans SQL envelopes and checksum v1
@@ -43,21 +48,27 @@ Applications can construct explicitly ordered migration plans and reject malform
 ## Progress
 
 
-- [ ] M1 — Names, ordering and the one-statement SQL envelope have pure positive and negative tests.
-- [ ] M2 — Context-bound step/migration checksums and compatibility descriptors have published byte-level vectors and invariant-safe public APIs.
+- [x] M1 — 2026-10-16: Pure tests accept independent libraries with shared local names, preserve explicit order, and reject invalid names/duplicates/empty definitions/dependency errors. Lexer tests cover exact bytes, UTF-8/NUL, nested comments, escaped quotes/identifiers, heredocs, multiple statements, protected settings and excluded commands.
+- [x] M2 — 2026-10-16: Public two-library composition runs; six representation bypasses fail compilation. All 24 independent input/digest vectors match private encoding and public bound checksums. Unit suite, Haddock, all package builds/checks/distributions, and all six local Nix checks pass; Linux execution remains deferred.
 
 ## Surprises & Discoveries
 
+
+2026-10-16: Current ClickHouse syntax documents nested block comments and `//` line comments as well as SQL/hash comment forms. The scanner handles these explicitly and requires the later server matrix to qualify them. Public fields are ordinary functions over private data representations, so the public consumer can inspect checksums/SQL without exposing record setters or Generic reconstruction.
 
 
 
 ## Decision Log
 
 
+2026-10-16: Freeze the exact policy/domain/framing bytes in `docs/contracts/checksum-v1.md`; independent Python vectors include changed step boundaries with equal concatenated SQL. Restrict command headers to qualified table/view names, keep a documented local DDL/INSERT allowlist, and reject quoted SETTINGS keys or unfamiliar quoted-identifier escapes conservatively. Semantic safety and completion remain author/server-qualification obligations. List-oriented parsing helpers reject empty collections; the plan helper returns a direct structured EmptyPlan error.
+
 2026-10-15: Final checksum calculation occurs at component binding. This preserves ergonomic library-owned migration definitions while ensuring every persisted digest includes the identity required by the specification. Generic record access is restricted where it would undermine smart constructors.
 
 ## Outcomes & Retrospective
 
+
+2026-10-16: Accepted the invariant-safe authoring/view API, order-preserving graph validation, conservative SQL envelope and checksum v1 contract. The fixed policy and framing are independently reproducible; descriptions are excluded and dependency/order descriptors remain available for ledger comparison. Tests run against exposed modules as well as private encoders, and Nix runs the actual core suite. No network execution or server support is claimed. Durable decisions are distilled in `docs/adr/0003-bind-checksums-through-invariant-safe-definitions.md`.
 
 
 

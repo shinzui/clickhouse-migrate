@@ -26,7 +26,11 @@ format:
 check-format:
     nix fmt -- --fail-on-change
 
-check: build check-packages test-unit check-format
+check: build check-packages test-unit check-public-invariants check-format
 
 sdist:
     cabal sdist all
+
+check-public-invariants:
+    python3 scripts/check-public-invariants.py
+    python3 scripts/checksum-reference.py --check
