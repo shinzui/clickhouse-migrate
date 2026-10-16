@@ -1,19 +1,24 @@
 module Main (main) where
 
+import ClickHouseMigrate.ExclusiveAccess qualified as Access
+import ClickHouseMigrate.Ledger qualified as Ledger
 import ClickHouseMigrate.Prelude
+import ClickHouseMigrate.Target qualified as Target
+import ClickHouseMigrate.TestSupport.ExclusiveAccess (hostLocalExclusiveAccess)
 import ClickHouseMigrate.TestSupport.FaultProxy
 import ClickHouseMigrate.TestSupport.Server
 import Control.Concurrent (forkFinally, killThread, newEmptyMVar, putMVar, takeMVar, threadDelay, tryReadMVar)
 import Control.Exception (bracket, finally, throwIO)
-import Data.Aeson (FromJSON, Key, Object, Result (..), Value (..), fromJSON)
+import Data.Aeson (FromJSON, Key, Object, Result (..), Value (..), fromJSON, object, (.=))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString qualified as BS
 import Data.ByteString.Char8 qualified as Char8
 import Data.ByteString.Lazy qualified as Lazy
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Encoding
-import System.Environment (getArgs, getEnv, getEnvironment)
+import System.Environment (getArgs, getEnv, getEnvironment, getExecutablePath)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hClose)
@@ -33,13 +38,21 @@ convert value = case fromJSON value of Success result -> pure result; Error _ ->
 main :: IO ()
 main = do
   args <- getArgs
-  driver <- getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
+  case args of
+    ["exclusive-child", endpoint, identity, namespace, ledger, root, micros, evidence] -> exclusiveChild endpoint identity namespace ledger root micros evidence
+    _ -> integrationMain args
+
+integrationMain :: [String] -> IO ()
+integrationMain args = do
+  driver <- if args == ["exclusive"] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
   finished <- timeout 180000000 $ withCandidateServer "lts-native" $ \server -> do
     putStrLn ("Candidate ClickHouse " ++ Text.unpack (serverVersion server))
     case args of
       [] -> transportCases driver server
       ["transport"] -> transportCases driver server
       ["completion"] -> completionCases driver server
+      ["ledger"] -> ledgerCases driver server
+      ["exclusive"] -> exclusiveCases server
       _ -> fail "Unknown integration group"
   case finished of Nothing -> fail "Integration watchdog expired"; Just () -> pure ()
 
@@ -151,9 +164,20 @@ transportCases driver server = do
     assert "Untrusted TLS executed SQL" (not present)
     putStrLn "untrusted TLS: certificate rejected before HTTP; requests=0"
 
+  fullRead <- runDriver driver server (serverEndpoint server) "read" "complete_machine_read" "SELECT number FROM numbers(3) ORDER BY number" 3000000 1048576
+  expectFirst "acknowledged-success" fullRead
+  readOutcomes <- outcomes fullRead
+  readRows <- case readOutcomes of [row] -> field "rows" row :: IO [Value]; _ -> fail "Missing complete read"
+  assert "Profile silently truncated a machine read" (length readRows == 3)
+  putStrLn "machine read: profile result_overflow_mode=break/max_result_rows=1 cannot silently truncate history"
+
   -- A checked transport verifies every fresh connection, not just its first request.
   identityRows <- queryServer server "SELECT toString(serverUUID()) AS server_id" >>= convert :: IO [Value]
   actualId <- case identityRows of [row] -> field "server_id" row; _ -> fail "Missing server identity"
+  direct <- runDriverExpected (Just actualId) driver server (serverEndpoint server) "guarded-command" "guarded_direct" "CREATE TABLE default.guarded_direct (id UInt8) ENGINE=Memory" 3000000 1048576
+  expectFirst "acknowledged-success" direct
+  assert "Direct target effect absent" =<< exists server "guarded_direct"
+  putStrLn "direct native admission: explicit identity encoding; acknowledged application effect"
   withFaultProxy server $ \proxy -> do
     report <- runDriverExpected (Just actualId) driver server (proxyEndpoint proxy) "guarded-command" "guarded_success" "CREATE TABLE default.guarded_success (id UInt8) ENGINE=Memory" 3000000 1048576
     expectFirst "acknowledged-success" report
@@ -316,3 +340,122 @@ waitRows _ _ 0 = fail "Delayed effect never completed"
 waitRows server sql remaining = do
   count <- scalar server sql
   if count == 1 then pure () else threadDelay 50000 >> waitRows server sql (remaining - 1)
+
+right :: (Show e) => Either e a -> IO a
+right = either (fail . show) pure
+
+-- Separate child processes exercise the public provider/initialization API.
+exclusiveChild :: String -> String -> String -> String -> FilePath -> String -> String -> IO ()
+exclusiveChild endpoint identity namespace ledger root micros evidence = do
+  key <- right (Target.targetKey ("ledger-tests/" <> Text.pack namespace))
+  credentials <- right (Target.basicCredentials "default" "test-password")
+  config <- Target.targetConfig key <$> right (Target.directEndpoint (Text.pack endpoint)) <*> right (Target.serverId (Text.pack identity)) <*> right (Target.ledgerNamespace (Text.pack namespace)) <*> pure Target.FirstUse <*> pure credentials <*> right (Target.httpLimits 10000000 1048576)
+  uuid <- right (Target.ledgerId (Text.pack ledger))
+  audit <- right (Ledger.auditContext "test child administrator" "owned fixture handoff" ["owned process and all server requests independently quiescent"])
+  quiet <- right (Ledger.attestQuiescence key audit)
+  provider <- hostLocalExclusiveAccess root (read micros) (if evidence == "yes" then Just quiet else Nothing) >>= right
+  report <- Ledger.initializeLedger config provider (Ledger.authorizeInitialization key uuid audit) quiet
+  let status = case Ledger.result report of
+        Right position -> object ["outcome" .= ("initialized" :: Text), "position" .= Ledger.ledgerPositionText position]
+        Left (Ledger.AccessRejected problem) -> object ["outcome" .= ("access-rejected" :: Text), "code" .= show problem]
+        Left problem -> object ["outcome" .= ("rejected" :: Text), "code" .= show problem]
+  Lazy.putStr (Aeson.encode status)
+
+ledgerCases :: FilePath -> Server -> IO ()
+ledgerCases driver server = do
+  identityRows <- queryServer server "SELECT toString(serverUUID()) AS server_id" >>= convert :: IO [Value]
+  actualId <- case identityRows of [row] -> field "server_id" row; _ -> fail "Missing server identity"
+  let file = serverLogDirectory server </> "ledger-smoke.sql"
+  BS.writeFile file ""
+  inherited <- getEnvironment
+  let configured = ("CHM_EXPECTED_SERVER_ID", Text.unpack actualId) : filter ((/= "CHM_EXPECTED_SERVER_ID") . fst) inherited
+  (exit, output, _) <- readCreateProcessWithExitCode ((proc driver ["ledger-smoke", Text.unpack (serverEndpoint server), "ledger-smoke", file, "10000000", "1048576"]) {env = Just configured}) ""
+  assert "Private ledger roundtrip failed" (exit == ExitSuccess)
+  value <- either (const (fail "Invalid ledger driver protocol")) pure (Aeson.eitherDecodeStrict' (Encoding.encodeUtf8 (Text.pack output)))
+  field "roundtrip" value >>= assert "Ledger byte roundtrip mismatch"
+  putStrLn "ledger: direct native initialization + immutable append/read roundtrip; quoted/newline audit text preserved"
+
+exclusiveCases :: Server -> IO ()
+exclusiveCases server = do
+  binary <- getExecutablePath
+  identityRows <- queryServer server "SELECT toString(serverUUID()) AS server_id" >>= convert :: IO [Value]
+  actualId <- case identityRows of [row] -> field "server_id" row; _ -> fail "Missing server identity"
+  let root = serverLogDirectory server </> "locks"
+      ledger = "01234567-89ab-4def-8123-456789abcdef"
+      child endpoint namespace micros evidence = proc binary ["exclusive-child", Text.unpack endpoint, Text.unpack actualId, namespace, ledger, root, micros, evidence]
+      launch command = do
+        (status, output, _) <- readCreateProcessWithExitCode command ""
+        assert "Public lock child failed" (status == ExitSuccess)
+        either (const (fail "Invalid lock child protocol")) pure (Aeson.eitherDecodeStrict' (Encoding.encodeUtf8 (Text.pack output)))
+      outcome expected value = field "outcome" value >>= assert "Wrong public lock outcome" . (== (expected :: Text))
+      waitForPost proxy = do
+        events <- proxyEvents proxy >>= convert :: IO [Value]
+        if null events then threadDelay 10000 >> waitForPost proxy else pure ()
+  withFaultProxy server $ \proxy -> do
+    setFault proxy DelayFirstResponse
+    (input, output, _, process) <- createProcess (child (proxyEndpoint proxy) "concurrent_history" "5000000" "yes") {std_out = CreatePipe}
+    let close = do
+          mapM_ hClose input
+          mapM_ hClose output
+          terminateProcess process
+          void (waitForProcess process)
+    ( do
+        ready <- timeout 5000000 (waitForPost proxy)
+        assert "First administrator never entered" (isJust ready)
+        second <- launch (child (serverEndpoint server) "concurrent_history" "100000" "yes")
+        outcome "access-rejected" second
+        field "code" second >>= assert "Second process entered while first held lock" . (== ("AcquisitionTimedOut" :: Text))
+        first <- case output of
+          Just handle -> do
+            bytes <- BS.hGetContents handle
+            either (const (fail "Invalid first child result")) pure (Aeson.eitherDecodeStrict' bytes)
+          Nothing -> fail "Missing child stdout"
+        void (waitForProcess process)
+        outcome "initialized" first
+        blocked <- launch (child (serverEndpoint server) "concurrent_history" "1000000" "no")
+        outcome "access-rejected" blocked
+        field "code" blocked >>= assert "OS unlock was mistaken for quiescence" . (== ("PredecessorQuiescenceRequired" :: Text))
+        resumed <- launch (child (serverEndpoint server) "concurrent_history" "1000000" "yes")
+        outcome "initialized" resumed
+        before <- field "position" first :: IO Text
+        after <- field "position" resumed :: IO Text
+        assert "Initialized ledger was rewritten" (before == after)
+        putStrLn "exclusive: two processes excluded; timeout typed; clean OS unlock still requires quiescence; same UUID/position retained"
+      )
+      `finally` close
+  withFaultProxy server $ \proxy -> do
+    setFault proxy DelayFirstResponse
+    (_, output, _, process) <- createProcess (child (proxyEndpoint proxy) "crashed_history" "1000000" "yes") {std_out = CreatePipe}
+    ready <- timeout 5000000 (waitForPost proxy)
+    assert "Crash test owner never acquired" (isJust ready)
+    terminateProcess process
+    void (waitForProcess process)
+    mapM_ hClose output
+    blocked <- launch (child (serverEndpoint server) "crashed_history" "1000000" "no")
+    outcome "access-rejected" blocked
+    field "code" blocked >>= assert "Process death silently authorized successor" . (== ("PredecessorQuiescenceRequired" :: Text))
+    putStrLn "exclusive: process death releases OS lock but persistent marker blocks successor without explicit evidence"
+  -- Lease loss is checked at the actual socket write, including admission probes.
+  key <- right (Target.targetKey "ledger-tests/lease_lost")
+  credentials <- right (Target.basicCredentials "default" "test-password")
+  uuid <- right (Target.ledgerId (Text.pack ledger))
+  audit <- right (Ledger.auditContext "lease test" "forced loss" ["owned fixture, no predecessor requests"])
+  quiet <- right (Ledger.attestQuiescence key audit)
+  withFaultProxy server $ \proxy -> do
+    setFault proxy DelayFirstResponse
+    config <- Target.targetConfig key <$> right (Target.directEndpoint (proxyEndpoint proxy)) <*> right (Target.serverId actualId) <*> right (Target.ledgerNamespace "lease_lost") <*> pure Target.FirstUse <*> pure credentials <*> pure Target.defaultHttpLimits
+    alive <- newIORef True
+    provider <- right (Access.externallySerialized "controlled-test-lease" "complete isolated test target" 1000000 (const (pure ())) (const (pure ())) (const (readIORef alive)))
+    finished <- newEmptyMVar
+    bracket (forkFinally (Ledger.initializeLedger config provider (Ledger.authorizeInitialization key uuid audit) quiet) (putMVar finished)) killThread $ \_ -> do
+      ready <- timeout 5000000 (waitForPost proxy)
+      assert "Lease-loss probe was never submitted" (isJust ready)
+      writeIORef alive False
+      report <- takeMVar finished >>= either throwIO pure
+      assert "Lease loss did not stop command" (case Ledger.result report of Left (Ledger.RequestFailed Ledger.PositiveNonSubmission failure _) -> Ledger.code failure == Ledger.AdministrativeAccessLost; _ -> False)
+      requests <- proxyEvents proxy >>= convert :: IO [Value]
+      assert "A request escaped after lease loss during admission" (length requests == 1)
+    rows <- queryServer server "SELECT toUInt8(count()) AS count FROM system.databases WHERE name='lease_lost'" >>= convert :: IO [Value]
+    count <- case rows of [row] -> field "count" row :: IO Int; _ -> fail "Missing lease observation"
+    assert "Lost lease created a database" (count == 0)
+    putStrLn "exclusive: loss DURING connection admission prevents the next HTTP write; no initialization DDL; no server-side fencing claimed"

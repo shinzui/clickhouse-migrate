@@ -14,6 +14,7 @@ module ClickHouseMigrate.Target
     queryIdText,
     LedgerId,
     ledgerId,
+    newLedgerId,
     ledgerIdText,
     LedgerNamespace,
     ledgerNamespace,
@@ -34,6 +35,7 @@ module ClickHouseMigrate.Target
   )
 where
 
+import ClickHouseMigrate.Internal.Identity (freshUuid)
 import ClickHouseMigrate.Internal.TargetTypes
 import ClickHouseMigrate.Prelude
 import Data.Char (isAsciiLower, isAsciiUpper)
@@ -136,3 +138,8 @@ identityVersion (ServerIdentity _ value _) = value
 
 identityHostName :: ServerIdentity -> Text
 identityHostName (ServerIdentity _ _ value) = value
+
+-- | Fresh client-generated UUID for a one-time first-use authorization. Persist
+-- this value before submission and retain it after interrupted initialization.
+newLedgerId :: IO LedgerId
+newLedgerId = LedgerId <$> freshUuid

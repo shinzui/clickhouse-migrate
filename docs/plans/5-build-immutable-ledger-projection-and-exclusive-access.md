@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-16T05:03:30Z
       mode: "update"
       note: "Define early shared types and quiescent exact-event reconciliation for every unacknowledged submitted append."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T13:06:45Z
+      mode: "implement"
+      note: "Begin immutable event projection and guarded native ledger after accepted transport qualification."
 ---
 
 # Build immutable ledger projection and exclusive access
@@ -43,17 +48,23 @@ History becomes an immutable, validated event log protected by caller-provided e
 ## Progress
 
 
-- [ ] M1 — A pure event projection rejects corrupt sequences and produces compatible-prefix or blocking states.
+- [x] (2026-10-16) M1 — Complete strict v1 event codec/projection covers initialization, execution, recovery and adoption; independent canonical JSON vector, corruption/duplicate/identity checks, global-prefix comparison and interrupted-state tests pass. Stable context names/checksums are retained on individual migration/step events.
 - [ ] M2 — Guarded initialization, synchronous append/read and exact-event reconciliation pass real-server and concurrent-administrator tests.
+
+Handoff 2026-10-16: Early direct native initialization + second-event append/read roundtrip passes, including quoted/newline audit data. Public initializeLedger/reconcileAppend and validated position/receipt tokens exist; receipt includes INSERT query ID. Host-local adapter and public bootstrap pass separate-process exclusion, typed acquisition timeout, persistent marker after clean/process-death release, UUID/position retention, and lease loss DURING socket admission preventing the next write. Transport regression passes explicit identity encoding and a profile that otherwise returns partial results. Native Nix core/test-support builds also pass, exercising the frozen codec against Aeson 2.2.4.1 (Cabal uses 2.3.2.0). Evidence: `/tmp/clickhouse-migrate-ep5-m1-unit-final.log`, `/tmp/clickhouse-migrate-ep5-ledger.log`, `/tmp/clickhouse-migrate-ep5-m1-exclusive.log`, `/tmp/clickhouse-migrate-ep5-m1-transport.log` and `/tmp/clickhouse-migrate-ep5-m1-nix.log`. Remaining M2 work: initialization/representative-event lost/error acknowledgements, delayed first-event arrival after an empty read with blocked successor, schema/corruption/binding faults, real guarded exact reconciliation, acknowledged server-kill/restart durability and complete Cabal/Nix acceptance. Do not start EP-6 until all pass.
 
 ## Surprises & Discoveries
 
+2026-10-16: Direct admission initially failed because http-client advertises gzip even when decompression is disabled. The proxy had used uncompressed upstream responses. Explicit Accept-Encoding identity fixes direct reads; the transport suite now includes this path. Candidate Settings.cpp also permits partial results under break overflow modes, which could hide unresolved history behind a valid prefix. Machine reads force unlimited server read/result sizes and throwing read/result/timeout/sort modes, while retaining bounded full client responses.
 
+2026-10-16: Metadata fsync is a per-query setting distinct from MergeTree part fsync. Internal requests force fsync_metadata=1 and preflight verifies its effective value. The candidate's exact normalized table definition exposes fsync_after_insert and fsync_part_directory; its profile is deliberately weakened in fixtures. Actual server-crash acceptance remains M2 work.
 
 
 ## Decision Log
 
+2026-10-16: Freeze one complete event family now, including recovery/adoption, and compare stable per-event context against the active immutable definition. Canonical encoding plus exact physical column checks preserves duplicate evidence rather than selecting a timestamp winner. See [ledger v1](../contracts/ledger-v1.md) and [ADR 0006](../adr/0006-freeze-immutable-ledger-and-explicit-coordination.md).
 
+2026-10-16: Public bootstrap is an early consumer for the coordinator adapter, so separate-process tests exercise actual guarded storage without exposing Guard/Transport/raw append. The development OS-lock marker survives every release; later entry requires explicit external quiescence evidence even after a clean client exit. Lease checks run immediately before HTTP writes as well as before store operations.
 
 
 ## Outcomes & Retrospective

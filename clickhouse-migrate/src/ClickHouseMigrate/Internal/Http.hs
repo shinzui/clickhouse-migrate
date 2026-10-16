@@ -1,5 +1,5 @@
 -- | Dedicated direct HTTP resources, bounded full responses, and no replay.
-module ClickHouseMigrate.Internal.Http (Http, withHttp, withHttpAdmission, withHttpFinalizer, probeConnection, submit) where
+module ClickHouseMigrate.Internal.Http (Http, withHttp, withHttpAdmission, withHttpAdmissionChecked, withHttpFinalizer, probeConnection, submit) where
 
 import ClickHouseMigrate.Internal.TargetTypes
 import ClickHouseMigrate.Internal.Transport hiding (request)
@@ -36,13 +36,16 @@ withHttp config = withHttpFinalizer config (pure ())
 
 -- Private qualification hook runs through the real cleanup path after sockets.
 withHttpFinalizer :: TargetConfig -> IO () -> (Http -> IO a) -> IO (ScopeResult a)
-withHttpFinalizer config finalizer = withHttpOwned config (const (pure (Right ()))) finalizer
+withHttpFinalizer config finalizer = withHttpOwned config (const (pure (Right ()))) (pure (Right ())) finalizer
 
 withHttpAdmission :: TargetConfig -> (Internal.Connection -> IO (Either TransportError ())) -> (Http -> IO a) -> IO (ScopeResult a)
-withHttpAdmission config admit = withHttpOwned config admit (pure ())
+withHttpAdmission config admit = withHttpAdmissionChecked config admit (pure (Right ()))
 
-withHttpOwned :: TargetConfig -> (Internal.Connection -> IO (Either TransportError ())) -> IO () -> (Http -> IO a) -> IO (ScopeResult a)
-withHttpOwned config admit finalizer action = mask $ \restore -> do
+withHttpAdmissionChecked :: TargetConfig -> (Internal.Connection -> IO (Either TransportError ())) -> IO (Either TransportError ()) -> (Http -> IO a) -> IO (ScopeResult a)
+withHttpAdmissionChecked config admit check = withHttpOwned config admit check (pure ())
+
+withHttpOwned :: TargetConfig -> (Internal.Connection -> IO (Either TransportError ())) -> IO (Either TransportError ()) -> IO () -> (Http -> IO a) -> IO (ScopeResult a)
+withHttpOwned config admit check finalizer action = mask $ \restore -> do
   submitted <- newIORef False
   active <- newIORef True
   connections <- newIORef [(0 :: Int, finalizer)]
@@ -67,6 +70,7 @@ withHttpOwned config admit finalizer action = mask $ \restore -> do
                   { Internal.connectionWrite = \bytes -> do
                       live <- readIORef active
                       unless live (fail "HTTP scope closed")
+                      check >>= either (throwIO . AdmissionFailure) pure
                       writeIORef submitted True
                       Internal.connectionWrite conn bytes,
                     Internal.connectionClose = close
@@ -74,7 +78,7 @@ withHttpOwned config admit finalizer action = mask $ \restore -> do
           atomicModifyIORef' connections (\old -> ((connectionId, close) : old, ()))
           live <- readIORef active
           unless live (close >> fail "HTTP scope closed")
-          admitted <- restoreOpen (admit conn) `onException` close
+          admitted <- restoreOpen (admit (conn {Internal.connectionWrite = \bytes -> check >>= either (throwIO . AdmissionFailure) (const (Internal.connectionWrite conn bytes))})) `onException` close
           case admitted of
             Left failure -> close >> throwIO (AdmissionFailure failure)
             Right () -> pure ()
@@ -128,7 +132,7 @@ submit (Http (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials user p
     then pure (NotSubmitted (safeError InvalidRequest))
     else do
       result <- try @SomeException $ timeout micros $ do
-        request <- makeRequest endpoint user password micros identity sql
+        request <- makeRequest endpoint user password micros identity kind sql
         HTTP.withResponse request manager $ \response -> do
           bytes <- readBounded maxBytes (HTTP.responseBody response)
           pure $ case bytes of
@@ -137,7 +141,7 @@ submit (Http (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials user p
       didSubmit <- readIORef submitted
       case result of
         Left exception | isJust (fromException exception :: Maybe SomeAsyncException) -> throwIO exception
-        Left exception | Just (AdmissionFailure failure) <- fromException exception -> pure (NotSubmitted failure)
+        Left exception | Just (AdmissionFailure failure) <- fromException exception -> pure (if didSubmit then SubmissionUncertain failure else NotSubmitted failure)
         Left _ -> pure $ if didSubmit then SubmissionUncertain (safeError ResponseInterrupted) else NotSubmitted (safeError ConnectionFailed)
         Right Nothing -> pure $ if didSubmit then SubmissionUncertain (safeError DeadlineExpired) else NotSubmitted (safeError DeadlineExpired)
         Right (Just outcome) -> pure outcome
@@ -174,7 +178,7 @@ classify kind status exceptionHeader body
 probeConnection :: TargetConfig -> Internal.Connection -> QueryId -> ByteString -> IO TransportOutcome
 probeConnection (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials user password) (HttpLimits micros maxBytes)) connection (QueryId identity) sql = do
   result <- try @SomeException $ timeout micros $ do
-    request <- makeRequest endpoint user password micros identity sql
+    request <- makeRequest endpoint user password micros identity JsonRows sql
     continuation <- Internal.requestBuilder request connection
     bracket
       (Internal.getResponse (Just (Internal.MaxHeaderLength 4096)) (Just (Internal.MaxNumberHeaders 64)) (Just micros) request (Internal.dummyManaged connection) continuation)
@@ -187,23 +191,38 @@ probeConnection (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials use
       )
   case result of
     Left exception | isJust (fromException exception :: Maybe SomeAsyncException) -> throwIO exception
+    Left exception | Just (AdmissionFailure failure) <- fromException exception -> pure (SubmissionUncertain failure)
     Left _ -> pure (SubmissionUncertain (safeError ResponseInterrupted))
     Right Nothing -> pure (SubmissionUncertain (safeError DeadlineExpired))
     Right (Just outcome) -> pure outcome
 
-makeRequest :: Text -> ByteString -> ByteString -> Int -> Text -> ByteString -> IO HTTP.Request
-makeRequest endpoint user password micros identity sql = do
+makeRequest :: Text -> ByteString -> ByteString -> Int -> Text -> RequestKind -> ByteString -> IO HTTP.Request
+makeRequest endpoint user password micros identity kind sql = do
   base <- HTTP.parseRequest (Text.unpack endpoint)
   let request =
         HTTP.applyBasicAuth user password $
           HTTP.setQueryString
-            [ ("query_id", Just (Encoding.encodeUtf8 identity)),
-              ("async_insert", Just "0"),
-              ("mutations_sync", Just "1"),
-              ("alter_sync", Just "1"),
-              ("wait_end_of_query", Just "1"),
-              ("default_format", Just "JSONEachRow")
-            ]
+            ( [ ("query_id", Just (Encoding.encodeUtf8 identity)),
+                ("async_insert", Just "0"),
+                ("mutations_sync", Just "1"),
+                ("alter_sync", Just "1"),
+                ("fsync_metadata", Just "1"),
+                ("wait_end_of_query", Just "1"),
+                ("default_format", Just "JSONEachRow")
+              ]
+                ++ if kind == JsonRows
+                  then
+                    [ ("max_rows_to_read", Just "0"),
+                      ("max_bytes_to_read", Just "0"),
+                      ("max_result_rows", Just "0"),
+                      ("max_result_bytes", Just "0"),
+                      ("read_overflow_mode", Just "throw"),
+                      ("result_overflow_mode", Just "throw"),
+                      ("timeout_overflow_mode", Just "throw"),
+                      ("sort_overflow_mode", Just "throw")
+                    ]
+                  else []
+            )
             base
               { HTTP.method = "POST",
                 HTTP.requestBody = HTTP.RequestBodyBS sql,
@@ -211,7 +230,7 @@ makeRequest endpoint user password micros identity sql = do
                 HTTP.checkResponse = \_ _ -> pure (),
                 HTTP.responseTimeout = HTTP.responseTimeoutMicro micros,
                 HTTP.decompress = const False,
-                HTTP.requestHeaders = [("Content-Type", "text/plain; charset=utf-8")]
+                HTTP.requestHeaders = [("Content-Type", "text/plain; charset=utf-8"), ("Accept-Encoding", "identity")]
               }
   pure request
 

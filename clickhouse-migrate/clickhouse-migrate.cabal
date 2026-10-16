@@ -15,6 +15,7 @@ build-type: Simple
 extra-doc-files: README.md
 extra-source-files:
   test/public/*.hs
+  test/vectors/*.json
   test/vectors/*.tsv
 
 tested-with: ghc ==9.12.4
@@ -38,7 +39,9 @@ common common
     bytestring >=0.12.2 && <0.13,
     containers >=0.7 && <0.9,
     cryptohash-sha256 >=0.11.102.1 && <0.12,
+    entropy >=0.4.1.10 && <0.5,
     text >=2.1 && <2.2,
+    time >=1.12.2 && <1.17,
 
   build-depends:
     aeson >=2.2.4.1 && <2.4,
@@ -53,13 +56,24 @@ library
     ClickHouseMigrate
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
+    ClickHouseMigrate.ExclusiveAccess
+    ClickHouseMigrate.Ledger
     ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
     ClickHouseMigrate.Target
 
   other-modules:
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.Exclusive
+    ClickHouseMigrate.Internal.ExclusiveTypes
     ClickHouseMigrate.Internal.Http
+    ClickHouseMigrate.Internal.Identity
+    ClickHouseMigrate.Internal.LedgerCodec
+    ClickHouseMigrate.Internal.LedgerSchema
+    ClickHouseMigrate.Internal.LedgerStore
+    ClickHouseMigrate.Internal.LedgerTypes
+    ClickHouseMigrate.Internal.LedgerValidation
+    ClickHouseMigrate.Internal.Projection
     ClickHouseMigrate.Internal.ServerPolicy
     ClickHouseMigrate.Internal.SqlEnvelope
     ClickHouseMigrate.Internal.TargetTypes
@@ -80,11 +94,28 @@ executable clickhouse-migrate-test-driver
 
   main-is: Main.hs
   other-modules:
+    ClickHouseMigrate
+    ClickHouseMigrate.Definition
+    ClickHouseMigrate.Error
+    ClickHouseMigrate.ExclusiveAccess
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.Exclusive
+    ClickHouseMigrate.Internal.ExclusiveTypes
     ClickHouseMigrate.Internal.Http
+    ClickHouseMigrate.Internal.Identity
+    ClickHouseMigrate.Internal.LedgerCodec
+    ClickHouseMigrate.Internal.LedgerSchema
+    ClickHouseMigrate.Internal.LedgerStore
+    ClickHouseMigrate.Internal.LedgerTypes
+    ClickHouseMigrate.Internal.LedgerValidation
+    ClickHouseMigrate.Internal.Projection
     ClickHouseMigrate.Internal.ServerPolicy
+    ClickHouseMigrate.Internal.SqlEnvelope
     ClickHouseMigrate.Internal.TargetTypes
     ClickHouseMigrate.Internal.Transport
+    ClickHouseMigrate.Internal.Types
+    ClickHouseMigrate.Ledger
+    ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
     ClickHouseMigrate.Target
 
@@ -103,13 +134,26 @@ test-suite clickhouse-migrate-unit
     ClickHouseMigrate
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
+    ClickHouseMigrate.ExclusiveAccess
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.Exclusive
+    ClickHouseMigrate.Internal.ExclusiveTypes
     ClickHouseMigrate.Internal.Http
+    ClickHouseMigrate.Internal.Identity
+    ClickHouseMigrate.Internal.LedgerCodec
+    ClickHouseMigrate.Internal.LedgerSchema
+    ClickHouseMigrate.Internal.LedgerStore
+    ClickHouseMigrate.Internal.LedgerTypes
+    ClickHouseMigrate.Internal.LedgerValidation
+    ClickHouseMigrate.Internal.Projection
     ClickHouseMigrate.Internal.ServerPolicy
     ClickHouseMigrate.Internal.SqlEnvelope
     ClickHouseMigrate.Internal.TargetTypes
     ClickHouseMigrate.Internal.Transport
     ClickHouseMigrate.Internal.Types
+    ClickHouseMigrate.Ledger
     ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
     ClickHouseMigrate.Target
+    ExclusiveTests
+    LedgerTests

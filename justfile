@@ -49,3 +49,13 @@ test-completion-policy:
     cabal build clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver
     driver=$(cabal list-bin clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver)
     CLICKHOUSE_MIGRATE_TEST_DRIVER="$driver" cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=completion
+
+test-ledger:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cabal build clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver
+    driver=$(cabal list-bin clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver)
+    CLICKHOUSE_MIGRATE_TEST_DRIVER="$driver" cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=ledger
+
+test-exclusive-access:
+    cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=exclusive

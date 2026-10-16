@@ -5,12 +5,13 @@ module ClickHouseMigrate.Internal.ServerPolicy
   ( TargetCheckError (..),
     probeTarget,
     withTransport,
+    withTransportChecked,
     supportedVersions,
   )
 where
 
 import ClickHouseMigrate.Internal.Checksum qualified as Checksum
-import ClickHouseMigrate.Internal.Http (Http, probeConnection, submit, withHttpAdmission)
+import ClickHouseMigrate.Internal.Http (Http, probeConnection, submit, withHttpAdmissionChecked)
 import ClickHouseMigrate.Internal.TargetTypes
 import ClickHouseMigrate.Internal.Transport
 import ClickHouseMigrate.Prelude
@@ -66,7 +67,10 @@ identityQuery =
 -- The only production constructor for a checked transport. Its Http resources
 -- close at scope exit; a capability used after exit cannot submit again.
 withTransport :: TargetConfig -> QueryId -> (Transport -> IO a) -> IO (ScopeResult (Either TargetCheckError a))
-withTransport config probeId@(QueryId rootId) action = do
+withTransport config probeId = withTransportChecked config probeId (pure (Right ()))
+
+withTransportChecked :: TargetConfig -> QueryId -> IO (Either TransportError ()) -> (Transport -> IO a) -> IO (ScopeResult (Either TargetCheckError a))
+withTransportChecked config probeId@(QueryId rootId) check action = do
   counter <- newIORef (0 :: Int)
   let prefix = "chm-admission-" <> Checksum.digestHex (Checksum.digest (Encoding.encodeUtf8 rootId)) <> "-"
       admit connection = do
@@ -79,7 +83,7 @@ withTransport config probeId@(QueryId rootId) action = do
           Left (ProbeFailure (SubmissionUncertain failure)) -> Left failure
           Left (ProbeFailure (ObservedServerFailure failure)) -> Left failure
           Left _ -> Left (TransportError UnexpectedResponse Nothing Nothing)
-  withHttpAdmission config admit $ \http -> do
+  withHttpAdmissionChecked config admit check $ \http -> do
     checked <- probeTarget http config probeId
     case checked of
       Left failure -> pure (Left failure)

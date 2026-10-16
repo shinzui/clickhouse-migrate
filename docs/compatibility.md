@@ -16,7 +16,9 @@ an intermediate gate, not ledger, runner, adoption or release qualification.
 
 Only this exact patch passes the runtime version allowlist. New patches and
 prereleases fail closed until independently qualified and explicitly added.
-Supported operation is one directly addressed, persistently identified server
+Runtime probes do not attest a binary digest or OS; administrators must install
+the artifact/platform from the matrix. Matching version text alone is not
+qualification. Supported operation is one directly addressed, persistently identified server
 using local synchronous effects. Cloud, HTTP reverse proxies/load balancers,
 failover aliases, distributed execution and replicated engines are excluded.
 The fault proxy is test infrastructure, not a supported production topology.
@@ -31,7 +33,10 @@ the actual newly opened connection before application or ledger bytes, including
 connections opened after an earlier successful probe.
 
 Every POST supplies an explicit query ID and `async_insert=0`, `mutations_sync=1`,
-`alter_sync=1`, `wait_end_of_query=1` and JSONEachRow output. There is no arbitrary
+`alter_sync=1`, `wait_end_of_query=1` and JSONEachRow output. Ledger metadata writes additionally force
+`fsync_metadata=1`; machine reads force throwing overflow modes and unrestricted
+server read/result limits while retaining client response bounds. Requests explicitly
+accept identity encoding. There is no arbitrary
 request/manager/settings injection. These settings define observed local completion,
 not power-loss durability or atomic SQL-plus-ledger commit. Query IDs identify
 requests; they do not deduplicate SQL. A full bounded response must validate before

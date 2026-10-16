@@ -13,6 +13,8 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Encoding
 import Data.Text.IO qualified as Text
+import ExclusiveTests (exclusiveTests)
+import LedgerTests (ledgerTests)
 import Numeric (readHex)
 
 assert :: String -> Bool -> IO ()
@@ -31,6 +33,8 @@ isPlanError _ _ = False
 
 main :: IO ()
 main = do
+  ledgerTests
+  exclusiveTests
   targetValidation
   let sql = "CREATE TABLE app.events (id UInt64) ENGINE=MergeTree ORDER BY id"
   create <- right (sqlStep "create" sql)

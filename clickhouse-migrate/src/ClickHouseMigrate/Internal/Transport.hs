@@ -9,7 +9,7 @@ data RequestKind = Command | JsonRows deriving stock (Eq, Show)
 
 data ResponsePayload = CommandAccepted | Rows ![Object] deriving stock (Eq, Show)
 
-data TransportErrorCode = InvalidRequest | ClientScopeFailed | ConnectionFailed | DeadlineExpired | ResponseInterrupted | ResponseTooLarge | UnexpectedResponse | ServerRejected | RedirectRejected | ServerIdentityMismatch | UnsupportedServer | CompletionPolicyMismatch | CleanupFailed | CleanupTimedOut
+data TransportErrorCode = AdministrativeAccessLost | InvalidRequest | ClientScopeFailed | ConnectionFailed | DeadlineExpired | ResponseInterrupted | ResponseTooLarge | UnexpectedResponse | ServerRejected | RedirectRejected | ServerIdentityMismatch | UnsupportedServer | CompletionPolicyMismatch | CleanupFailed | CleanupTimedOut
   deriving stock (Eq, Ord, Show)
 
 -- Only safe structured diagnostics; raw server/HTTP exceptions are never rendered.

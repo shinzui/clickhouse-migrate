@@ -154,3 +154,37 @@ Mori found no Nixpkgs source checkout. The locked Nixpkgs commit
 Its enableCabalFlag supplies the opt-in Nix internal-test-driver output; the
 production core output retains the default-off flag. No dependency pin was chosen
 from an unverified local corpus version.
+
+## Ledger identities and exclusive access — 2026-10-16
+
+Mori located `mori://haskell/time/packages/time`; its getCurrentTime, UTC parsing
+and formatting source was read. Hackage preferred time 1.16.0.1 and upstream tag
+`1.16.0.1` (`24ddc629d3da321f4d6bf36ea7b329ffc7978032`) were checked. Bounds
+>=1.12.2 && <1.17 include the tested compiler-bundled 1.14.
+
+Mori found no entropy or filelock checkout. Authoritative Hackage release sources
+were therefore read directly, including entropy's bracketed OS entropy acquisition
+and filelock's OS-lock ownership/interruptibility. Preferred releases and upstream
+tags: `mori://TomMD/entropy` 0.4.1.11, tag v0.4.1.11 at
+`c1046279dc2741c88cc608dc5f70a28625046f5e`; `mori://haskell-pkg-janitors/filelock`
+0.1.1.9, tag v0.1.1.9 at `74e5cd6f8e3cf1ca72af118782f256887f5fd9ba`.
+Core entropy bounds >=0.4.1.10 && <0.5 resolve to 0.4.1.11. Filelock bounds >=0.1.1.8 && <0.2 resolve to 0.1.1.9 in Cabal. File locking belongs
+only to development/test support, not to the core's external-coordinator contract.
+
+At the exact matrix source commit, `mori://ClickHouse/ClickHouse`, project-relative
+`src/Storages/MergeTree/MergeTreeSettings.cpp` and `src/Core/Settings.cpp`
+(file URIs pending), confirm fsync_after_insert, fsync_part_directory and
+fsync_metadata semantics. The isolated native schema spike verifies the two table
+settings appear in the exact normalized engine/CREATE metadata. The native Nix core/test-support build passes its unit checks with entropy
+0.4.1.11, filelock 0.1.1.9, aeson 2.2.4.1 and http-client-tls 0.3.6.4.
+Full crash/fault
+qualification remains the ledger plan's M2 gate.
+
+The ledger's early native integration exposed http-client's implicit gzip
+Accept-Encoding header even when decompression is disabled. Source inspection of
+its requestBuilder confirmed the behavior; requests now explicitly accept identity
+encoding, and the transport group includes direct admitted-server metadata. This
+regression was hidden when the fault proxy requested uncompressed upstream data.
+Candidate Settings.cpp also documents partial-result read/result/timeout/sort
+modes. Internal machine reads override result/read limits and force throwing modes;
+a deliberately truncating fixture profile must still return a complete history.

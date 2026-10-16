@@ -70,7 +70,7 @@ class NativeServer:
         for directory in ['data', 'tmp', 'user_files', 'format_schemas']:
             (self.root / directory).mkdir()
         users = self.root / 'users.xml'
-        users.write_text('''<clickhouse><profiles><default><max_threads>2</max_threads><async_insert>1</async_insert><wait_for_async_insert>0</wait_for_async_insert><async_insert_busy_timeout_ms>10000</async_insert_busy_timeout_ms><mutations_sync>0</mutations_sync><alter_sync>0</alter_sync></default></profiles>
+        users.write_text('''<clickhouse><profiles><default><max_threads>2</max_threads><async_insert>1</async_insert><wait_for_async_insert>0</wait_for_async_insert><async_insert_busy_timeout_ms>10000</async_insert_busy_timeout_ms><mutations_sync>0</mutations_sync><alter_sync>0</alter_sync><fsync_metadata>0</fsync_metadata><max_result_rows>1</max_result_rows><result_overflow_mode>break</result_overflow_mode><max_block_size>1</max_block_size></default></profiles>
 <users><default><password>test-password</password><networks><ip>127.0.0.1</ip></networks>
 <profile>default</profile><quota>default</quota><access_management>1</access_management></default></users>
 <quotas><default><interval><duration>3600</duration><queries>0</queries><errors>0</errors>
@@ -172,6 +172,8 @@ class FaultProxy:
                     query_id = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('query_id', [''])[0]
                     if proxy.query_id is not None and query_id != proxy.query_id:
                         mode = 'pass'
+                    if mode == 'delay-first':
+                        mode = 'delay' if not proxy.events else 'pass'
                     if mode == 'close-second':
                         mode = 'pass' if not proxy.events else 'close'
                     proxy.events.append({'path': self.path, 'mode': mode, 'connection': self.client_address[1], 'forwarded': mode not in ['redirect', 'close']})

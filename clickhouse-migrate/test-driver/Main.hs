@@ -1,9 +1,19 @@
 -- | Opt-in qualification of actual private core sources. Never a public SQL API.
 module Main (main) where
 
+import ClickHouseMigrate.Definition qualified as Def
+import ClickHouseMigrate.ExclusiveAccess
+import ClickHouseMigrate.Internal.Exclusive
+import ClickHouseMigrate.Internal.ExclusiveTypes (AccessResult (..))
 import ClickHouseMigrate.Internal.Http
+import ClickHouseMigrate.Internal.Identity
+import ClickHouseMigrate.Internal.LedgerCodec qualified as Codec
+import ClickHouseMigrate.Internal.LedgerStore qualified as Store
+import ClickHouseMigrate.Internal.LedgerTypes qualified as L
 import ClickHouseMigrate.Internal.ServerPolicy
 import ClickHouseMigrate.Internal.Transport
+import ClickHouseMigrate.Ledger qualified as Ledger
+import ClickHouseMigrate.Plan qualified as Plan
 import ClickHouseMigrate.Target
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Exception (AsyncException (ThreadKilled), SomeException, throwIO, try)
@@ -11,7 +21,9 @@ import Data.Aeson (Value, object, toJSON, (.=))
 import Data.Aeson qualified as Aeson
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy.Char8 qualified as Lazy
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
+import Data.Set qualified as Set
 import Data.Text qualified as Text
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (exitFailure)
@@ -48,6 +60,7 @@ run = do
       query <- either (const (fail "Invalid query id")) pure (queryId (Text.pack identity))
       sql <- BS.readFile file
       case operation of
+        "ledger-smoke" -> ledgerSmoke config query
         mode | mode `elem` ["guarded-command", "guarded-reuse"] -> do
           probe <- either (const (fail "Invalid probe id")) pure (queryId (Text.pack (identity ++ "-identity")))
           result <- withTransport config probe $ \transport -> do
@@ -119,3 +132,38 @@ guardedValue (ScopeResult result cleanup) =
 checkValue :: TargetCheckError -> Value
 checkValue (TargetRejected failure) = object ["rejected" .= errorValue failure]
 checkValue (ProbeFailure failure) = object ["probeFailure" .= outcomeValue failure]
+
+-- The fixture owns a fresh isolated server, and this explicit provider represents
+-- its single administrative process. It is not an application/default provider.
+ledgerSmoke :: TargetConfig -> QueryId -> IO ()
+ledgerSmoke config probe = do
+  key <- either (fail . show) pure (targetKey "test-target")
+  audit <- either (fail . show) pure (Ledger.auditContext "test operator's \"review\"" "roundtrip\nencoding" ["owned isolated fixture"])
+  quiet <- either (fail . show) pure (Ledger.attestQuiescence key audit)
+  uuid <- freshUuid >>= either (fail . show) pure . ledgerId
+  runIdentity <- freshUuid
+  provider <- either (fail . show) pure (externallySerialized "owned-fixture-single-process" "complete isolated test target" 1000000 (const (pure ())) (const (pure ())) (const (pure True)))
+  result <- withExclusive provider key $ \guard -> withTransport config probe $ \transport -> Store.storeResult $ do
+    absent <- Store.load (Just guard) transport config
+    unlessTest (absent == Store.Missing) "Fresh fixture already has a ledger"
+    store <- Store.openStore guard transport config (Just (Ledger.authorizeInitialization key uuid audit)) quiet runIdentity
+    initial <- Store.storeProjection store
+    step <- either (fail . show) pure (Def.sqlStep "first" "CREATE TABLE app.events (id UInt8)")
+    migration <- either (fail . show) pure (Def.sqlMigration "m" (step :| []))
+    component <- either (fail . show) pure (Def.migrationComponent "app" Set.empty (migration :| []))
+    plan <- either (fail . show) pure (Plan.migrationPlan (component :| []))
+    definition <- case Codec.definitions plan of [value] -> pure value; _ -> fail "Unexpected test plan"
+    identity <- freshUuid
+    attempt <- freshUuid
+    time <- diagnosticTime
+    context <- either (fail . show) pure (Codec.contextFor definition Nothing)
+    let event = L.LedgerEvent 2 identity uuid runIdentity (Just attempt) time audit "0.1.0.0" (Just context) (L.StartMigration definition)
+    local <- Store.append store event
+    loaded <- Store.load (Just guard) transport config
+    unlessTest (loaded == Store.History local) "Stored event differs from projected event"
+    pure (object ["position" .= Ledger.ledgerPositionText (L.position local), "initializedPosition" .= Ledger.ledgerPositionText (L.position initial), "roundtrip" .= True])
+  case result of
+    AccessResult (Right (ScopeResult (Right (Right (Right value))) [])) [] -> Lazy.putStrLn (Aeson.encode value)
+    _ -> Lazy.putStrLn (Aeson.encode (object ["failure" .= show result])) >> exitFailure
+  where
+    unlessTest condition message = if condition then pure () else fail message

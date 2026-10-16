@@ -19,7 +19,7 @@ import Control.Exception (bracket)
 import Data.Aeson (Value, object, (.=))
 import Data.Aeson qualified
 
-data FaultMode = Pass | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | SwitchIdentityAfterResponse
+data FaultMode = Pass | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | DelayFirstResponse | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | SwitchIdentityAfterResponse
   deriving stock (Eq, Show)
 
 data FaultProxy = FaultProxy !Fixture !Int !Text
@@ -62,6 +62,7 @@ modeName Redirect = "redirect"
 modeName CloseConnection = "close"
 modeName CloseReusedConnection = "close-second"
 modeName DelayResponse = "delay"
+modeName DelayFirstResponse = "delay-first"
 modeName UnsupportedVersion = "unsupported-version"
 modeName PrereleaseVersion = "prerelease-version"
 modeName WeakenedPolicy = "weakened-policy"
