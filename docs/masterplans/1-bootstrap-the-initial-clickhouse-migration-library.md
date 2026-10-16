@@ -73,7 +73,7 @@ Use the fewest boundaries that preserve these acceptance differences. A single l
 | 5 | Immutable ledger and exclusive access | [docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md](../../docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md) | EP-2, EP-4 | None | Complete |
 | 6 | Runner, inspection and explicit recovery | [docs/plans/6-execute-inspect-and-repair-migrations-conservatively.md](../../docs/plans/6-execute-inspect-and-repair-migrations-conservatively.md) | EP-5 | None | Complete |
 | 7 | Generic adoption and consumer fixtures | [docs/plans/7-adopt-legacy-history-with-auditable-consumer-fixtures.md](../../docs/plans/7-adopt-legacy-history-with-auditable-consumer-fixtures.md) | EP-3, EP-6 | None | Complete |
-| 8 | Reusable CLI and release qualification | [docs/plans/8-deliver-reusable-cli-documentation-and-release-qualification.md](../../docs/plans/8-deliver-reusable-cli-documentation-and-release-qualification.md) | EP-3, EP-7 | None | In Progress |
+| 8 | Reusable CLI and release qualification | [docs/plans/8-deliver-reusable-cli-documentation-and-release-qualification.md](../../docs/plans/8-deliver-reusable-cli-documentation-and-release-qualification.md) | EP-3, EP-7 | None | Complete |
 
 Whole-child hard dependencies require Complete status and acceptance evidence before starting their consumers. No milestone exceptions or soft dependencies are used. All plans inherit the intention in frontmatter. Commit implementation on the current branch with Conventional Commit messages and MasterPlan, ExecPlan and Intention trailers; use canonical Mori references for cross-repository artifacts.
 
@@ -124,12 +124,31 @@ Promote durable choices into local ADRs as their owning children implement them:
 ## Progress
 
 
-EP-1 through EP-7 are Complete under the user’s native-only validation scope. The workspace, pure definitions/checksum v1, content-qualified embedding, direct HTTP admission, immutable ledger and explicit coordination pass their acceptance gates. Cabal and Nix core drivers pass the full native transport/ledger matrix; extracted source archives pass ledger qualification and all six native flake checks pass. The exact candidate is 26.8.28.14 LTS on Apple Silicon, now adoption-qualified. Public scoped execution/inspection and all four explicit repairs pass the enumerated interruption matrix, both surviving-client cases and extracted source-distribution tests. Linux and remote CI remain deferred. The complete captured consumer passes fresh native replay and original-source replay plus adoption without SQL, followed by one native migration, in both source-archive and Nix dependency closures. EP-8 is In Progress.
+EP-1 through EP-8 are Complete under the user's native-only validation scope.
+All twelve required native groups pass from seven extracted sibling distributions
+and in a complete separate serial Nix suite/driver/example run. Package metadata,
+three pure suites, fourteen public invariant negatives, 24 checksum vectors, two
+adoption vectors, archive Haddocks, six native flake checks, formatting and managed
+tooling drift checks pass. The CLI preserves scoped core evidence, and two separately
+embedded libraries compose in an application-owned executable. ADRs 0001–0009 and
+`docs/release-evidence.md` record final contracts, limitations and exact witnesses.
+Only ClickHouse 26.8.28.14 LTS on Apple Silicon is qualified; newly published patches,
+Linux and remote CI remain unqualified/deferred. A separate pre-ready native startup
+SIGSEGV is preserved with unknown cause and is not counted as passing or hidden by
+fixture retries. The actual complete serial Nix rerun passes.
 
-The remaining initiative-level integration gate is the separate consumer cutover: record its canonical change reference and evidence that the old runner is retired, exclusive administration is established, the adopted native ledger verifies, and a subsequent native migration succeeds on an isolated existing-history fixture. EP-8 records the full section 19 acceptance mapping in `docs/release-evidence.md`; all claimed versions must pass before release qualification is complete.
+The remaining initiative-level integration gate is the separate consumer cutover: record its canonical change reference and evidence that the old runner is retired, exclusive administration is established, the adopted native ledger verifies, and a subsequent native migration succeeds on an isolated existing-history fixture. EP-8 records the full section 19 acceptance mapping in `docs/release-evidence.md`; all locally claimed versions now pass. The external gate remains open, so the initiative/first release is not declared complete.
 
 
 ## Surprises & Discoveries
+
+2026-10-16: EP-8's command/result adapters and executable preserve partial reports,
+query/append identities, weaker attestation evidence and asynchronous cancellation.
+The closure audit distinguishes actual fixture tooling from the standard process
+library already transitively required by HTTP. Nix-shell TMPDIR differences require
+a fixed host-wide qualification-job lock; this is not a production coordinator.
+A pre-ready native SIGSEGV is retained separately from complete passing matrices.
+New upstream patches remain excluded until their own exact qualification.
 
 2026-10-16: EP-5 qualifies one late commit after NotObserved for step intent, completion and adoption, plus delayed bootstrap after empty row/process reads. The externally serialized job must retain exclusion through request drain; the development OS-lock marker blocks later entry without explicit evidence even after clean/process-death release. Required local disk/fsync metadata and acknowledged SIGKILL/restart behavior are qualified separately from untested power loss. ADR 0006 and ledger-v1.md own this handoff.
 
@@ -169,3 +188,17 @@ Revision 2026-10-15 — Applied the pre-implementation API/correctness review ac
 
 
 ## Outcomes & Retrospective
+
+All eight local children are implemented and qualified on 2026-10-16. The early
+consumer-first acceptance exposed timestamp caches, transport encoding/completion
+assumptions, parser/data-path test assumptions and evidence-boundary errors before
+later expansion. Shared validated types and complete hard prerequisites kept CLI,
+recovery and adoption from inventing conflicting state models. Durable context is
+in ADRs 0001–0009; section 19 evidence and artifact identities are published locally.
+
+The initiative remains open solely for the separate external runner replacement at
+`mori://shinzui/kansoku`. No external repository write, production database action,
+publication, deployment, Linux build or remote CI execution was performed. A fixture
+is useful acceptance evidence, but does not retire an external runner. The user can
+review and use the complete local library without implying that final external gate
+has passed.

@@ -44,13 +44,15 @@ for chain in process_paths:
 
 metadata = json.loads(run(['nix', 'eval', '--builders', '', '--json', '.#clickhouse-migrate', '--apply', '''p: {
   name = p.pname;
-  library = map (d: d.pname or d.name) p.getCabalDeps.libraryHaskellDepends;
+  library = map (d: d.pname or d.name) (builtins.filter (d: d != null) p.getCabalDeps.libraryHaskellDepends);
   flags = p.configureFlags or [];
   outputs = p.outputs;
-  executable = p.isExecutable or false;
+  executable = map (d: d.pname or d.name) (builtins.filter (d: d != null) p.getCabalDeps.executableHaskellDepends);
 }''']))
 if metadata['executable']:
     raise SystemExit('Normal core Nix output must not install an executable')
+if not {'http-client', 'http-client-tls'}.issubset(set(metadata['library'])):
+    raise SystemExit('Missing expected transport library edges in Nix metadata')
 if forbidden.intersection(metadata['library']) or 'process' in metadata['library']:
     raise SystemExit('Forbidden direct Nix production library edge')
 if any('internal-test-driver' in flag and not flag.startswith('-f-') for flag in metadata['flags']):

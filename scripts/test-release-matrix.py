@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run every required native group serially; never skip an unavailable candidate."""
 import json
+import fcntl
 import os
 from pathlib import Path
 import platform
@@ -28,7 +29,11 @@ example = binary('CLICKHOUSE_MIGRATE_EXAMPLE', 'clickhouse-migrate-example:exe:c
 env = dict(os.environ, CLICKHOUSE_MIGRATE_TEST_DRIVER=driver, CLICKHOUSE_MIGRATE_EXAMPLE=example)
 if 'CLICKHOUSE_MIGRATE_SUITE' not in os.environ:
     env.setdefault('clickhouse_migrate_test_support_datadir', str(ROOT / 'clickhouse-migrate-test-support'))
-for group in GROUPS:
-    print('Required case:', group, flush=True)
-    subprocess.run([suite, group], cwd=ROOT, env=env, check=True)
+# Serialize independent artifact variants on this host. This is only fixture-job
+# coordination, never a production administrative provider or proof of drain.
+with (Path('/tmp') / 'clickhouse-migrate-native-release.lock').open('a') as gate:
+    fcntl.flock(gate, fcntl.LOCK_EX)
+    for group in GROUPS:
+        print('Required case:', group, flush=True)
+        subprocess.run([suite, group], cwd=ROOT, env=env, check=True)
 print('All twelve native groups passed; no external consumer cutover, remote CI or publication implied', flush=True)

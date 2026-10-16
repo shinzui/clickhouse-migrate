@@ -1,0 +1,110 @@
+{
+  "recordVersion": 1,
+  "qualifiedAt": "2026-10-16T17:39:22Z",
+  "sourceRevision": "457e197",
+  "scope": "All eight local plans complete; external consumer cutover open; no publication or deployment",
+  "server": {
+    "version": "26.8.28.14",
+    "tag": "v26.8.28.14-lts",
+    "tagObject": "cb8b2f96f32feb4203ab9edbf4f03b274bbb6952",
+    "commit": "3694fe07040369cef78c937311cbaac5f0555484",
+    "platform": "aarch64-darwin",
+    "sha256": "ab5a04de4a6b705e0f1f02e6a0e0a44feff8b4455b6dfcc4a03b7571f98fbb60"
+  },
+  "host": "macOS 26.7 arm64",
+  "compiler": "ghc-9.12.4",
+  "base": "4.21.2.0",
+  "variants": {
+    "extractedSiblingDistributions": {
+      "result": "passed",
+      "groups": 12,
+      "workspace": "/tmp/clickhouse-migrate-release-sdist-saaumydn",
+      "log": "/tmp/clickhouse-migrate-ep8-distributions.log"
+    },
+    "nix": {
+      "result": "passed",
+      "groups": 12,
+      "suite": "/tmp/clickhouse-migrate-ep8-qualified/bin/clickhouse-migrate-integration",
+      "driver": "/tmp/clickhouse-migrate-ep8-qualified-1/bin/clickhouse-migrate-test-driver",
+      "example": "/tmp/clickhouse-migrate-ep8-qualified-2/bin/clickhouse-migrate-example",
+      "log": "/tmp/clickhouse-migrate-ep8-nix-matrix-final.log"
+    }
+  },
+  "archives": [
+    {
+      "file": "clickhouse-migrate-0.1.0.0.tar.gz",
+      "sha256": "c3106813834c303dcf5600bacdb042bdb40e0947ee00a26962f3542953ab9038"
+    },
+    {
+      "file": "clickhouse-migrate-cli-0.1.0.0.tar.gz",
+      "sha256": "718024f0ab52ac405b152a5b6462f6a360e7555494cc67a663e62dfa0e014aa0"
+    },
+    {
+      "file": "clickhouse-migrate-embed-0.1.0.0.tar.gz",
+      "sha256": "ebc4402e4f08e4df3ebd6ce9575a1171e7b7e4d793c2862f56611f2ec9e04c12"
+    },
+    {
+      "file": "clickhouse-migrate-example-0.1.0.0.tar.gz",
+      "sha256": "4b85880b273b95184e02e5d9c33bdf31cb497d2b7c3f8a9c07c08d18ce7226f5"
+    },
+    {
+      "file": "clickhouse-migrate-example-analytics-0.1.0.0.tar.gz",
+      "sha256": "dbb630503f24e6322ab9990630b9fe95e344b38f89eeaf9655d2cf64db229d0c"
+    },
+    {
+      "file": "clickhouse-migrate-example-catalog-0.1.0.0.tar.gz",
+      "sha256": "78f7025c599d6ab868af57cb029e0e6d6007b32d465a70bd36e43b5f7f7839e5"
+    },
+    {
+      "file": "clickhouse-migrate-test-support-0.1.0.0.tar.gz",
+      "sha256": "9296d6003a6b37c4fc832741922ce4f6c14d4c9b8fde4d062824944497672e1f"
+    }
+  ],
+  "metadataAnnotation": "The witness archives are the actual qualified bytes; final matrix success/upstream annotations do not change admitted version, binary, executable sources or SQL.",
+  "otherPassedGates": {
+    "metadataPackages": 7,
+    "unitSuites": 3,
+    "publicInvariantNegatives": 14,
+    "checksumVectors": 24,
+    "adoptionVectors": 2,
+    "nativeFlakeChecks": 6,
+    "CabalCoreLibraryPackageUnits": 113,
+    "NixRuntimeReferences": 330,
+    "Haddock": "all distribution libraries; nonfatal coverage/link warnings",
+    "Seihou": "No changes since last generation"
+  },
+  "excludedFailedAttempt": {
+    "phase": "Nix CLI fixture startup before readiness/logger output",
+    "serverExit": -11,
+    "cause": "unknown",
+    "log": "/tmp/clickhouse-migrate-fixture87050-0.log",
+    "root": "/tmp/clickhouse-migrate-server-x740b4kl",
+    "automaticFixtureRetry": false
+  },
+  "openOrDeferred": [
+    "external runner replacement at mori://shinzui/kansoku",
+    "Linux builder qualification",
+    "remote CI execution",
+    "all unqualified patches/platforms"
+  ],
+  "dependencyVersions": {
+    "Cabal": {
+      "http-client": "0.7.19",
+      "http-client-tls": "0.4.0",
+      "aeson": "2.3.2.0",
+      "optparse-applicative": "0.19.0.0"
+    },
+    "Nix": {
+      "http-client": "0.7.19",
+      "http-client-tls": "0.3.6.4",
+      "aeson": "2.2.4.1",
+      "optparse-applicative": "0.18.1.0"
+    }
+  },
+  "finalSourceComparison": {
+    "result": "passed",
+    "changedArchiveMember": "clickhouse-migrate-test-support/test/data/clickhouse-matrix.json",
+    "change": "qualification success, startup caveat and unqualified upstream annotations only; original admission/binary fields equal",
+    "allOtherArchiveMembers": "byte-identical"
+  }
+}

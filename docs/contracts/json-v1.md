@@ -97,7 +97,7 @@ its safe display projection, not an append/import API.
 | `initialized` | `{target}` |
 | `migration-started` | `{definition}` |
 | `step-started`, `step-succeeded` | `{step,queryId}` (step index) |
-| `execution-failed` | `{step,queryId,code,httpStatus,serverCode}` (nullable step/query/status/code numbers as provided) |
+| `execution-failed` | `{step,queryId,code,httpStatus,serverCode}` (nullable step/query/httpStatus/serverCode; code is a string) |
 | `migration-completed` | `{}` |
 | `recovery-authorized` | `{action,expected,previousAttempt,nextAttempt,target,quiescence}` |
 | `step-accepted` | `{step,evidence}` |

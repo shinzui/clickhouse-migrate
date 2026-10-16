@@ -49,7 +49,7 @@ Applications can mount reusable migration commands around their compiled plan, o
 
 
 - [x] M1 — Reusable command parsing/handling and schemaVersion 1 JSON pass offline and guarded integration cases.
-- [ ] M2 — A two-component executable example, published contracts, compatibility matrix and release gates pass with the production dependency closure isolated from test tools.
+- [x] M2 — A two-component executable example, published contracts, compatibility matrix and release gates pass with the production dependency closure isolated from test tools.
 
 ## Surprises & Discoveries
 
@@ -68,6 +68,15 @@ Applications can mount reusable migration commands around their compiled plan, o
 
 
 
+
+- One Nix matrix attempt passed ten groups, then the official native server exited
+  -11 before CLI fixture readiness or logger output. Preserve its failed root/log;
+  do not count it as passing. Different Nix-shell TMPDIRs had defeated the initial
+  cross-variant job lock; use a fixed host-wide /tmp path. The native crash cause
+  remains unknown; serialize the next full Nix run after distribution qualification.
+- Final upstream recheck found newly published 26.8.29.10 LTS. Its package-index
+  version and tag/source commit were verified, but it is not qualified. Preserve
+  the exact already tested 26.8.28.14 allowlist; do not imply all current patches pass.
 
 ## Decision Log
 
@@ -97,7 +106,31 @@ native CLI group (inspection/current distinction, explicit init, all repair/adop
 handlers, stale state, partial JSON, delayed append receipt and async propagation).
 The native executable group also passes composed offline/fresh/no-op/inspection,
 finalize and adoption commands, separate streams and killed-subprocess controlled
-drain. Final Nix/distribution/closure/package release qualification remains M2 work.
+drain. M2 completes on 2026-10-16: all twelve native groups pass from seven extracted
+sibling distributions and in a separate complete serial Nix run. All seven package
+metadata checks, three unit suites, fourteen public negative consumers, 24 checksum
+vectors, two adoption vectors, source-distribution Haddocks, six native flake checks,
+formatting and Seihou drift checks pass. Cabal core library closure has 113 package
+units and Nix runtime metadata 330 references, excluding optional/test/DB harnesses;
+the standard transitive process library is reported explicitly. Source archives build
+with only sibling packages and explicit manifest inputs; no repository source path
+is needed. CLI/authoring/operations/adoption guides, JSON/error contracts and ADR 0009
+are reconciled with the compiled API.
+
+Evidence: `/tmp/clickhouse-migrate-ep8-distributions.log` and its preserved
+`/tmp/clickhouse-migrate-release-sdist-saaumydn` witness workspace;
+`/tmp/clickhouse-migrate-ep8-nix-matrix-final.log` for the complete serial Nix run;
+root-checks/closure/flake/format logs under the same ep8 prefix. The earlier pre-ready
+SIGSEGV is explicitly excluded and retained, with unknown cause and no uptime claim.
+New upstream 26.8.29.10 LTS/26.9 stable remain unqualified, rather than being silently
+accepted. Final matrix annotations record evidence without changing the admitted
+version/digest/SQL. No Linux builder, remote CI, publication, deployment or external
+consumer change occurred. The separate cutover at `mori://shinzui/kansoku` remains open.
+
+The early parsed/typed consumer and subprocess tests found data-directory and
+expected-error test assumptions before expanding qualification. Exact-wire goldens
+and public core reports avoided a second CLI state model. The closure audit also
+prevented an inaccurate claim about HTTP's standard transitive process library.
 
 
 

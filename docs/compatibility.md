@@ -1,6 +1,6 @@
 # Compatibility evidence
 
-The currently transport/ledger/runner/adoption-qualified candidate is ClickHouse **26.8.28.14 LTS** on
+The native-qualified candidate is ClickHouse **26.8.28.14 LTS** on
 Apple Silicon macOS. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
 [test/compatibility/clickhouse-matrix.json](../test/compatibility/clickhouse-matrix.json).
@@ -9,10 +9,9 @@ matrix in test-support so installed fixtures use the same candidate.
 
 On 2026-10-16, the upstream [security/support policy](https://github.com/ClickHouse/ClickHouse/security/policy)
 and [release](https://github.com/ClickHouse/ClickHouse/releases/tag/v26.8.28.14-lts)
-were checked before selecting the current LTS patch. The developer template's
+were checked before selecting this exact LTS candidate. The developer template's
 ClickHouse version is not release evidence. Linux execution is deferred by the
-user; this evidence makes no Linux or remote CI claim. Transport, ledger, runner and adoption qualification are
-intermediate gates; CLI and release qualification are still pending.
+user; this evidence makes no Linux or remote CI claim. All twelve required groups pass in both Nix and extracted source-distribution artifact sets; local CLI/release qualification is complete. The separate external consumer cutover remains open.
 
 Only this exact patch passes the runtime version allowlist. New patches and
 prereleases fail closed until independently qualified and explicitly added.
@@ -110,3 +109,12 @@ Its three explicit native adaptations and unchanged source hashes are published 
 provenance and ADR 0008. Filename-only evidence remains operator-attested. Schema
 metadata comparisons are fixture observations, not a general schema-equality claim.
 The external consumer runner replacement remains separate.
+
+
+The qualification host is macOS 26.7/arm64. A native server startup SIGSEGV before
+readiness/logger output is preserved in release-evidence.md and is not counted as
+a passing run; its cause is unknown. Fixture startup failures fail the case rather
+than automatically retrying. Native protocol evidence is not production OS/uptime
+certification. Final recheck found 26.8.29.10 LTS newly published in the official
+package index (tag/source identity recorded in release evidence); it remains unqualified
+and rejected, as does 26.9 stable. No implicit latest-patch compatibility is claimed.
