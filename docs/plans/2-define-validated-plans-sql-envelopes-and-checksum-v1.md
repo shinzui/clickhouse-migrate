@@ -1,0 +1,99 @@
+---
+id: 2
+slug: define-validated-plans-sql-envelopes-and-checksum-v1
+title: "Define validated plans SQL envelopes and checksum v1"
+kind: exec-plan
+created_at: 2026-10-16T04:45:20Z
+intention: "intention_01m51gc3zpezra0de7ctcp9r8w"
+master_plan: "docs/masterplans/1-bootstrap-the-initial-clickhouse-migration-library.md"
+provenance:
+  created_by:
+    model: "gpt-6-astra"
+    harness: "codex-cli"
+    at: 2026-10-16T04:45:20Z
+---
+
+# Define validated plans SQL envelopes and checksum v1
+
+This ExecPlan is a living document. Keep Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective current. Distill durable decisions into `docs/adr/` before completion.
+
+
+## Purpose / Big Picture
+
+
+Applications can construct explicitly ordered migration plans and reject malformed definitions before any network operation. The same logical definitions produce published, byte-for-byte reproducible v1 checksums, giving embedding, history verification and execution a common identity contract.
+
+## Progress
+
+
+- [ ] M1 — Names, ordering and the one-statement SQL envelope have pure positive and negative tests.
+- [ ] M2 — Context-bound step/migration checksums and compatibility descriptors have published byte-level vectors and invariant-safe public APIs.
+
+## Surprises & Discoveries
+
+
+
+
+## Decision Log
+
+
+2026-10-15: Final checksum calculation occurs at component binding. This preserves ergonomic library-owned migration definitions while ensuring every persisted digest includes the identity required by the specification. Generic record access is restricted where it would undermine smart constructors.
+
+## Outcomes & Retrospective
+
+
+
+
+## Context and Orientation
+
+
+At planning time this repository contains `docs/initial-spec.md`, `mori.dhall`, `mina.kdl`, and Seihou-installed planning skills, but no Haskell implementation. `mori.dhall` already declares the four root package directories. Files named below that are absent are deliverables, not existing APIs. Run commands from the repository root. The initial specification remains the normative product contract; this plan supplies the implementation decisions and acceptance for its slice.
+
+No local ADR corpus or profiled ADR bundle exists at creation. Before implementation, follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. Create durable decisions in `docs/adr/` using the convention then present; do not introduce a new OKF profile incidentally. All cross-repository references use canonical Mori URIs.
+
+Follow `mori://shinzui/haskell-jitsurei/docs/core-standards`: GHC 9.12 or newer, GHC2024, common Cabal settings with DeriveAnyClass, DuplicateRecordFields, OverloadedLabels and OverloadedStrings, postpositive qualified imports, strict fields, unprefixed field names and explicit deriving strategies. `ClickHouseMigrate.Prelude` is the only module enabling PackageImports. Keep generic-lens label instances local to modules that need them. Validated public types must not expose constructors, writable generic optics, unchecked deserializers or Generic instances that bypass validation. Use MultilineStrings for internal multiline Haskell SQL; file embedding must preserve bytes without its indentation processing.
+
+Before selecting any dependency API, use Mori registry search/show/docs and inspect its source. Before adding bounds or pins, verify current Hackage releases and upstream release tags, record evidence in `docs/dependencies.md`, and test the resolved versions. Local corpus versions are not release evidence. Never search or read `/nix/store`.
+
+Hard prerequisite: `docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md` must be Complete. Its package layout, compiler and test entry points are required. This slice implements specification sections 5–7 and the pure part of section 19. A SQL envelope is a lexer that recognizes statement boundaries and forbidden forms; it is not a complete SQL parser or schema-safety proof. A checksum is a SHA-256 digest of a specified binary encoding, not a normalized SQL string.
+
+The conceptual spec places a checksum inside a Migration built without a component name, but section 6 requires component identity in its hash. Resolve that mismatch explicitly: standalone migration definitions remain unbound; component construction binds their identities and calculates final checksums. Only bound plan inspection exposes executable migration/step checksums. Do not insert a fake checksum before component binding.
+
+## Plan of Work
+
+
+M1 adds `clickhouse-migrate/src/ClickHouseMigrate/Definition.hs`, `Plan.hs`, `Error.hs`, and `Internal/SqlEnvelope.hs`. Hidden constructor names validate the ASCII grammar `[a-z0-9][a-z0-9_-]{0,127}`. Reject empty collections at the parsing boundary, duplicate identities in their scopes, missing/self/cyclic dependencies and a dependency appearing after its dependent. Preserve caller order without topological sorting. Return structured errors with definition paths and safe locations. No environment reads or IO belong in these constructors.
+
+The lexer preserves original ByteString payloads while validating UTF-8, no NUL, substantive SQL and a single statement. Cover quoted identifiers, escapes, line/block comments and explicitly supported heredoc forms; reject unterminated constructs and unsupported ambiguous forms. Permit at most one trailing terminator plus comments. Reject transaction control, USE, session SET, client directives, ON CLUSTER, INSERT FORMAT and protected-setting overrides, including mixed case and comments between tokens. Define a conservative accepted command envelope for local DDL and INSERT SELECT/VALUES, and document qualifications/replication/remote-write/ledger-isolation obligations that cannot be proven lexically. Never imply that a lexer establishes full SQL safety or asynchronous completion.
+
+M2 adds `Internal/Checksum.hs`, bound plan descriptors and `docs/contracts/checksum-v1.md`. Freeze the byte layout as a documented domain/version/policy discriminator followed by unsigned 64-bit big-endian byte lengths for variable fields and unsigned 64-bit counts for lists. Distinct step and migration domains include component/migration identity; the step domain also includes step identity and exact SQL, and the migration domain includes the ordered complete step encodings. Freeze exact discriminator/policy bytes in this milestone and publish complete input hex and expected digest hex. Dependencies are compared in the stored component descriptor as a sorted set, while component/migration order remains a sequence; descriptions and source paths never enter these hashes. Reject unknown formats. Use an independent reference encoder to generate expected vectors once and check them in, rather than generating expected values with the implementation under test.
+
+Finalize exports in `clickhouse-migrate/src/ClickHouseMigrate.hs`. Bound values expose read-only views and structured constructors, not Generic reconstruction, Read, unchecked FromJSON or setters that can invalidate them. Internal ordinary records may use Jitsurei's generic-lens style. Add package compilation fixtures that prove clients cannot forge a valid step or mutate SQL through a public optic. Record the checksum and public-invariant decisions in ADRs.
+
+## Concrete Steps
+
+
+Create the named suite and fixtures, then run from the repository root:
+
+```bash
+nix develop -c cabal test clickhouse-migrate-unit --test-show-details=direct
+nix develop -c just check-public-invariants
+nix develop -c cabal haddock clickhouse-migrate
+```
+
+`just check-public-invariants` must compile valid public consumers and assert compilation failure for constructor/optic bypass fixtures. The unit suite must check fixed checksum vectors plus definition and lexer properties.
+
+## Validation and Acceptance
+
+
+Accept two library components with the same local migration name and preserve their supplied order. Reject duplicate names within one scope, empty/comment-only SQL, invalid UTF-8, NUL, two statements, escaped-boundary attacks and dependency cycles. Semicolons inside every supported literal/comment form must not create extra steps. Changing one SQL byte, component identity, migration/step identity, step boundary or order changes the corresponding digest; changing description or relocating a file does not. Verify ambiguous concatenation examples cannot share encoded inputs. Reordering existing components or changing recorded dependencies will be detectable from the descriptors consumed by the ledger plan. This plan does not claim real-server execution support.
+
+## Idempotence and Recovery
+
+
+Builds and pure tests may be repeated. Integration tests must allocate their own temporary directories, ports and database names, track their server processes, and clean up only resources they created. Preserve failed-run evidence before cleanup. Never test against a persistent application database. A failed or uncertain mutating request is not safe to repeat: inspect its exact event and attempt under exclusive access, and use the explicit recovery protocol. Do not erase history, rewrite checksums or assume a timeout stopped server work.
+
+## Interfaces and Dependencies
+
+
+Consumes the workspace in `docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md`. Owns ComponentName, MigrationName, StepName, SqlStep, unbound Migration definitions, MigrationComponent, MigrationPlan, DefinitionError, PlanError, checksum format v1 and the fixed completion-policy identifier. Expose `sqlStep`, `sqlMigration`, `migrationComponent`, and `migrationPlan` with the spec's input shapes, refining the result types to distinguish bound views. Constructors recompute identity rather than accepting caller-supplied checksums. Plans for embedding and ledger must consume these APIs, never duplicate the lexer or encoder. The future transport implements async_insert=0, mutations_sync=1 and alter_sync=1 as the runtime interpretation of this policy.
