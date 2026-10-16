@@ -17,6 +17,8 @@ with tempfile.TemporaryDirectory(prefix='clickhouse-migrate-public-') as directo
         ('Constructor.hs', 'SqlStep'), ('Coercion.hs', 'Coercible'),
         ('Generic.hs', 'Generic'), ('Deserialize.hs', 'Read SqlStep'),
         ('Optic.hs', 'stepSql'), ('Private.hs', 'hidden module'),
+        ('LedgerConstructor.hs', 'LedgerPosition'), ('PrivateLedger.hs', 'hidden module'),
+        ('MissingProvider.hs', 'ExclusiveAccess'), ('MissingQuiescence.hs', 'QuiescenceEvidence'),
     ]:
         result = subprocess.run([*common, '-fno-code', str(fixtures / file)],
                                 cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -26,4 +28,4 @@ with tempfile.TemporaryDirectory(prefix='clickhouse-migrate-public-') as directo
         if result.returncode == 0 or not any(term in result.stdout for term in alternatives):
             raise SystemExit(f'{file}: expected invariant failure, got:\n{result.stdout}')
         print(f'{file}: rejected as expected')
-print('Public composition runs; all six invariant bypasses rejected')
+print('Public composition runs; all ten core/ledger invariant bypasses rejected')

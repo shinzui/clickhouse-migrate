@@ -188,3 +188,13 @@ regression was hidden when the fault proxy requested uncompressed upstream data.
 Candidate Settings.cpp also documents partial-result read/result/timeout/sort
 modes. Internal machine reads override result/read limits and force throwing modes;
 a deliberately truncating fixture profile must still return a complete history.
+
+Ledger preflight also checks the exact candidate's storage-policy and disk metadata.
+At the same `mori://ClickHouse/ClickHouse` commit, project-relative
+`src/Storages/System/StorageSystemDisks.cpp`,
+`src/Storages/System/StorageSystemStoragePolicies.cpp` and
+`src/Databases/DatabaseMemory.cpp` (file URIs pending) were inspected before these
+queries/negative fixtures. Explicit default storage policy and healthy writable
+Local disks are required; Atomic/MergeTree names can otherwise conceal unqualified
+remote storage. The native metadata spike independently confirms the normalized
+CREATE spelling and disk flags. No new Haskell dependency is needed.

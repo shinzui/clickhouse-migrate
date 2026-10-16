@@ -99,7 +99,8 @@ fixtureRpc (Fixture input output _ gate _ root _) request = withMVar gate $ \() 
   Lazy.hPutStrLn input (Aeson.encode request)
   -- ByteString writes to a Handle still use its buffering policy.
   hFlush input
-  line <- timeout 15000000 (BS.hGetLine output)
+  let deadline = case request of Object fields | KM.lookup "operation" fields == Just (String "restart") -> 40000000; _ -> 15000000
+  line <- timeout deadline (BS.hGetLine output)
   reply <- maybe (fail ("Fixture RPC deadline expired; evidence: " ++ root)) (either (const (fail "Invalid fixture protocol")) pure . Aeson.eitherDecodeStrict') line
   case reply of
     Object members -> maybe (fail ("Owned fixture operation failed; evidence: " ++ root)) pure (KM.lookup "result" members)

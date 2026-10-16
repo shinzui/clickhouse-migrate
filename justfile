@@ -15,7 +15,7 @@ check-packages:
 test-unit:
     cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- test all --test-show-details=direct
 
-test-integration: test-transport test-completion-policy
+test-integration: test-transport test-completion-policy test-ledger test-exclusive-access
 
 format:
     nix fmt

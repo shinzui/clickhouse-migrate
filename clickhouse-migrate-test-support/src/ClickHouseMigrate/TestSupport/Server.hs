@@ -6,6 +6,7 @@ module ClickHouseMigrate.TestSupport.Server
     serverLogDirectory,
     serverVersion,
     queryServer,
+    restartCandidateServer,
   )
 where
 
@@ -27,3 +28,7 @@ serverVersion (Server fixture) = fixtureVersion fixture
 
 queryServer :: Server -> Text -> IO Value
 queryServer (Server fixture) sql = fixtureRpc fixture (object ["operation" .= ("query" :: Text), "sql" .= sql])
+
+-- | SIGKILL/restart the owned candidate using the same temporary data root.
+restartCandidateServer :: Server -> IO ()
+restartCandidateServer (Server fixture) = void $ fixtureRpc fixture (object ["operation" .= ("restart" :: Text)])

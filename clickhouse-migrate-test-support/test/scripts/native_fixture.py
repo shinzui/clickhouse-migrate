@@ -59,6 +59,7 @@ def binary_for(entry):
 
 class NativeServer:
     def __init__(self, entry):
+        self.entry = entry
         self.root = Path(tempfile.mkdtemp(prefix='clickhouse-migrate-server-', dir='/tmp'))
         self.port = port()
         self.tcp_port = port()
@@ -124,6 +125,25 @@ class NativeServer:
         with urllib.request.urlopen(request, timeout=10) as response:
             return [json.loads(line) for line in response.read().splitlines() if line.strip()]
 
+    def restart(self):
+        """Kill/restart only this owned process, preserving its data/config/UUID."""
+        if self.process is not None and self.process.poll() is None:
+            os.killpg(self.process.pid, signal.SIGKILL)
+            self.process.wait(timeout=5)
+        self.process = subprocess.Popen([str(self.binary), 'server', '--config-file', str(self.root / 'config.xml')], stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None:
+                raise RuntimeError('Owned restarted server exited')
+            try:
+                identity = self.query('SELECT version() AS version, toString(serverUUID()) AS server_id')[0]
+                if identity['version'] == self.entry['version'] and identity['server_id'] == (self.root / 'data/uuid').read_text().strip():
+                    return
+            except OSError:
+                pass
+            time.sleep(.05)
+        raise RuntimeError('Owned server restart deadline expired')
+
     def close(self, success):
         for proxy in self.proxies:
             proxy.close()
@@ -145,6 +165,8 @@ class FaultProxy:
         self.tls = tls
         self.mode = 'pass'
         self.query_id = None
+        self.stage = None
+        self.release = threading.Event()
         self.identity_spoof = False
         self.closed = False
         self.events = []
@@ -168,7 +190,22 @@ class FaultProxy:
             def do_POST(self):
                 body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
                 with proxy.lock:
+                    stage = None
+                    if body.startswith(b'CREATE DATABASE IF NOT EXISTS '):
+                        stage = 'ddl-database'
+                    elif body.startswith(b'CREATE TABLE IF NOT EXISTS '):
+                        stage = 'ddl-table'
+                    elif b'FORMAT JSONEachRow\n' in body:
+                        try:
+                            payload = json.loads(body.split(b'FORMAT JSONEachRow\n', 1)[1])
+                            stage = json.loads(payload['event'])['kind']
+                        except (ValueError, KeyError, TypeError):
+                            pass
+                    if stage is None and body.lstrip().startswith((b'CREATE ', b'ALTER ', b'INSERT ', b'DROP ', b'TRUNCATE ', b'RENAME ')):
+                        stage = 'application-sql'
                     mode = proxy.mode
+                    if proxy.stage is not None and stage != proxy.stage:
+                        mode = 'pass'
                     query_id = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('query_id', [''])[0]
                     if proxy.query_id is not None and query_id != proxy.query_id:
                         mode = 'pass'
@@ -176,7 +213,8 @@ class FaultProxy:
                         mode = 'delay' if not proxy.events else 'pass'
                     if mode == 'close-second':
                         mode = 'pass' if not proxy.events else 'close'
-                    proxy.events.append({'path': self.path, 'mode': mode, 'connection': self.client_address[1], 'forwarded': mode not in ['redirect', 'close']})
+                    event_index = len(proxy.events)
+                    proxy.events.append({'path': self.path, 'mode': mode, 'stage': stage, 'connection': self.client_address[1], 'forwarded': mode not in ['redirect', 'close', 'hold-before']})
                 if mode == 'close':
                     self.close_connection = True
                     return
@@ -186,6 +224,12 @@ class FaultProxy:
                     self.send_header('Content-Length', '0')
                     self.end_headers()
                     return
+                if mode == 'hold-before':
+                    if not proxy.release.wait(timeout=15):
+                        self.close_connection = True
+                        return
+                    with proxy.lock:
+                        proxy.events[event_index]['forwarded'] = True
                 upstream = http.client.HTTPConnection('127.0.0.1', target.port, timeout=20)
                 try:
                     upstream.request('POST', self.path, body=body, headers={'Authorization': self.headers.get('Authorization', ''), 'Content-Type': 'text/plain'})
@@ -213,6 +257,12 @@ class FaultProxy:
                         rows[0]['version'] = '26.8.28.14-rc1'
                     else:
                         rows[0]['mutations_sync'] = 0
+                    data = b''.join(json.dumps(row).encode() + b'\n' for row in rows)
+                if mode == 'weakened-storage' and data.strip():
+                    rows = [json.loads(line) for line in data.splitlines() if line.strip()]
+                    for row in rows:
+                        if 'is_remote' in row:
+                            row['is_remote'], row['type'] = 1, 'ObjectStorage'
                     data = b''.join(json.dumps(row).encode() + b'\n' for row in rows)
                 if mode == 'late-error':
                     status, data = 200, b'Code: 999. DB::Exception: SQL_SECRET_MARKER (SYNTHETIC_ERROR)\n'
@@ -258,6 +308,7 @@ class FaultProxy:
         if self.closed:
             return
         self.closed = True
+        self.release.set()
         self.http.shutdown()
         self.http.server_close()
         self.thread.join(timeout=2)
@@ -277,7 +328,10 @@ def serve(matrix, entry_id):
             request = json.loads(line)
             operation = request['operation']
             try:
-                if operation == 'query':
+                if operation == 'restart':
+                    server.restart()
+                    result = None
+                elif operation == 'query':
                     result = server.query(request['sql'])
                 elif operation == 'proxy-start':
                     proxy = FaultProxy(server, bool(request.get("tls", False)))
@@ -291,6 +345,11 @@ def serve(matrix, entry_id):
                     with proxy.lock:
                         proxy.mode = request['mode']
                         proxy.query_id = request.get('queryId')
+                        proxy.stage = request.get('stage')
+                        proxy.release.clear()
+                    result = None
+                elif operation == 'proxy-release':
+                    server.proxies[request['id']].release.set()
                     result = None
                 elif operation == 'proxy-open-connections':
                     proxy = server.proxies[request['id']]

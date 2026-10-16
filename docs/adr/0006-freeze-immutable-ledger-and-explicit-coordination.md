@@ -48,7 +48,9 @@ read-only and never reinserts or resumes work.
 Every event is submitted once. Any unacknowledged submitted append stops the store,
 including an observed error response. Preserve primary observations and cleanup
 errors separately; rethrow asynchronous cancellation after cleanup. Verify the
-exact schema and effective metadata/part fsync settings, and prevent server partial-
+exact schema and effective metadata/part fsync settings. Select the default
+storage policy explicitly and verify all its disks are healthy writable Local
+disks; Atomic/MergeTree names alone do not qualify remote storage. Prevent server partial-
 result modes from presenting a truncated history as a complete valid prefix.
 
 ## Consequences
@@ -63,7 +65,11 @@ administrator needs explicit target-bound quiescence evidence. Every administrat
 must share the same host, canonical lock root and target key. This is development
 coordination, not a distributed lease/fencing implementation.
 
-The first native roundtrip and separate-process exclusion checks establish early
-integration. Full delayed-append, initialization-fault and server-crash qualification
-remain the ledger plan's M2 acceptance gate. Fsync configuration/process-kill tests
+Native qualification includes separate-process exclusion, initialization/event
+acknowledgement loss, late intent/completion/adoption events after NotObserved,
+and an acknowledged owned-server SIGKILL/restart. Read-only diagnosis can remain
+inside a caller-owned serialized job while a prior request is outstanding; that
+job must admit no mutating successor until all predecessor requests drain.
+The host-local marker is more conservative and requires explicit evidence even
+for later entry after client exit. Fsync configuration/process-kill tests
 do not establish power-loss or storage-failure durability.

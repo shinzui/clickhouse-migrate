@@ -73,6 +73,7 @@ keys expected row = unless (Set.fromList expected == Set.fromList (KM.keys row))
 -- ledger identity. Return False for absent table after checking every object.
 shape :: Maybe Guard -> Transport -> LedgerNamespace -> IO (Bool, Bool)
 shape guard transport namespace = do
+  checkLocalStorage guard transport
   settings <- readRows guard transport "SELECT toUInt8(getSetting('fsync_metadata')) AS fsync_metadata"
   case settings of
     [setting] -> do
@@ -102,6 +103,34 @@ shape guard transport namespace = do
     _ -> invalid
   where
     invalid = abort (LedgerProblem InvalidLedgerSchema)
+
+-- Fsync-qualified v1 storage is the explicitly selected default policy backed by
+-- healthy writable local disks. A same-named policy can otherwise point at object
+-- storage, for which the native process-crash qualification does not apply.
+checkLocalStorage :: Maybe Guard -> Transport -> IO ()
+checkLocalStorage guard transport = do
+  policies <- readRows guard transport "SELECT disks FROM system.storage_policies WHERE policy_name='default'"
+  names <- concat <$> mapM (\row -> keys ["disks"] row >> (member "disks" row :: IO [Text])) policies
+  unless (not (null names) && length names == Set.size (Set.fromList names)) invalid
+  disks <- readRows guard transport "SELECT name, type, is_remote, is_read_only, is_broken FROM system.disks"
+  decoded <-
+    mapM
+      ( \row -> do
+          keys ["name", "type", "is_remote", "is_read_only", "is_broken"] row
+          name <- member "name" row
+          kind <- member "type" row :: IO Text
+          flags <- mapM (`member` row) ["is_remote", "is_read_only", "is_broken"] :: IO [Int]
+          pure (name, kind, flags)
+      )
+      disks
+  mapM_
+    ( \name -> case [(kind, flags) | (actual, kind, flags) <- decoded, actual == name] of
+        [("Local", [0, 0, 0])] -> pure ()
+        _ -> invalid
+    )
+    names
+  where
+    invalid = abort (LedgerProblem UnsupportedLedgerStorage)
 
 load :: Maybe Guard -> Transport -> TargetConfig -> IO Observation
 load guard transport (TargetConfig target _ _ namespace binding _ _) = do

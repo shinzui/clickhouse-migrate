@@ -14,7 +14,9 @@ The sorting/primary key is `sequence`; partition and sampling keys are empty.
 There are no defaults, TTLs, codecs, projections, constraints, replacing/deduplication
 semantics or extra objects. The candidate's normalized CREATE definition is
 checked in full. Required table settings are `fsync_after_insert=1` and
-`fsync_part_directory=1`, with the candidate's default `index_granularity=8192`.
+`fsync_part_directory=1`, explicit `storage_policy='default'`, with the candidate's default `index_granularity=8192`.
+The default policy must contain only healthy writable Local disks, with no
+remote flags; selecting an Atomic/MergeTree engine alone does not establish this.
 Every request forces `fsync_metadata=1`; metadata preflight verifies it is effective.
 Normal inserts use the fixed synchronous completion settings. These checks concern
 the documented native process/server-crash model; power loss, disk/controller

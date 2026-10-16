@@ -18,7 +18,8 @@ import Data.ByteString.Lazy qualified as Lazy
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Encoding
-import System.Environment (getArgs, getEnv, getEnvironment, getExecutablePath)
+import LedgerIntegration (ledgerFaultCases)
+import System.Environment (getArgs, getEnv, getEnvironment, getExecutablePath, lookupEnv)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hClose)
@@ -349,7 +350,8 @@ exclusiveChild :: String -> String -> String -> String -> FilePath -> String -> 
 exclusiveChild endpoint identity namespace ledger root micros evidence = do
   key <- right (Target.targetKey ("ledger-tests/" <> Text.pack namespace))
   credentials <- right (Target.basicCredentials "default" "test-password")
-  config <- Target.targetConfig key <$> right (Target.directEndpoint (Text.pack endpoint)) <*> right (Target.serverId (Text.pack identity)) <*> right (Target.ledgerNamespace (Text.pack namespace)) <*> pure Target.FirstUse <*> pure credentials <*> right (Target.httpLimits 10000000 1048576)
+  requestMicros <- maybe 10000000 read <$> lookupEnv "CHM_CHILD_HTTP_MICROS"
+  config <- Target.targetConfig key <$> right (Target.directEndpoint (Text.pack endpoint)) <*> right (Target.serverId (Text.pack identity)) <*> right (Target.ledgerNamespace (Text.pack namespace)) <*> pure Target.FirstUse <*> pure credentials <*> right (Target.httpLimits requestMicros 1048576)
   uuid <- right (Target.ledgerId (Text.pack ledger))
   audit <- right (Ledger.auditContext "test child administrator" "owned fixture handoff" ["owned process and all server requests independently quiescent"])
   quiet <- right (Ledger.attestQuiescence key audit)
@@ -358,8 +360,11 @@ exclusiveChild endpoint identity namespace ledger root micros evidence = do
   let status = case Ledger.result report of
         Right position -> object ["outcome" .= ("initialized" :: Text), "position" .= Ledger.ledgerPositionText position]
         Left (Ledger.AccessRejected problem) -> object ["outcome" .= ("access-rejected" :: Text), "code" .= show problem]
+        Left (Ledger.RequestFailed requestEvidence failure receipt) -> object ["outcome" .= ("request-failed" :: Text), "code" .= show (Ledger.code failure), "evidence" .= show requestEvidence, "receipt" .= fmap Ledger.appendReceiptText receipt]
+        Left (Ledger.InitializationFailed ledgerIdentity stage query requestEvidence failure) -> object ["outcome" .= ("ddl-failed" :: Text), "code" .= show (Ledger.code failure), "evidence" .= show requestEvidence, "ledgerId" .= ledgerIdentity, "stage" .= stage, "queryId" .= Target.queryIdText query]
         Left problem -> object ["outcome" .= ("rejected" :: Text), "code" .= show problem]
-  Lazy.putStr (Aeson.encode status)
+  let value = case status of Object fields -> Object (KM.insert "cleanupErrors" (Aeson.toJSON (map show (Ledger.cleanupErrors report))) fields); other -> other
+  Lazy.putStr (Aeson.encode value)
 
 ledgerCases :: FilePath -> Server -> IO ()
 ledgerCases driver server = do
@@ -374,6 +379,7 @@ ledgerCases driver server = do
   value <- either (const (fail "Invalid ledger driver protocol")) pure (Aeson.eitherDecodeStrict' (Encoding.encodeUtf8 (Text.pack output)))
   field "roundtrip" value >>= assert "Ledger byte roundtrip mismatch"
   putStrLn "ledger: direct native initialization + immutable append/read roundtrip; quoted/newline audit text preserved"
+  ledgerFaultCases driver server
 
 exclusiveCases :: Server -> IO ()
 exclusiveCases server = do

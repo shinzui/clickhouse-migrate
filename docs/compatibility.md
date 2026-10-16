@@ -1,6 +1,6 @@
 # Compatibility evidence
 
-The currently transport-qualified candidate is ClickHouse **26.8.28.14 LTS** on
+The currently transport/ledger-qualified candidate is ClickHouse **26.8.28.14 LTS** on
 Apple Silicon macOS. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
 [test/compatibility/clickhouse-matrix.json](../test/compatibility/clickhouse-matrix.json).
@@ -11,15 +11,17 @@ On 2026-10-16, the upstream [security/support policy](https://github.com/ClickHo
 and [release](https://github.com/ClickHouse/ClickHouse/releases/tag/v26.8.28.14-lts)
 were checked before selecting the current LTS patch. The developer template's
 ClickHouse version is not release evidence. Linux execution is deferred by the
-user; this evidence makes no Linux or remote CI claim. Transport qualification is
-an intermediate gate, not ledger, runner, adoption or release qualification.
+user; this evidence makes no Linux or remote CI claim. Transport and ledger qualification are
+intermediate gates; runner, adoption-command and release qualification are still pending.
 
 Only this exact patch passes the runtime version allowlist. New patches and
 prereleases fail closed until independently qualified and explicitly added.
 Runtime probes do not attest a binary digest or OS; administrators must install
 the artifact/platform from the matrix. Matching version text alone is not
 qualification. Supported operation is one directly addressed, persistently identified server
-using local synchronous effects. Cloud, HTTP reverse proxies/load balancers,
+using local synchronous effects. The ledger uses the explicitly selected default
+storage policy backed only by healthy writable Local disks, with verified metadata
+and part fsync settings. Cloud, HTTP reverse proxies/load balancers,
 failover aliases, distributed execution and replicated engines are excluded.
 The fault proxy is test infrastructure, not a supported production topology.
 
@@ -60,3 +62,22 @@ The completion group checks visible synchronous INSERT, local ALTER, a mutation
 blocked by stopped merges, an empty read before a delayed INSERT commits, and a
 server query surviving client cancellation. All passed on 2026-10-16. Failed fixture
 runs preserve their owned diagnostic root; successful runs remove only owned data.
+
+Ledger qualification also passes `just test-ledger` and `just test-exclusive-access`:
+initialization DDL/first-event response loss; representative execution, recovery and
+adoption append loss; complete observed error with a committed event; read-only exact
+receipt reconciliation; delayed intent/completion/adoption after NotObserved; a
+delayed first INSERT after empty row/process observations with a blocked different-
+UUID successor; wrong engines/columns/UUID/target/storage; physical duplicate,
+sequence gap/conflict, unknown version, missing initialization and foreign-ledger
+corruption; and acknowledged history after owned-server SIGKILL/restart. The suite
+runs against both Cabal and Nix-built core drivers. Public separate-process host-local
+coordination runs in the Cabal harness; the Nix package build also compiles that
+adapter. Extracted sibling source distributions pass the complete ledger group.
+
+A caller-owned externally serialized job may retain exclusion across read-only
+NotObserved diagnosis and eventual request drain. It must admit no mutating successor
+until every predecessor request is quiescent. The host-local development adapter
+leaves a persistent marker after clean release and process death, and requires an
+explicit target-bound external attestation before later entry. Neither an absent
+system.processes row nor an empty ledger read satisfies that responsibility.

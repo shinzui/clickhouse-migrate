@@ -2,6 +2,9 @@
 module ClickHouseMigrate.TestSupport.FaultProxy
   ( FaultProxy,
     FaultMode (..),
+    LedgerStage (..),
+    setLedgerFault,
+    releaseFault,
     withFaultProxy,
     withTlsFaultProxy,
     proxyEndpoint,
@@ -19,7 +22,7 @@ import Control.Exception (bracket)
 import Data.Aeson (Value, object, (.=))
 import Data.Aeson qualified
 
-data FaultMode = Pass | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | DelayFirstResponse | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | SwitchIdentityAfterResponse
+data FaultMode = Pass | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | DelayFirstResponse | HoldBeforeForward | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | WeakenedStorage | SwitchIdentityAfterResponse
   deriving stock (Eq, Show)
 
 data FaultProxy = FaultProxy !Fixture !Int !Text
@@ -63,9 +66,11 @@ modeName CloseConnection = "close"
 modeName CloseReusedConnection = "close-second"
 modeName DelayResponse = "delay"
 modeName DelayFirstResponse = "delay-first"
+modeName HoldBeforeForward = "hold-before"
 modeName UnsupportedVersion = "unsupported-version"
 modeName PrereleaseVersion = "prerelease-version"
 modeName WeakenedPolicy = "weakened-policy"
+modeName WeakenedStorage = "weakened-storage"
 modeName SwitchIdentityAfterResponse = "switch-identity"
 
 setFaultForQuery :: FaultProxy -> Text -> FaultMode -> IO ()
@@ -75,3 +80,29 @@ proxyConnections :: FaultProxy -> IO Int
 proxyConnections (FaultProxy fixture identity _) = fixtureRpc fixture (object ["operation" .= ("proxy-open-connections" :: Text), "id" .= identity]) >>= fieldResult
   where
     fieldResult value = case Data.Aeson.fromJSON value of Data.Aeson.Success number -> pure number; Data.Aeson.Error _ -> fail "Invalid proxy connection count"
+
+-- SQL bodies are inspected privately only to select a protocol stage; they are
+-- never included in proxy events or diagnostics.
+data LedgerStage = DatabaseCreation | TableCreation | Initialization | MigrationStart | StepStart | StepSuccess | MigrationCompletion | RecoveryAuthorization | StepAcceptance | AdoptionStart | AdoptionEntry | AdoptionCompletion
+  deriving stock (Eq, Show)
+
+stageName :: LedgerStage -> Text
+stageName = \case
+  DatabaseCreation -> "ddl-database"
+  TableCreation -> "ddl-table"
+  Initialization -> "initialized"
+  MigrationStart -> "migration-started"
+  StepStart -> "step-started"
+  StepSuccess -> "step-succeeded"
+  MigrationCompletion -> "migration-completed"
+  RecoveryAuthorization -> "recovery-authorized"
+  StepAcceptance -> "step-accepted"
+  AdoptionStart -> "adoption-started"
+  AdoptionEntry -> "adoption-entry"
+  AdoptionCompletion -> "adoption-completed"
+
+setLedgerFault :: FaultProxy -> LedgerStage -> FaultMode -> IO ()
+setLedgerFault (FaultProxy fixture identity _) stage mode = void $ fixtureRpc fixture (object ["operation" .= ("proxy-mode" :: Text), "id" .= identity, "mode" .= modeName mode, "stage" .= stageName stage])
+
+releaseFault :: FaultProxy -> IO ()
+releaseFault (FaultProxy fixture identity _) = void $ fixtureRpc fixture (object ["operation" .= ("proxy-release" :: Text), "id" .= identity])

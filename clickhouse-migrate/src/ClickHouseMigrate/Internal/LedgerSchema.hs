@@ -18,7 +18,7 @@ createDatabase :: LedgerNamespace -> ByteString
 createDatabase namespace = Encoding.encodeUtf8 ("CREATE DATABASE IF NOT EXISTS " <> quoteIdentifier (ledgerNamespaceText namespace) <> " ENGINE=Atomic")
 
 createTable :: LedgerNamespace -> ByteString
-createTable namespace = Encoding.encodeUtf8 ("CREATE TABLE IF NOT EXISTS " <> qualifiedTable namespace <> " " <> columnsSql <> " ENGINE=MergeTree ORDER BY sequence SETTINGS fsync_after_insert=1, fsync_part_directory=1")
+createTable namespace = Encoding.encodeUtf8 ("CREATE TABLE IF NOT EXISTS " <> qualifiedTable namespace <> " " <> columnsSql <> " ENGINE=MergeTree ORDER BY sequence SETTINGS fsync_after_insert=1, fsync_part_directory=1, storage_policy='default'")
 
 columnsSql :: Text
 columnsSql = "(sequence UInt64, event_id UUID, ledger_id UUID, event String)"
@@ -27,7 +27,7 @@ expectedCreate :: LedgerNamespace -> Text
 expectedCreate namespace = "CREATE TABLE " <> ledgerNamespaceText namespace <> ".events (`sequence` UInt64, `event_id` UUID, `ledger_id` UUID, `event` String) ENGINE = " <> expectedEngine
 
 expectedEngine :: Text
-expectedEngine = "MergeTree ORDER BY sequence SETTINGS fsync_after_insert = 1, fsync_part_directory = 1, index_granularity = 8192"
+expectedEngine = "MergeTree ORDER BY sequence SETTINGS fsync_after_insert = 1, fsync_part_directory = 1, storage_policy = 'default', index_granularity = 8192"
 
 -- Only validated ASCII namespace names enter literals; event/audit data are JSON.
 namespaceLiteral :: LedgerNamespace -> Text

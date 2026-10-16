@@ -38,6 +38,7 @@ data LedgerError
   | ImpossibleTransition
   | DefinitionMismatch
   | InvalidLedgerSchema
+  | UnsupportedLedgerStorage
   | LedgerAbsent
   | LedgerUninitialized
   | InitializationNotAuthorized
