@@ -11,6 +11,23 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T04:45:20Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T04:57:58Z
+      verdict: "comments"
+      note: "Carry domain failure and cancellation contracts into CLI validation."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      verdict: "approved"
+      note: "Revised plan addresses this review; ready for its declared implementation prerequisites and acceptance gates, not runtime qualification."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      mode: "update"
+      note: "Align CLI result contracts and release checks with runtime cancellation and private test driver."
 ---
 
 # Deliver reusable CLI documentation and release qualification
@@ -49,7 +66,7 @@ Applications can mount reusable migration commands around their compiled plan, o
 
 At planning time this repository contains `docs/initial-spec.md`, `mori.dhall`, `mina.kdl`, and Seihou-installed planning skills, but no Haskell implementation. `mori.dhall` already declares the four root package directories. Files named below that are absent are deliverables, not existing APIs. Run commands from the repository root. The initial specification remains the normative product contract; this plan supplies the implementation decisions and acceptance for its slice.
 
-No local ADR corpus or profiled ADR bundle exists at creation. Before implementation, follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. Create durable decisions in `docs/adr/` using the convention then present; do not introduce a new OKF profile incidentally. All cross-repository references use canonical Mori URIs.
+At creation there was no local ADR corpus. The pre-implementation review added [Preserve uncertainty across runtime boundaries](../adr/0001-preserve-uncertainty-across-runtime-boundaries.md): unsuccessful requests never authorize automatic replay, successor mutation requires all prior server work to be quiescent, shared ledger types are defined before runtime consumers, and test access must preserve public invariants. Follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. There is no profiled ADR bundle; preserve the plain Markdown convention. All cross-repository references use canonical Mori URIs.
 
 Follow `mori://shinzui/haskell-jitsurei/docs/core-standards`: GHC 9.12 or newer, GHC2024, common Cabal settings with DeriveAnyClass, DuplicateRecordFields, OverloadedLabels and OverloadedStrings, postpositive qualified imports, strict fields, unprefixed field names and explicit deriving strategies. `ClickHouseMigrate.Prelude` is the only module enabling PackageImports. Keep generic-lens label instances local to modules that need them. Validated public types must not expose constructors, writable generic optics, unchecked deserializers or Generic instances that bypass validation. Use MultilineStrings for internal multiline Haskell SQL; file embedding must preserve bytes without its indentation processing.
 
@@ -62,13 +79,15 @@ Hard prerequisites: `docs/plans/7-adopt-legacy-history-with-auditable-consumer-f
 
 M1 adds `clickhouse-migrate-cli/src/ClickHouseMigrate/CLI.hs`, `CLI/Parser.hs`, `CLI/Handler.hs`, `CLI/Render/Text.hs`, and `CLI/Render/Json.hs`. Use optparse-applicative after Mori lookup, released-source review and Hackage/tag verification. Expose parsers and dispatchers receiving the compiled plan, caller connection config, exclusive-access provider, event sink and command policy. The executable owns environment/secret loading, logging, stdout and exit-code choice. Required commands are offline plan; remote status/history; verify with optional require-current; up with explicit target-bound initialize-ledger; repair resume/retry-step/accept-step/finalize; and adopt plan/apply/resume. Mutation without a provider fails. Repair/adoption require expected state and audit fields; uncertain work additionally requires explicit quiescence acknowledgement and evidence. Help distinguishes compatible, current and schema drift, and forbids force/mark-clean/reset/checksum rewriting.
 
-Publish `docs/contracts/json-v1.md` with schemaVersion 1, stable command/status/error codes and explicit report variants. JSON is one complete command-result document on stdout, including partial failure with completed work and unresolved attempts. Progress goes to a separate caller sink, with tests capturing both streams. Keep operator-attested acceptance distinct from observed server success and source-checksum evidence. Default renderers redact SQL, credentials, sensitive parameters and raw server diagnostics; raw detail is explicit opt-in. Use golden contract fixtures, including malformed input and partial failures, and make encoders explicit enough that adding a Haskell constructor cannot silently break the wire format.
+Publish `docs/contracts/json-v1.md` with schemaVersion 1, stable command/status/error codes and explicit report variants. For normally returning commands, JSON is one complete command-result document on stdout, including synchronous partial failure with completed work and unresolved attempts. Asynchronous cancellation preserves cancellation semantics; a final JSON document is not guaranteed on interruption or process termination. Progress goes to a separate caller sink, with tests capturing both streams. Keep operator-attested acceptance distinct from observed server success and source-checksum evidence. Default renderers redact SQL, credentials, sensitive parameters and raw server diagnostics; raw detail is explicit opt-in. Use golden contract fixtures, including malformed input and partial failures, and make encoders explicit enough that adding a Haskell constructor cannot silently break the wire format.
 
 M2 creates `examples/two-components/` with two small library components and an application-owned executable that mounts the parser; list them as non-public workspace packages with valid distributions. It must run offline plan without a server, demonstrate explicit initialization/fresh up, no-op second up, inspection, repair and adoption against isolated fixtures. Publish authoring/composition, connection/exclusive-access, maintenance, recovery and adoption guides, along with ledger/checksum/manifest/adoption/JSON contracts and error codes. Reconcile README, Haddocks and examples with the final API rather than conceptual signatures.
 
 Finish `test/compatibility/clickhouse-matrix.json`, `docs/compatibility.md`, `scripts/check-production-closure.py` and CI release jobs. Verify current upstream supported stable/LTS policy and tags at qualification time, record exact server patches/digests and compiler/transport versions, and run all real-server failure suites on every claimed series. Keep default acceptance limited to tested exact patches; a broader patch policy requires explicit documented evidence. Include effective fsync/synchronous settings, direct self-managed Atomic/MergeTree assumptions and tested process/server failure limits. Do not claim Cloud, distributed execution or power-loss protection from process-kill tests. Build source tarballs, run package metadata/Haddock checks, compile consumers from the distributions and inspect both Cabal library dependencies and Nix runtime closures without traversing `/nix/store`.
 
 Produce `docs/release-evidence.md` mapping every section 19 criterion to a test command, fixture and result. Use it for release qualification, not a checklist that manufactures passing evidence. Complete the separate consumer runner replacement at `mori://shinzui/kansoku` through that repository's workflow when authorized, after the example proves the integration API. A fixture-only result is insufficient to close that gate. Finally distill all child decisions into local ADRs and reconcile the MasterPlan registry and remaining integration gates. Building releasable artifacts does not by itself authorize publishing to Hackage or deployment.
+
+Use the already compiled public consumer contracts from the definition and runner plans for CLI integration. Parsing must validate expected-state tokens, target-bound initialization, audit fields and operation-specific recovery inputs before dispatch. Reuse the core's failure/report and evidence types; do not translate ObservedServerFailure into proof of no effects or NotObserved into permission to retry. Add golden results for delayed-ledger uncertainty and synchronous failure after partial progress, plus a subprocess cancellation check that proves cleanup without requiring final JSON. Build and run the opt-in internal test driver from source distributions for qualification, and prove it is absent from normal production outputs.
 
 ## Concrete Steps
 
@@ -103,3 +122,5 @@ Builds and pure tests may be repeated. Integration tests must allocate their own
 
 
 Consumes all public model/runtime/adoption APIs from `docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md`, `docs/plans/6-execute-inspect-and-repair-migrations-conservatively.md`, `docs/plans/7-adopt-legacy-history-with-auditable-consumer-fixtures.md` and embedding from `docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md`. Owns CLI command types, parser/dispatch contracts, text rendering and JSON schemaVersion 1. It may extend shared CI/Nix/Cabal wiring defined by `docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md` and matrix scenarios defined by `docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md`, but must preserve their single source of truth. JSON rendering must not redefine core state/evidence semantics. No library API calls exitWith or reads secrets implicitly. The external consumer change is an initiative integration gate with its own canonical reference, not a hidden core dependency.
+
+Revision 2026-10-15 — Pre-implementation API/correctness review: Align CLI with typed failures, recovery inputs and asynchronous cancellation semantics.

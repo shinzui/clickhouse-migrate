@@ -11,6 +11,23 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T04:45:20Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T04:57:58Z
+      verdict: "changes-requested"
+      note: "Define absent-ledger expected state and fresh-ledger adoption scope; consume early evidence types."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      verdict: "approved"
+      note: "Revised plan addresses this review; ready for its declared implementation prerequisites and acceptance gates, not runtime qualification."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      mode: "update"
+      note: "Specify fresh-ledger adoption APIs, expected state, evidence and delayed-append recovery."
 ---
 
 # Adopt legacy history with auditable consumer fixtures
@@ -49,7 +66,7 @@ An application can review and adopt a complete legacy prefix without running its
 
 At planning time this repository contains `docs/initial-spec.md`, `mori.dhall`, `mina.kdl`, and Seihou-installed planning skills, but no Haskell implementation. `mori.dhall` already declares the four root package directories. Files named below that are absent are deliverables, not existing APIs. Run commands from the repository root. The initial specification remains the normative product contract; this plan supplies the implementation decisions and acceptance for its slice.
 
-No local ADR corpus or profiled ADR bundle exists at creation. Before implementation, follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. Create durable decisions in `docs/adr/` using the convention then present; do not introduce a new OKF profile incidentally. All cross-repository references use canonical Mori URIs.
+At creation there was no local ADR corpus. The pre-implementation review added [Preserve uncertainty across runtime boundaries](../adr/0001-preserve-uncertainty-across-runtime-boundaries.md): unsuccessful requests never authorize automatic replay, successor mutation requires all prior server work to be quiescent, shared ledger types are defined before runtime consumers, and test access must preserve public invariants. Follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. There is no profiled ADR bundle; preserve the plain Markdown convention. All cross-repository references use canonical Mori URIs.
 
 Follow `mori://shinzui/haskell-jitsurei/docs/core-standards`: GHC 9.12 or newer, GHC2024, common Cabal settings with DeriveAnyClass, DuplicateRecordFields, OverloadedLabels and OverloadedStrings, postpositive qualified imports, strict fields, unprefixed field names and explicit deriving strategies. `ClickHouseMigrate.Prelude` is the only module enabling PackageImports. Keep generic-lens label instances local to modules that need them. Validated public types must not expose constructors, writable generic optics, unchecked deserializers or Generic instances that bypass validation. Use MultilineStrings for internal multiline Haskell SQL; file embedding must preserve bytes without its indentation processing.
 
@@ -69,6 +86,21 @@ M2 implements guarded apply/resume with the ledger schema already defined: valid
 Add immutable consumer fixtures under `clickhouse-migrate-test-support/test/fixtures/kansoku/`, with a provenance file recording the canonical source project, source revision, exact source paths and digests, reviewed step split/mapping and evidence limits. Capture only checked-in SQL and synthetic filename/time history, no live data. Embed the native component through the embedding package in the integration test component, not the test-support production library. First prove one real multi-statement legacy file as a complete native migration, then cover the full captured history. Test both fresh execution and pre-existing effects plus adoption, followed by an appended native migration. If the captured history cannot replay fresh, record a consumer prerequisite and keep the release gate open; do not rewrite history to hide it.
 
 Document a cutover runbook in `docs/adoption.md`: stop old runner, establish target-wide exclusive administration and required writer maintenance, preserve legacy evidence, review the mapping, apply adoption, verify, and switch the administrative executable so two runners cannot operate. This plan prepares the adapter/fixtures/runbook in this repository. The actual consumer runner replacement is a separately tracked change to `mori://shinzui/kansoku`, gated on the CLI example from the final child; record its canonical change reference and acceptance evidence at initiative completion. Create the adoption-evidence ADR.
+
+Keep v1 adoption limited to a fresh ledger: absent with explicit initialization authorization, or initialized with no execution/adoption history. An interrupted matching batch may resume; an already committed identical batch is inspection-only even if later native migrations have run. Reject a new adoption batch on mixed/native history or a different committed batch before any mutation. This makes the specification's fresh-ledger protocol explicit rather than inventing history-splicing semantics.
+
+Use ExpectedLedgerState from the ledger plan to represent absence before initialization and a concrete LedgerPosition afterward. Pure planning operates on supplied evidence and an inspection snapshot without IO; apply always revalidates inside exclusive access. Initialization, if needed, occurs only after the whole batch is validated. An identical completed request is checked by batch identity/digests before stale-position rejection because it performs no mutation; every path that appends still requires a fresh expected position.
+
+```haskell
+planAdoption :: MigrationPlan -> InspectionReport -> AdoptionRequest
+             -> Either AdoptionError AdoptionPlan
+applyAdoption :: MutationContext -> MigrationPlan -> AdoptionPlan
+              -> IO (Either RunFailure RunReport)
+resumeAdoption :: MutationContext -> MigrationPlan -> AdoptionPlan
+               -> IO (Either RunFailure RunReport)
+```
+
+AdoptionPlan is opaque and binds the expected state, target, full source/mapping/definition digests and audit evidence; rebuild it from a fresh inspection for explicit resume. Retain bounded source evidence or a durable resolvable evidence reference beside its digest: a digest alone is neither reviewable history nor proof of predecessor checksums. Use a versioned unambiguous encoding for mapping/snapshot hashes; identity includes the complete mapped prefix and evidence level. Reports use the existing evidence variants. Quiescence covers uncertain adoption and initialization appends; a missing entry in one read never licenses immediate resubmission. Test delayed entries arriving after an empty observation and prove there is no duplicate append or premature adoption-complete.
 
 ## Concrete Steps
 
@@ -95,4 +127,6 @@ Builds and pure tests may be repeated. Integration tests must allocate their own
 ## Interfaces and Dependencies
 
 
-Consumes typed reports/recovery/access from `docs/plans/6-execute-inspect-and-repair-migrations-conservatively.md`, event protocol from `docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md`, and component embedding from `docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md`. Owns AdoptionRequest, AdoptionPlan, mapping/source digests, EvidenceLevel and source-neutral planning/apply/resume APIs. The source reader and filename mapping live in fixtures/example adapter or consumer integration, never ordinary up. Ledger projection remains owned by `docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md` and must represent partial batches before this command logic is introduced. CLI exposes these APIs without adding a force or checksum-rewrite path.
+Consumes typed reports/recovery/access from `docs/plans/6-execute-inspect-and-repair-migrations-conservatively.md`, event protocol from `docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md`, and component embedding from `docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md`. Owns AdoptionRequest, AdoptionPlan, mapping/source digests and source-neutral planning/apply/resume APIs. Consumes EvidenceLevel, ExpectedLedgerState, InitializationAuthorization and audit/quiescence primitives from the ledger plan. The source reader and filename mapping live in fixtures/example adapter or consumer integration, never ordinary up. Ledger projection remains owned by `docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md` and must represent partial batches before this command logic is introduced. CLI exposes these APIs without adding a force or checksum-rewrite path.
+
+Revision 2026-10-15 — Pre-implementation API/correctness review: Define fresh-ledger adoption, absent-state binding, idempotent inspection and delayed-append safety.

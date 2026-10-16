@@ -11,6 +11,23 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T04:45:20Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T04:57:58Z
+      verdict: "changes-requested"
+      note: "Specify usable bound views and metadata constructors; prohibit unchecked embedding bridges."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      verdict: "approved"
+      note: "Revised plan addresses this review; ready for its declared implementation prerequisites and acceptance gates, not runtime qualification."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      mode: "update"
+      note: "Specify bound public views, description construction and invariant-preserving embedding."
 ---
 
 # Define validated plans SQL envelopes and checksum v1
@@ -49,7 +66,7 @@ Applications can construct explicitly ordered migration plans and reject malform
 
 At planning time this repository contains `docs/initial-spec.md`, `mori.dhall`, `mina.kdl`, and Seihou-installed planning skills, but no Haskell implementation. `mori.dhall` already declares the four root package directories. Files named below that are absent are deliverables, not existing APIs. Run commands from the repository root. The initial specification remains the normative product contract; this plan supplies the implementation decisions and acceptance for its slice.
 
-No local ADR corpus or profiled ADR bundle exists at creation. Before implementation, follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. Create durable decisions in `docs/adr/` using the convention then present; do not introduce a new OKF profile incidentally. All cross-repository references use canonical Mori URIs.
+At creation there was no local ADR corpus. The pre-implementation review added [Preserve uncertainty across runtime boundaries](../adr/0001-preserve-uncertainty-across-runtime-boundaries.md): unsuccessful requests never authorize automatic replay, successor mutation requires all prior server work to be quiescent, shared ledger types are defined before runtime consumers, and test access must preserve public invariants. Follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. There is no profiled ADR bundle; preserve the plain Markdown convention. All cross-repository references use canonical Mori URIs.
 
 Follow `mori://shinzui/haskell-jitsurei/docs/core-standards`: GHC 9.12 or newer, GHC2024, common Cabal settings with DeriveAnyClass, DuplicateRecordFields, OverloadedLabels and OverloadedStrings, postpositive qualified imports, strict fields, unprefixed field names and explicit deriving strategies. `ClickHouseMigrate.Prelude` is the only module enabling PackageImports. Keep generic-lens label instances local to modules that need them. Validated public types must not expose constructors, writable generic optics, unchecked deserializers or Generic instances that bypass validation. Use MultilineStrings for internal multiline Haskell SQL; file embedding must preserve bytes without its indentation processing.
 
@@ -69,6 +86,22 @@ The lexer preserves original ByteString payloads while validating UTF-8, no NUL,
 M2 adds `Internal/Checksum.hs`, bound plan descriptors and `docs/contracts/checksum-v1.md`. Freeze the byte layout as a documented domain/version/policy discriminator followed by unsigned 64-bit big-endian byte lengths for variable fields and unsigned 64-bit counts for lists. Distinct step and migration domains include component/migration identity; the step domain also includes step identity and exact SQL, and the migration domain includes the ordered complete step encodings. Freeze exact discriminator/policy bytes in this milestone and publish complete input hex and expected digest hex. Dependencies are compared in the stored component descriptor as a sorted set, while component/migration order remains a sequence; descriptions and source paths never enter these hashes. Reject unknown formats. Use an independent reference encoder to generate expected vectors once and check them in, rather than generating expected values with the implementation under test.
 
 Finalize exports in `clickhouse-migrate/src/ClickHouseMigrate.hs`. Bound values expose read-only views and structured constructors, not Generic reconstruction, Read, unchecked FromJSON or setters that can invalidate them. Internal ordinary records may use Jitsurei's generic-lens style. Add package compilation fixtures that prove clients cannot forge a valid step or mutate SQL through a public optic. Record the checksum and public-invariant decisions in ADRs.
+
+Freeze the authoring and inspection surface in M2, and compile a separate consumer using only exposed modules. Keep the four representative constructors from specification section 5 with `Migration` explicitly unbound. Add these operations (all view types have hidden constructors and ordinary read-only accessors):
+
+```haskell
+withMigrationDescription :: Maybe Text -> Migration -> Migration
+inspectPlan :: MigrationPlan -> NonEmpty ComponentView
+componentMigrations :: ComponentView -> NonEmpty MigrationView
+migrationSteps :: MigrationView -> NonEmpty StepView
+migrationChecksum :: MigrationView -> MigrationChecksum
+stepChecksum :: StepView -> StepChecksum
+stepSql :: StepView -> ByteString
+```
+
+ComponentView also exposes its validated name and dependency set; MigrationView exposes its component-qualified MigrationId, description and ordered steps; StepView exposes its validated local name and bytes. The view hierarchy represents bound definitions; no checksum accessor exists on an unbound Migration or SqlStep. Checksum values expose their format and canonical digest representation but cannot be supplied back as trusted definitions. Description updates are pure metadata updates before binding. This supplies the manifest's description field without unsafe record mutation and lets offline plan rendering use the core rather than reconstruct identity.
+
+Add a representative two-library composition fixture before expanding diagnostics. Compile-failure fixtures cover constructor access, `Coercible`/newtype or Generic reconstruction where relevant, public deserialization and writable optics. Embedding must use the same public constructors; do not add a public unchecked `Lift` or internal-named exposed bridge. M1 must enumerate accepted command families and protected-setting spellings in `docs/contracts/sql-envelope-v1.md`; a leading DDL keyword alone cannot authorize detached/background commands. Match that contract against EP-4's supported completion cases before expanding server support.
 
 ## Concrete Steps
 
@@ -97,3 +130,5 @@ Builds and pure tests may be repeated. Integration tests must allocate their own
 
 
 Consumes the workspace in `docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md`. Owns ComponentName, MigrationName, StepName, SqlStep, unbound Migration definitions, MigrationComponent, MigrationPlan, DefinitionError, PlanError, checksum format v1 and the fixed completion-policy identifier. Expose `sqlStep`, `sqlMigration`, `migrationComponent`, and `migrationPlan` with the spec's input shapes, refining the result types to distinguish bound views. Constructors recompute identity rather than accepting caller-supplied checksums. Plans for embedding and ledger must consume these APIs, never duplicate the lexer or encoder. The future transport implements async_insert=0, mutations_sync=1 and alter_sync=1 as the runtime interpretation of this policy.
+
+Revision 2026-10-15 — Pre-implementation API/correctness review: Make unbound/bound public views and metadata construction concrete; close embedding bypasses.

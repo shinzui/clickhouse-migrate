@@ -11,6 +11,23 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T04:45:20Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T04:57:58Z
+      verdict: "comments"
+      note: "Define a test-only route to private core modules without a package cycle."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      verdict: "approved"
+      note: "Revised plan addresses this review; ready for its declared implementation prerequisites and acceptance gates, not runtime qualification."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      mode: "update"
+      note: "Add opt-in private core test driver while preserving production package boundaries."
 ---
 
 # Bootstrap Seihou tooling and the four-package workspace
@@ -49,7 +66,7 @@ A contributor can enter a reproducible development shell, build all four librari
 
 At planning time this repository contains `docs/initial-spec.md`, `mori.dhall`, `mina.kdl`, and Seihou-installed planning skills, but no Haskell implementation. `mori.dhall` already declares the four root package directories. Files named below that are absent are deliverables, not existing APIs. Run commands from the repository root. The initial specification remains the normative product contract; this plan supplies the implementation decisions and acceptance for its slice.
 
-No local ADR corpus or profiled ADR bundle exists at creation. Before implementation, follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. Create durable decisions in `docs/adr/` using the convention then present; do not introduce a new OKF profile incidentally. All cross-repository references use canonical Mori URIs.
+At creation there was no local ADR corpus. The pre-implementation review added [Preserve uncertainty across runtime boundaries](../adr/0001-preserve-uncertainty-across-runtime-boundaries.md): unsuccessful requests never authorize automatic replay, successor mutation requires all prior server work to be quiescent, shared ledger types are defined before runtime consumers, and test access must preserve public invariants. Follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. There is no profiled ADR bundle; preserve the plain Markdown convention. All cross-repository references use canonical Mori URIs.
 
 Follow `mori://shinzui/haskell-jitsurei/docs/core-standards`: GHC 9.12 or newer, GHC2024, common Cabal settings with DeriveAnyClass, DuplicateRecordFields, OverloadedLabels and OverloadedStrings, postpositive qualified imports, strict fields, unprefixed field names and explicit deriving strategies. `ClickHouseMigrate.Prelude` is the only module enabling PackageImports. Keep generic-lens label instances local to modules that need them. Validated public types must not expose constructors, writable generic optics, unchecked deserializers or Generic instances that bypass validation. Use MultilineStrings for internal multiline Haskell SQL; file embedding must preserve bytes without its indentation processing.
 
@@ -67,6 +84,8 @@ M1 applies the template with PostgreSQL, Redis and Kafka disabled, ClickHouse an
 M2 creates `cabal.project`, `clickhouse-migrate/clickhouse-migrate.cabal`, `clickhouse-migrate-embed/clickhouse-migrate-embed.cabal`, `clickhouse-migrate-cli/clickhouse-migrate-cli.cabal`, and `clickhouse-migrate-test-support/clickhouse-migrate-test-support.cabal`, each with package-local license and source distribution metadata. Create a small `clickhouse-migrate/src/ClickHouseMigrate/Prelude.hs` and compileable package entry modules without placeholder claims of migration functionality. Optional libraries may depend on core; core must not depend on them. Do not make core tests depend on test-support, which will depend on core and would create a package cycle; put server integration suites in test-support. Standardize test targets as `clickhouse-migrate-unit`, `clickhouse-migrate-embed-test`, `clickhouse-migrate-cli-test`, and `clickhouse-migrate-integration`, adding behavioral tests in their owning plans.
 
 Wire each local package into one mutually recursive Haskell package set in `flake.module.nix`, with `packages.default` as core, named outputs for the four packages and checks for unit suites. Avoid a root callCabal2nix invocation against a nonexistent root cabal file. Add `justfile`, `.github/workflows/ci.yml`, and `README.md` documenting build, unit, integration and formatting entry points. Integration jobs are opt-in until the owned server fixture exists. `docs/dependencies.md` records actual dependency versions and evidence, not speculative bounds. Register the Jitsurei standard and concrete packages in `mori.dhall` using its existing schema after consulting Mori source if needed. Create the package-boundary/tooling ADR before marking M2 accepted.
+
+Keep private core modules in `other-modules`, not `exposed-modules`. Reserve a manual, default-off Cabal flag `internal-test-driver` for a `clickhouse-migrate-test-driver` executable in the core package. EP-4 supplies its behavior using `src` plus `test-driver` sources and the same core dependency stanza; it must not depend on test-support or copy the implementation. Test-support's server suites launch the explicitly built driver as a subprocess and assert its structured result and proxy counts. Recipes pass the built executable path explicitly. This lets EP-4 and EP-5 test private transport/storage before the public runner exists, without exposing raw SQL/append operations or introducing a package cycle. Production outputs disable the flag; source distributions include the driver sources for opt-in qualification.
 
 ## Concrete Steps
 
@@ -107,3 +126,5 @@ Preview Seihou changes before applying them. Repeating the same resolved templat
 
 
 No hard prerequisites. This plan owns workspace layout, Cabal/Nix/CI conventions and `ClickHouseMigrate.Prelude`. Later plans add their own modules, dependencies and test targets within this structure; preserve the single package wiring definition. It also owns `docs/dependencies.md`'s format. Later plans append verified dependency evidence there. No PostgreSQL or pg-migrate package is a production dependency.
+
+Revision 2026-10-15 — Pre-implementation API/correctness review: Define private-module test access without a public bypass or package cycle.

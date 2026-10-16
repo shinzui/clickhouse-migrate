@@ -11,6 +11,23 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-10-16T04:45:20Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T04:57:58Z
+      verdict: "changes-requested"
+      note: "Define runtime API and partial failure shape; scope retry-step and all-request quiescence."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      verdict: "approved"
+      note: "Revised plan addresses this review; ready for its declared implementation prerequisites and acceptance gates, not runtime qualification."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-16T05:03:30Z
+      mode: "update"
+      note: "Define command signatures, partial failures, cancellation and explicit repair scope."
 ---
 
 # Execute inspect and repair migrations conservatively
@@ -49,7 +66,7 @@ A caller can execute pending migrations, inspect compatible history and recover 
 
 At planning time this repository contains `docs/initial-spec.md`, `mori.dhall`, `mina.kdl`, and Seihou-installed planning skills, but no Haskell implementation. `mori.dhall` already declares the four root package directories. Files named below that are absent are deliverables, not existing APIs. Run commands from the repository root. The initial specification remains the normative product contract; this plan supplies the implementation decisions and acceptance for its slice.
 
-No local ADR corpus or profiled ADR bundle exists at creation. Before implementation, follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. Create durable decisions in `docs/adr/` using the convention then present; do not introduce a new OKF profile incidentally. All cross-repository references use canonical Mori URIs.
+At creation there was no local ADR corpus. The pre-implementation review added [Preserve uncertainty across runtime boundaries](../adr/0001-preserve-uncertainty-across-runtime-boundaries.md): unsuccessful requests never authorize automatic replay, successor mutation requires all prior server work to be quiescent, shared ledger types are defined before runtime consumers, and test access must preserve public invariants. Follow `agents/skills/exec-plan/ADR.md` and read relevant records added by prerequisites. There is no profiled ADR bundle; preserve the plain Markdown convention. All cross-repository references use canonical Mori URIs.
 
 Follow `mori://shinzui/haskell-jitsurei/docs/core-standards`: GHC 9.12 or newer, GHC2024, common Cabal settings with DeriveAnyClass, DuplicateRecordFields, OverloadedLabels and OverloadedStrings, postpositive qualified imports, strict fields, unprefixed field names and explicit deriving strategies. `ClickHouseMigrate.Prelude` is the only module enabling PackageImports. Keep generic-lens label instances local to modules that need them. Validated public types must not expose constructors, writable generic optics, unchecked deserializers or Generic instances that bypass validation. Use MultilineStrings for internal multiline Haskell SQL; file embedding must preserve bytes without its indentation processing.
 
@@ -67,6 +84,29 @@ M1 adds `clickhouse-migrate/src/ClickHouseMigrate/Runner.hs`, `Inspection.hs`, `
 M2 adds `clickhouse-migrate/src/ClickHouseMigrate/Repair.hs` using the original bound plan and ledger event definitions. Every repair includes exact expected ledger position/attempt, actor, reason, external evidence and typed quiescence assertion where required; re-read/revalidate inside acquired access. Resume starts the first never-started step only when no uncertain step remains. Retry-step durably authorizes a new attempt/query ID for the same bytes after evidence that retry is safe. Accept-step records an operator attestation without executing SQL or continuing later steps. Finalize records migration completion only when every step is successful or accepted. New attempts link to superseded identities. An authorization without a subsequent step-start remains blocking after a crash, requiring a fresh expected-state request.
 
 Treat event sinks as observations, not audit storage. A throwing callback stops further SQL, preserves already acknowledged state and is reported as callback failure. Emit completion callbacks only after the corresponding acknowledgement. Scope access through deterministic transport cleanup; aggregate primary, failure-recording, callback and cleanup failures without swallowing asynchronous cancellation. Default diagnostics redact credentials, SQL and raw server message bodies; expose raw diagnostics only through explicit caller opt-in. Create `docs/operations.md` with recovery sequences and write runner/recovery ADRs.
+
+Freeze the public operation shapes in M1 and compile an application consumer before adding the full failure matrix:
+
+```haskell
+up :: MutationContext -> UpOptions -> MigrationPlan
+   -> IO (Either RunFailure RunReport)
+status :: InspectionOptions -> TargetConfig -> MigrationPlan
+       -> IO (Either InspectionFailure InspectionReport)
+history :: InspectionOptions -> TargetConfig
+        -> IO (Either InspectionFailure HistoryReport)
+verify :: InspectionOptions -> TargetConfig -> VerifyOptions -> MigrationPlan
+       -> IO (Either InspectionFailure VerificationReport)
+repair :: MutationContext -> MigrationPlan -> RepairRequest
+       -> IO (Either RunFailure RunReport)
+```
+
+MutationContext is validated caller configuration: target, mandatory ExclusiveAccess provider, event sink and diagnostic policy, with no live acquired resources. Each operation acquires/releases its own scope. InspectionOptions explicitly selects unguarded observation or an acquired provider; there is no implicit mutation-capable session. Pure `inspectPlan` is owned by the definition plan. RunFailure contains the primary typed error, the latest acknowledged RunReport and separate secondary recording/callback/cleanup errors. Reports distinguish observed failures, uncertain application submissions and uncertain ledger acknowledgements, carrying exact request/event identities for investigation. Secondary errors do not overwrite primary errors or completed work. History reports need no current plan so operators can inspect incompatible stored definitions.
+
+RepairRequest is a validated operation-specific sum: resume/finalize name a migration attempt; retry/accept additionally name the exact step attempt. Every variant carries expected position and audit evidence, and any possible prior work requires typed quiescence evidence. Retry-step executes only its named step under a new authorized attempt; it does not run the remaining suffix or finalize implicitly. Resume runs the remaining never-started steps of that migration and records completion; it does not begin another migration. If no steps remain, use finalize. Accept-step and finalize submit no application SQL. Adoption uses the same failure/report envelope.
+
+Treat asynchronous cancellation separately from synchronous RunFailure: perform bounded cleanup and rethrow cancellation. Do not promise that every cancelled call returns a report or emits a final JSON document. Best-effort failure recording is allowed only with retained access, no unreconciled preceding ledger append (including one with an observed server failure) and a known safe next sequence. After lease loss or uncertain append, submit no further writes, including failure recording. Require quiescence for prior ledger/initialization requests as well as application queries before recovery.
+
+Compile a consumer that constructs an explicit provider, initializes once, persists the returned ledger ID, inspects history, roundtrips an expected-position token and builds each repair variant. Add tests proving retry-step leaves subsequent steps untouched, resume stops at the selected migration, synchronous failures retain progress, and cancellation is rethrown after cleanup.
 
 ## Concrete Steps
 
@@ -96,4 +136,6 @@ Builds and pure tests may be repeated. Integration tests must allocate their own
 ## Interfaces and Dependencies
 
 
-Consumes LedgerPosition, attempts, event schema and guarded storage from `docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md`. Owns UpOptions, InitializationAuthorization, RunReport, InspectionReport, VerifyOptions, RepairRequest, RecoveryEvidence, typed events and stable core error categories. Public conceptual operations are `up`, `status`, `history`, `verify`, and `repair`, returning typed results without printing, configuration loading or process exit. Expose enough report structure for CLI rendering without driver-specific types. JSON wire encoding belongs to the later CLI plan; domain state/evidence semantics belong here. Adoption extends these reports through existing evidence states rather than a second report model.
+Consumes LedgerPosition, attempts, event schema and guarded storage from `docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md`. Owns UpOptions, MutationContext, RunReport, RunFailure, InspectionOptions, InspectionReport, InspectionFailure, HistoryReport, VerificationReport, VerifyOptions, RepairRequest, RecoveryEvidence, typed events and stable core error categories. InitializationAuthorization, ExpectedLedgerState, AuditContext, QuiescenceEvidence and EvidenceLevel are consumed from the ledger plan. Public conceptual operations are `up`, `status`, `history`, `verify`, and `repair`, returning typed results without printing, configuration loading or process exit. Expose enough report structure for CLI rendering without driver-specific types. JSON wire encoding belongs to the later CLI plan; domain state/evidence semantics belong here. Adoption extends these reports through existing evidence states rather than a second report model.
+
+Revision 2026-10-15 — Pre-implementation API/correctness review: Specify runtime signatures, partial failures, cancellation and operation-specific recovery scope.
