@@ -1,0 +1,25 @@
+cabal-version: 3.12
+name: embedding-consumer
+version: 0.1.0.0
+build-type: Simple
+extra-source-files:
+  component/manifest.json
+  component/sql/*.sql
+
+common common
+  default-language: GHC2024
+  default-extensions:
+    DeriveAnyClass
+    DuplicateRecordFields
+    OverloadedLabels
+    OverloadedStrings
+
+executable embedding-consumer
+  import: common
+  main-is: Main.hs
+  build-depends:
+    base >=4.21 && <4.22,
+    bytestring,
+    clickhouse-migrate,
+    clickhouse-migrate-embed,
+    text,

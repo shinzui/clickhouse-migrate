@@ -37,7 +37,18 @@ in  Schema.Project::{
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "clickhouse-migrate-embed"
-        , dependencies = [ Schema.Dependency.ByName "clickhouse-migrate" ]
+        , dependencies =
+          [ Schema.Dependency.ByName "clickhouse-migrate"
+          , Schema.Dependency.ByName "aeson"
+          , Schema.Dependency.ByName "bytestring"
+          , Schema.Dependency.ByName "text"
+          , Schema.Dependency.ByName "containers"
+          , Schema.Dependency.ByName "directory"
+          , Schema.Dependency.ByName "filepath"
+          , Schema.Dependency.ByName "template-haskell"
+          , Schema.Dependency.ByName "process"
+          , Schema.Dependency.ByName "cryptohash-sha256"
+          ]
         }
       , Schema.Package::{
         , name = "clickhouse-migrate-cli"

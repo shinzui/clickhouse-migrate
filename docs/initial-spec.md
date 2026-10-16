@@ -600,6 +600,14 @@ recompile the generated value, including on GHC 9.12. The integration suite must
 prove this through incremental rebuilds, not just clean builds. Any necessary
 compiler plugin belongs to the embedding package and must be documented.
 
+For timestamp-independent Cabal builds, the embedding package supplies a
+content-qualified build entry point. Consumers declare every package-root/manifest
+input; the command fingerprints manifest/SQL bytes and paths before Cabal can
+skip GHC based on unchanged modification times. Raw Cabal retains its own
+modification-time assumptions and is not qualified for preserved-time edits.
+The incremental harness must prove the declared-input build path against fresh
+compiler results; a compiler-only plugin cannot fix Cabal skipping compilation.
+
 SQL is embedded verbatim. Manifest formatting and file relocation do not alter
 the checksum when logical definitions and SQL bytes are unchanged. Runtime code
 must not reopen the source tree or use environment variables to replace SQL.

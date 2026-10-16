@@ -23,6 +23,7 @@ jobs:
       - run: nix develop --accept-flake-config -c just build
       - run: nix develop --accept-flake-config -c just check-packages
       - run: nix develop --accept-flake-config -c just test-unit
+      - run: nix develop --accept-flake-config -c just test-embedding
       - run: nix develop --accept-flake-config -c just check-public-invariants
       - run: nix develop --accept-flake-config -c just sdist
       - run: nix fmt --accept-flake-config -- --fail-on-change

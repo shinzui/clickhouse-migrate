@@ -2,7 +2,7 @@ default:
     @just --list
 
 build:
-    cabal build all
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- build all
 
 check-packages:
     #!/usr/bin/env bash
@@ -13,7 +13,7 @@ check-packages:
 
 # Behavioral suites are added by their owning implementation plans.
 test-unit:
-    cabal test all --test-show-details=direct
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- test all --test-show-details=direct
 
 # EP-4 will add the owned server fixture and private driver invocation.
 test-integration:
@@ -34,3 +34,7 @@ sdist:
 check-public-invariants:
     python3 scripts/check-public-invariants.py
     python3 scripts/checksum-reference.py --check
+
+test-embedding:
+    bash scripts/test-embedding-rebuild.sh
+    python3 scripts/check-embedding-failures.py

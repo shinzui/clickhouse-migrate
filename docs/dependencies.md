@@ -69,3 +69,52 @@ bounds accommodate the pinned compiler's bundled libraries without a workaround.
 Cabal resolved/tested bytestring 0.12.2.0, text 2.1.4, containers 0.7 and
 cryptohash-sha256 0.11.102.1 on GHC 9.12.4. The Nix package set independently
 checks the same public bounds and runs the unit suite.
+
+## Compile-time embedding — 2026-10-16
+
+Mori-located `mori://haskell/aeson/packages/aeson` source was inspected for the
+public Decoding.ByteString/Tokens interfaces and duplicate-preserving token
+representation; normal object decoding would discard duplicate evidence.
+`mori://haskell/directory` supplied canonicalization/ancestor/file checks, and
+`mori://haskell/process/packages/process` supplied `callProcess`'s argument-vector
+execution. Existing core ByteString/Text/Set/SHA-256 APIs are reused.
+
+Hackage preferred releases and upstream tags were verified: aeson 2.3.2.0
+(tag `v2.3.2.0`, `682162c66d26a770fbfb6271c797e646bc5c4f2e`),
+directory 1.3.11.0 (tag `v1.3.11.0`, `12d17af8ee2f84fc6b6ac0d4e1734952789ddd3e`),
+filepath 1.5.5.0 (tag `v1.5.5.0`, `baac7d7e76449f76fc6785e77206edb5530b6bfb`),
+and process 1.6.30.0 (tag `v1.6.30.0`, `11fd247ad33208da7a914acf15d4a09d64a6a4c4`).
+Bounds are aeson >=2.2.4.1 && <2.4, directory >=1.3.10 && <1.4,
+filepath >=1.5.4 && <1.6, process >=1.6.25 && <1.7, and the compiler's
+bundled template-haskell >=2.23 && <2.24. Hackage reports template-haskell
+2.24.0.0 as latest; this project qualifies the pinned 2.23.0.0 compiler generation.
+
+Mori lookup found no registered GHC/template-haskell or filepath source project.
+The pinned compiler's authoritative upstream source at GHC 9.12.4 release commit
+`44c6796f535d60861fa2510025ec79f27696a15e` was therefore read directly:
+`mori://ghc/ghc`, project-relative
+`libraries/ghc-internal/src/GHC/Internal/TH/Syntax.hs`,
+`compiler/GHC/Tc/Gen/Splice.hs` and `compiler/GHC/Iface/Recomp.hs`
+(artifact URIs pending). It confirms addDependentFile expects absolute paths and
+compares contents; getPackageRoot uses the compiler working directory.
+The `mori://haskell/filepath` source was checked directly at its matching
+1.5.5.0 upstream tag (file-level URI coverage pending).
+
+The Cabal timestamp-cache counterexample and content-qualified build workaround
+are recorded in [ADR 0004](adr/0004-qualify-embedding-builds-by-content.md).
+A compiler plugin cannot fix Cabal skipping the compiler invocation. No private
+compiler API or plugin dependency is needed.
+
+Cabal resolved and tested aeson 2.3.2.0, directory 1.3.10.1, filepath 1.5.5.0,
+process 1.6.26.1 and template-haskell 2.23.0.0 on the pinned GHC 9.12.4.
+The Nix package build separately exercises its pinned aeson 2.2 generation
+against the same public bounds. No Linux execution is included in this evidence.
+
+Before retaining the Cabal compatibility workaround, Hackage's latest released
+cabal-install 3.18.2.0 and upstream tag `cabal-install-v3.18.2.0`
+(`45f982c12ef78ea8ec5beb43cb8c71c8e8f237c1`) were checked. Its authoritative
+FileMonitor source still uses modification-time equality to reuse content hashes.
+The measured runtime remains the template's 3.16.1.0, tag
+`cabal-install-v3.16.1.0` (`8d1f5a33662be0db0654061fb53fb00e3f4417e0`).
+The workaround is not based only on a lagging local source checkout; no ad hoc
+managed-toolchain pin was changed.
