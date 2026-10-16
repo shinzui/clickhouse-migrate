@@ -13,6 +13,10 @@ and test harnesses. A [two-library executable example](examples/two-components/R
 demonstrates composition and application-owned configuration/output/exit policy.
 
 The [user documentation](docs/user/README.md) collects guides and interface references.
+Implementation audits live in the [review catalog](docs/reviews/index.md).
+[MasterPlan 2](docs/masterplans/2-resolve-initial-library-correctness-architecture-and-api-review-findings.md)
+tracks remediation of the three initial correctness, architecture and API findings.
+
 Start with [authoring and composition](docs/user/authoring.md), [CLI integration](docs/user/cli.md),
 [operations and recovery](docs/user/operations.md), and [legacy adoption](docs/user/adoption.md).
 Versioned contracts cover [checksums](docs/user/contracts/checksum-v1.md),

@@ -23,7 +23,12 @@ format:
 check-format:
     nix fmt -- --fail-on-change
 
-check: build check-packages test-unit check-public-invariants check-docs check-format
+check: build check-packages test-unit check-public-invariants check-docs check-reviews check-format
+
+check-reviews:
+    dhall type --file mori/reviews-profile.dhall > /dev/null
+    okf validate docs/reviews --strict --profile mori/reviews-profile.dhall --profile-enforce --log-enforce
+    okf graph docs/reviews --json > /dev/null
 
 check-docs:
     dhall type --file mori/user-documentation-profile.dhall > /dev/null

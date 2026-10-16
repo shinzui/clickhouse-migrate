@@ -1,0 +1,7 @@
+component initial: Right success
+append to component a: Left IncompatibleHistory [DefinitionChanged 1 (Just (DefinitionSummary {ordinal = 1, componentIndex = 0, component = "a", dependencies = [], migration = "two", checksum = "3806be2edf32f06a38ae444a6ad46297a51f4cbab7c43abb2be3d82af212222f", stepDefinitions = [("s","5fa03740183255b6b074599cbb741640a3e519a610e89d5b780ebc17ced1654c")]})) (Just (DefinitionSummary {ordinal = 1, componentIndex = 1, component = "b", dependencies = ["a"], migration = "one", checksum = "5ab3837272207b3c0d0d84157e7dba741316e0931118ae845cbf64ca62beb081", stepDefinitions = [("s","24e0eb937a5c884b5e95e48e7e8aec405b762ce3f1f8b568113173aed0cdb254")]}))]
+capacity initial: Right success
+capacity next history: Left LedgerRequestFailed UncertainSubmission (TransportError {code = ResponseTooLarge, httpStatus = Nothing, serverCode = Nothing}) Nothing
+capacity larger bound: Right success
+large accepted repair request: Left LedgerFailed InvalidEvent
+repair ledger events before/after: (3,4); last="recovery-authorized"

@@ -42,6 +42,28 @@ in  Schema.Project::{
         , description = Some
             "User guides, operational runbooks, and versioned interface references"
         }
+      , Schema.OkfBundle::{
+        , name = "reviews"
+        , path = "docs/reviews"
+        , profile = Some "mori/reviews-profile.dhall"
+        , profileBinding = Some
+            ( Schema.ProfileBinding.Published
+                Schema.PinnedImport::{
+                , publisher = "mori://shinzui/okf-profiles"
+                , publisherRef = Some Schema.MoriRef::{
+                  , namespace = "shinzui"
+                  , name = "okf-profiles"
+                  }
+                , export = Some "assurance.reviews"
+                , version = Some "v0.21.0"
+                , pin = Some
+                    "sha256:4be32588d55c74282ceab54b06b22f552cdbf4215788e3eb5256ee8744cb92a2"
+                }
+            )
+        , okfVersion = "0.2"
+        , description = Some
+            "Implementation reviews with scoped findings and remediation evidence"
+        }
       ]
     , packages =
       [ Schema.Package::{

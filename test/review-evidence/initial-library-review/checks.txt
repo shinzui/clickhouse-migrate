@@ -1,0 +1,36 @@
+Initial implementation review completed 2026-10-16T17:52:42Z.
+Reviewed implementation commit: 3a09f2189bd6fb0c91b5b515d916d219a2a31a15.
+Native environment: GHC 9.12.4, ClickHouse 26.8.28.14, Apple Silicon macOS.
+
+Passed during the review:
+- just test-unit: core, embedding and CLI suites.
+- just check-public-invariants: public consumer, fourteen rejected invariant bypasses,
+  24 independent checksum vectors and two independent adoption vectors.
+- just test-runner: ordinary execution, uncertainty and runtime validation cases.
+- just test-repair: recovery cases and dependent append failure boundaries.
+
+Reproduce.hs is the public-API diagnostic harness used for the three findings;
+observations.txt preserves its actual output. It uses a newly owned native fixture,
+not an application database. It prints observed failures rather than asserting the
+future corrected behavior. It is evidence, not a replacement regression suite.
+The next remediation plans must add assertions to maintained test suites.
+
+From the repository root, after entering its pinned development environment:
+
+cabal build clickhouse-migrate clickhouse-migrate-test-support
+cabal exec -- ghc -threaded -package clickhouse-migrate -package clickhouse-migrate-test-support -outputdir /tmp/chm-review-build test/review-evidence/initial-library-review/Reproduce.hs -o /tmp/chm-review-probes
+clickhouse_migrate_test_support_datadir="$PWD/clickhouse-migrate-test-support" /tmp/chm-review-probes
+
+The three baseline observations are:
+1. A.one + B.one succeeds; adding A.two to the earlier component fails with
+   IncompatibleHistory.
+2. A 12-step migration with 24 audit references of 2,000 characters succeeds;
+   default-limit history fails with ResponseTooLarge; a 16 MiB limit succeeds.
+   The hard 16 MiB total-response ceiling was established by source inspection,
+   not by claiming this particular fixture exceeded it.
+3. An accepted acceptStepRequest with those references returns LedgerFailed
+   InvalidEvent after history advances from 3 to 4 events, ending in
+   recovery-authorized.
+
+Exclusions: release preparation, publication, deployments, Linux qualification,
+production coordinator validation, and an exhaustive security/performance audit.
