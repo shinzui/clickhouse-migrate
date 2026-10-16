@@ -74,6 +74,10 @@ The kind/body families are:
 
 A definition contains global `ordinal`, `componentIndex`, component name, sorted
 unique dependencies, migration name/checksum and ordered `{name,checksum}` steps.
+`ordinal` is the execution-schedule position; `componentIndex` is the stable catalog
+position. An explicit schedule may interleave component upgrades without changing
+catalog indices. The default schedule concatenates the catalog. Applied schedule
+descriptors must remain unchanged.
 The checksum/policy formats are fixed by initialization. Compare every recorded
 definition with the complete supplied plan's prefix, including dependency and order
 evidence. A new definition inserted before recorded work is incompatible even if

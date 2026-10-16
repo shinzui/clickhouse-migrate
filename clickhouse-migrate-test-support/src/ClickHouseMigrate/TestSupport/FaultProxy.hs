@@ -24,7 +24,7 @@ import Control.Exception (bracket)
 import Data.Aeson (Value, object, (.=))
 import Data.Aeson qualified
 
-data FaultMode = Pass | AppendLateError | OversizedHistoryRow | HistoryGap | HistoryIdentityConflict | HistoryDuplicateConflict | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | DelayFirstResponse | HoldBeforeForward | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | WeakenedStorage | SwitchIdentityAfterResponse
+data FaultMode = Pass | DelayHistoryBody | AppendLateError | OversizedHistoryRow | HistoryGap | HistoryIdentityConflict | HistoryDuplicateConflict | DropResponse | TruncateResponse | LateError | Redirect | CloseConnection | CloseReusedConnection | DelayResponse | DelayFirstResponse | HoldBeforeForward | UnsupportedVersion | PrereleaseVersion | WeakenedPolicy | WeakenedStorage | SwitchIdentityAfterResponse
   deriving stock (Eq, Show)
 
 data FaultProxy = FaultProxy !Fixture !Int !Text
@@ -60,6 +60,7 @@ redirectTo (FaultProxy fixture identity _) endpoint = void $ fixtureRpc fixture 
 
 modeName :: FaultMode -> Text
 modeName Pass = "pass"
+modeName DelayHistoryBody = "delay-history-body"
 modeName AppendLateError = "append-late-error"
 modeName OversizedHistoryRow = "oversized-history-row"
 modeName HistoryGap = "history-gap"

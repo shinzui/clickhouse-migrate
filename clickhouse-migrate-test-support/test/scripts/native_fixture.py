@@ -255,7 +255,7 @@ class FaultProxy:
                     if mode == 'close-second':
                         mode = 'pass' if not proxy.events else 'close'
                     event_index = len(proxy.events)
-                    proxy.events.append({'path': self.path, 'mode': mode, 'stage': stage, 'connection': self.client_address[1], 'forwarded': mode not in ['redirect', 'close', 'hold-before']})
+                    proxy.events.append({'path': self.path, 'mode': mode, 'stage': stage, 'connection': self.client_address[1], 'forwarded': mode not in ['redirect', 'close', 'hold-before'], 'bodyPrefixSent': False})
                 if mode == 'close':
                     self.close_connection = True
                     return
@@ -340,7 +340,16 @@ class FaultProxy:
                 self.send_header('Content-Length', str(len(data) + (20 if mode == 'truncate' else 0)))
                 self.end_headers()
                 try:
-                    self.wfile.write(data)
+                    if mode == 'delay-history-body':
+                        pivot = len(data) // 2
+                        self.wfile.write(data[:pivot])
+                        self.wfile.flush()
+                        with proxy.lock:
+                            proxy.events[event_index]['bodyPrefixSent'] = True
+                        time.sleep(2)
+                        self.wfile.write(data[pivot:])
+                    else:
+                        self.wfile.write(data)
                     self.wfile.flush()
                 except OSError:
                     pass

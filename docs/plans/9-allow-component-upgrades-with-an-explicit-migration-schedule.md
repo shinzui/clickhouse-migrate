@@ -39,7 +39,7 @@ migrations as an unordered set.
 
 - [x] M1 (2026-10-16; unit tests and unchanged independent checksum vectors): Validated schedule API represents A.one, B.one, A.two and preserves existing default-plan descriptors and checksums.
 - [x] M2 (2026-10-16; native runner, adoption and interrupted ordinal-2 recovery): A public native upgrade applies only A.two, and inspection, recovery and adoption use the same schedule.
-- [ ] M3: CLI/example consumers expose execution order correctly; negative regressions, public invariants and user/ADR contracts pass.
+- [x] M3 (2026-10-16; six CLI goldens, native mounted example, public invariants and all embedding rebuild cases): CLI/example consumers expose execution order correctly; negative regressions, public invariants and user/ADR contracts pass.
 
 ## Surprises & Discoveries
 
@@ -71,8 +71,10 @@ The explicit schedule API, descriptor mapping, CLI schedule output and applicati
 example are implemented. Native A.one/B.one history accepts only appended A.two;
 repetition is a no-op and changed prefixes fail before SQL. Adoption maps the real
 prefix and interrupted recovery selects ordinal 2/component index 0. Independent
-checksum vectors and public invariant checks pass. Final embedding rebuild
-qualification and the post-fix verification record remain pending.
+checksum vectors, frozen default descriptor bytes and all fourteen public invariant
+checks pass. All eleven embedding rebuild cases and source-free execution pass,
+as do native CLI handlers and the mounted two-component example. No child work
+remains; the MasterPlan owns the separate post-fix verification record.
 
 [ADR 0010](../adr/0010-separate-component-catalog-from-execution-schedule.md)
 records the durable catalog/schedule and dependency-activation decisions.

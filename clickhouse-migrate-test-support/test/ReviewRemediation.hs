@@ -145,18 +145,18 @@ remediationCases server = do
       after <- mutationCount proxy
       assert "failed stream allowed mutation" (before == after)
       setFault proxy Pass
-    setLedgerFault proxy HistoryRead DelayResponse
+    setLedgerFault proxy HistoryRead DelayHistoryBody
     limits <- right (httpLimits 500000 1048576)
     short <- fixtureWithLimits limits server label (proxyEndpoint proxy) (ExistingLedger ledger)
     expired <- I.history I.Observe short
     assert "stream deadline did not stop read" (case expired of Left (R.InspectionFailure (R.LedgerRequestFailed _ (L.TransportError L.DeadlineExpired _ _) _) _ _) -> True; _ -> False)
-    beforeChild <- historyReadCount proxy
+    beforeChild <- historyPrefixCount proxy
     done <- newEmptyMVar
     child <- forkFinally (I.history I.Observe bound) (putMVar done)
-    -- The delay applies only to the complete ledger SELECT, not admission.
+    -- The delay occurs after headers and half the body have been flushed.
     let waitForRead remaining = do
-          count <- historyReadCount proxy
-          if count > beforeChild then pure () else if remaining == (0 :: Int) then fail "Child never entered streamed SELECT" else threadDelay 10000 >> waitForRead (remaining - 1)
+          count <- historyPrefixCount proxy
+          if count > beforeChild then pure () else if remaining == (0 :: Int) then fail "Child never consumed a streamed body prefix" else threadDelay 10000 >> waitForRead (remaining - 1)
     waitForRead 100
     killThread child
     cancelled <- timeout 3000000 (takeMVar done)
@@ -217,8 +217,9 @@ largeAdoption server = withFaultProxy server $ \proxy -> do
   assert "large adoption executed SQL/duplicated entries" (length (filter (== Just "adoption-entry") stages) == 360 && Just "application-sql" `notElem` stages)
   putStrLn ("stream: adoption wire bytes=" ++ show (maximum sizes) ++ "; 360 entries; interrupted resume and committed identical read are complete and submit no SQL")
 
-historyReadCount :: FaultProxy -> IO Int
-historyReadCount proxy = do
+historyPrefixCount :: FaultProxy -> IO Int
+historyPrefixCount proxy = do
   records <- proxyEvents proxy >>= fromJson :: IO [Value]
   stages <- mapM (field "stage") records :: IO [Maybe T.Text]
-  pure (length (filter (== Just "history-read") stages))
+  prefixes <- mapM (field "bodyPrefixSent") records :: IO [Bool]
+  pure (length [() | (Just "history-read", True) <- zip stages prefixes])

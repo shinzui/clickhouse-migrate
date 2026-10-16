@@ -38,8 +38,7 @@ automatically replay uncertain work.
 This initiative covers core behavior, the public API, affected embedding/CLI
 consumers, focused native tests and user contracts. Release packaging, publishing,
 new server/platform qualification, production database changes and the external
-consumer cutover gate in MasterPlan 1 are excluded. Creating this plan does not
-start implementation or close that separate gate. The user-created intention is
+consumer cutover gate in MasterPlan 1 are excluded. Implementation does not close that separate gate. The user-created intention is
 recorded in frontmatter and inherited by all children.
 
 ## Decomposition Strategy
@@ -62,7 +61,7 @@ immutable contiguous events, a global prefix, strict duplicate/conflict handling
 coordination and full history reads. [ADR 0007](../adr/0007-scope-commands-and-preserve-acknowledged-progress.md)
 requires scoped commands and acknowledged progress. [ADR 0008](../adr/0008-adopt-reviewed-prefixes-with-explicit-evidence.md)
 requires complete adoption validation and mapping onto a native execution prefix.
-These decisions remain constraints. EP-9 will explicitly revise the coupling
+These decisions remain constraints. EP-9 explicitly revises the coupling
 between component grouping and execution order; EP-10 removes a total-response
 ceiling without weakening completeness; EP-11 extends prevalidation to recovery.
 No cross-repository architectural decision is needed to define these repairs.
@@ -72,7 +71,7 @@ No cross-repository architectural decision is needed to define these repairs.
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 9 | Allow component upgrades with an explicit migration schedule | [ExecPlan 9](../plans/9-allow-component-upgrades-with-an-explicit-migration-schedule.md) | None | None | In Progress |
+| 9 | Allow component upgrades with an explicit migration schedule | [ExecPlan 9](../plans/9-allow-component-upgrades-with-an-explicit-migration-schedule.md) | None | None | Complete |
 | 10 | Stream complete ledger history with bounded row decoding | [ExecPlan 10](../plans/10-stream-complete-ledger-history-with-bounded-row-decoding.md) | None | None | Complete |
 | 11 | Validate complete recovery events before mutation | [ExecPlan 11](../plans/11-validate-complete-recovery-events-before-mutation.md) | None | None | Complete |
 
@@ -146,12 +145,13 @@ compilation alone.
 ## Progress
 
 
-EP-10 and EP-11 are Complete. EP-9's API, native upgrade/adoption/recovery and CLI
-gates pass; its final embedding rebuild qualification is running. The combined
-native gate passed with history above 16 MiB and unchanged-position recovery size
-rejection. All focused native transport, ledger, runner, repair, adoption,
-failure-boundary and surviving-work groups pass. Final aggregate checks and the
-post-fix verification record remain open. No external consumer cutover is implied.
+All three children are Complete and the combined native gate passed. Full package
+builds, all three unit suites, public invariant/checksum/adoption vectors,
+embedding rebuild/source-free qualification, the mounted example, and all focused
+native transport, ledger, runner, repair, adoption, failure-boundary, surviving-work
+and CLI groups pass. Mid-body deadline/cancellation checks also pass. The post-fix
+verification record is the only remaining coordination step. No external consumer
+cutover is implied.
 
 ## Surprises & Discoveries
 

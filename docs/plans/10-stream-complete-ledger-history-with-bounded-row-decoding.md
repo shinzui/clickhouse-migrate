@@ -70,13 +70,14 @@ and cancellation remain active.
 
 
 Complete streamed ledger reads work at default limits for the original 27-event
-reproduction, a 389-event native history (18,655,395 response bytes; largest row
-50,876 bytes), and an interrupted/committed 360-entry adoption batch (17,906,573
+reproduction, a 389-event native history (18,655,399 response bytes; largest row
+50,876 bytes), and an interrupted/committed 360-entry adoption batch (17,906,595
 response bytes). Status, history, require-current verification, pending up,
 recovery, adoption resume and identical committed adoption all pass. Exact physical
 duplicates retain their logical position; late sequence/identity conflicts,
 truncated framing, trailing errors and oversized rows reject the whole read and
-permit no mutation. Deadlines and asynchronous cancellation retain their meanings.
+permit no mutation. Deadlines and asynchronous cancellation retain their meanings, including
+interruption after headers and half of a real response body have been flushed.
 
 The private Rows boundary, complete projection, ordinary response limits and
 persisted formats remain intact. [ADR 0011](../adr/0011-read-complete-history-with-bounded-rows.md)
