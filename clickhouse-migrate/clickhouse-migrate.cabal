@@ -40,6 +40,12 @@ common common
     cryptohash-sha256 >=0.11.102.1 && <0.12,
     text >=2.1 && <2.2,
 
+  build-depends:
+    aeson >=2.2.4.1 && <2.4,
+    http-client ==0.7.19,
+    http-client-tls >=0.3.6.4 && <0.5,
+    http-types >=0.12.4 && <0.13,
+
 library
   import: common
   hs-source-dirs: src
@@ -49,10 +55,15 @@ library
     ClickHouseMigrate.Error
     ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
+    ClickHouseMigrate.Target
 
   other-modules:
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.Http
+    ClickHouseMigrate.Internal.ServerPolicy
     ClickHouseMigrate.Internal.SqlEnvelope
+    ClickHouseMigrate.Internal.TargetTypes
+    ClickHouseMigrate.Internal.Transport
     ClickHouseMigrate.Internal.Types
 
 flag internal-test-driver
@@ -62,11 +73,20 @@ flag internal-test-driver
 
 executable clickhouse-migrate-test-driver
   import: common
+  ghc-options: -threaded
   hs-source-dirs:
     test-driver
     src
 
   main-is: Main.hs
+  other-modules:
+    ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.Http
+    ClickHouseMigrate.Internal.ServerPolicy
+    ClickHouseMigrate.Internal.TargetTypes
+    ClickHouseMigrate.Internal.Transport
+    ClickHouseMigrate.Prelude
+    ClickHouseMigrate.Target
 
   if !flag(internal-test-driver)
     buildable: False
@@ -84,7 +104,12 @@ test-suite clickhouse-migrate-unit
     ClickHouseMigrate.Definition
     ClickHouseMigrate.Error
     ClickHouseMigrate.Internal.Checksum
+    ClickHouseMigrate.Internal.Http
+    ClickHouseMigrate.Internal.ServerPolicy
     ClickHouseMigrate.Internal.SqlEnvelope
+    ClickHouseMigrate.Internal.TargetTypes
+    ClickHouseMigrate.Internal.Transport
     ClickHouseMigrate.Internal.Types
     ClickHouseMigrate.Plan
     ClickHouseMigrate.Prelude
+    ClickHouseMigrate.Target

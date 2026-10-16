@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-16T05:03:30Z
       mode: "update"
       note: "Define four outcomes, early identity primitives, request policy and private fault driver."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-16T12:01:08Z
+      mode: "implement"
+      note: "Implement direct HTTP outcomes and local native-server fault qualification; Linux builder remains deferred."
 ---
 
 # Implement direct HTTP transport and isolated fault fixtures
@@ -43,22 +48,28 @@ The library can submit a single SQL statement to a pinned direct HTTP(S) target 
 ## Progress
 
 
-- [ ] M1 — Owned test servers and a controllable HTTP fault proxy prove the transport never redirects or replays SQL.
-- [ ] M2 — Supported server identity, completion settings, bounded response validation and cleanup pass on an explicitly recorded candidate server matrix.
+- [x] (2026-10-16) M1 — Owned native server/fault proxy and the opt-in real core driver prove one POST after committed-effect response loss, truncation, timeout, late error and reused-socket failure; redirects reach no destination. The fixtures are packaged data, scoped to temporary loopback processes.
+- [x] (2026-10-16) M2 — Exact 26.8.28.14 LTS native candidate passes per-connection UUID/version/policy admission, response bounds, invalid TLS, protected settings, mutation waiting, surviving server queries, asynchronous cancellation and bounded/separate cleanup. Cabal TLS 0.4.0 and Nix TLS 0.3.6.4 drivers both pass transport and completion groups. Linux remains deferred.
 
 ## Surprises & Discoveries
 
+2026-10-16: http-client 0.7.19 closeManager is a no-op; owned sockets need explicit tracking/closure. The cleanup test verifies zero open proxy sockets while the driver process remains alive. A one-time probe is insufficient when the pool reconnects, so admission is performed on each actual new socket before application bytes.
 
+2026-10-16: The template native server is not the current qualified candidate. An independently SHA-256-verified official 26.8.28.14 LTS Apple Silicon binary runs directly; no Docker daemon or Linux builder is required. The suite deliberately weakens profile defaults and observes per-request overrides. A delayed INSERT remains active after an empty read and commits once after client timeout/cancellation.
 
 
 ## Decision Log
 
 
+2026-10-16: Pin http-client exactly to 0.7.19 because admission uses its internal bounded request/response primitives on an already owned socket. Keep public HTTP configuration constrained and test both permitted TLS releases. See ADR 0005.
+
 2026-10-15: Accept the HTTP abstraction only after an effect-committed/response-lost test proves one submission. Disabling a convenience retry layer alone does not neutralize http-client's reused-connection replay path.
 
 ## Outcomes & Retrospective
 
+Complete within the user’s native-only validation scope. `just test-integration` passed both groups; the same groups passed with the Nix-built driver, covering both declared TLS dependency generations. `just test-unit`, `just check-packages`, `just check-public-invariants`, source distributions, Seihou drift verification and all six local flake checks pass. There are no compiler warnings in the final Cabal suite. Evidence logs: `/tmp/clickhouse-migrate-ep4-final-integration.log`, `/tmp/clickhouse-migrate-ep4-nix-qualification.log`, `/tmp/clickhouse-migrate-ep4-unit.log` and `/tmp/clickhouse-migrate-ep4-flake.log`.
 
+[Compatibility](../compatibility.md) records the exact candidate, topology/identity limitations and repeatable commands. [ADR 0005](../adr/0005-admit-direct-connections-and-preserve-request-outcomes.md) captures no replay, connection admission and resource ownership. The matrix status is transport-qualified, not full release-qualified. EP-5 must consume the private checked transport and preserve uncertainty for every unacknowledged submitted ledger append; an empty read cannot authorize reuse.
 
 
 ## Context and Orientation

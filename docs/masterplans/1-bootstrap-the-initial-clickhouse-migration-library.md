@@ -69,7 +69,7 @@ Use the fewest boundaries that preserve these acceptance differences. A single l
 | 1 | Seihou tooling and package workspace | [docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md](../../docs/plans/1-bootstrap-seihou-tooling-and-the-four-package-workspace.md) | None | None | Complete |
 | 2 | Validated definitions and checksum v1 | [docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md](../../docs/plans/2-define-validated-plans-sql-envelopes-and-checksum-v1.md) | EP-1 | None | Complete |
 | 3 | Compile-time manifest embedding | [docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md](../../docs/plans/3-embed-ordered-manifests-with-incremental-rebuild-guarantees.md) | EP-2 | None | Complete |
-| 4 | Direct HTTP transport and isolated fixtures | [docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md](../../docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md) | EP-2 | None | Not Started |
+| 4 | Direct HTTP transport and isolated fixtures | [docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md](../../docs/plans/4-implement-direct-http-transport-and-isolated-fault-fixtures.md) | EP-2 | None | Complete |
 | 5 | Immutable ledger and exclusive access | [docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md](../../docs/plans/5-build-immutable-ledger-projection-and-exclusive-access.md) | EP-2, EP-4 | None | Not Started |
 | 6 | Runner, inspection and explicit recovery | [docs/plans/6-execute-inspect-and-repair-migrations-conservatively.md](../../docs/plans/6-execute-inspect-and-repair-migrations-conservatively.md) | EP-5 | None | Not Started |
 | 7 | Generic adoption and consumer fixtures | [docs/plans/7-adopt-legacy-history-with-auditable-consumer-fixtures.md](../../docs/plans/7-adopt-legacy-history-with-auditable-consumer-fixtures.md) | EP-3, EP-6 | None | Not Started |
@@ -124,12 +124,14 @@ Promote durable choices into local ADRs as their owning children implement them:
 ## Progress
 
 
-EP-1 through EP-3 are Complete under the user’s local-only validation scope. The workspace, pure definitions/checksum v1, invariant-safe public views and compile-time embedding pass their acceptance gates. Embedding qualification also passes from extracted source distributions, including preserved timestamps and source-free execution; a package-owned content-qualified build command closes Cabal’s measured timestamp-cache gap. All local Nix checks pass. Linux validation and remote CI remain deferred. EP-4 is next; later children remain Not Started pending their whole-child prerequisites.
+EP-1 through EP-4 are Complete under the user’s native-only validation scope. The four-package workspace, validated definitions/checksums, content-qualified embedding, direct HTTP admission and isolated fault fixtures pass their acceptance gates. Both Cabal and Nix transport drivers pass real-server fault/completion suites against the digest-pinned 26.8.28.14 LTS candidate; all local Nix checks pass. Linux validation and remote CI remain deferred. EP-5 is next; later children await whole-child prerequisites.
 
 The remaining initiative-level integration gate is the separate consumer cutover: record its canonical change reference and evidence that the old runner is retired, exclusive administration is established, the adopted native ledger verifies, and a subsequent native migration succeeds on an isolated existing-history fixture. EP-8 records the full section 19 acceptance mapping in `docs/release-evidence.md`; all claimed versions must pass before release qualification is complete.
 
 
 ## Surprises & Discoveries
+
+2026-10-16: EP-4 proves that an empty read may precede a delayed commit and that client cancellation leaves server work alive. Its per-new-connection admission rejects changed server identity before successor SQL. ADR 0005 and the exact native candidate matrix constrain later ledger/runner qualification.
 
 
 2026-10-16: EP-3 exposed a pre-compiler Cabal timestamp cache: addDependentFile cannot help if Cabal skips GHC. The embed package owns a content-qualified build command; later embedded examples and consumer qualification must use it and declare all manifest inputs. Nix source builds remain content-addressed. ADR 0004 records the boundary and measured counterexample.

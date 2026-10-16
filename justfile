@@ -15,10 +15,7 @@ check-packages:
 test-unit:
     cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- test all --test-show-details=direct
 
-# EP-4 will add the owned server fixture and private driver invocation.
-test-integration:
-    @echo 'Integration fixture is not implemented yet (EP-4).' >&2
-    @exit 1
+test-integration: test-transport test-completion-policy
 
 format:
     nix fmt
@@ -38,3 +35,17 @@ check-public-invariants:
 test-embedding:
     bash scripts/test-embedding-rebuild.sh
     python3 scripts/check-embedding-failures.py
+
+test-transport:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cabal build clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver
+    driver=$(cabal list-bin clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver)
+    CLICKHOUSE_MIGRATE_TEST_DRIVER="$driver" cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=transport
+
+test-completion-policy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cabal build clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver
+    driver=$(cabal list-bin clickhouse-migrate:exe:clickhouse-migrate-test-driver -finternal-test-driver)
+    CLICKHOUSE_MIGRATE_TEST_DRIVER="$driver" cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=completion

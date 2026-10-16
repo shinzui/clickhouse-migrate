@@ -16,8 +16,11 @@
       };
     in
     {
-      packages = packages // { default = hs.clickhouse-migrate; };
+      packages = packages // {
+        default = hs.clickhouse-migrate;
+        internal-test-driver = pkgs.haskell.lib.compose.enableCabalFlag "internal-test-driver" hs.clickhouse-migrate;
+      };
       checks = packages;
-      haskellProject.extraDevPackages = [ pkgs.python3 ];
+      haskellProject.extraDevPackages = [ pkgs.python3 pkgs.openssl ];
     };
 }

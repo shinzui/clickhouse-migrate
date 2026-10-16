@@ -31,6 +31,7 @@ isPlanError _ _ = False
 
 main :: IO ()
 main = do
+  targetValidation
   let sql = "CREATE TABLE app.events (id UInt64) ENGINE=MergeTree ORDER BY id"
   create <- right (sqlStep "create" sql)
   migration <- right (sqlMigration "0001" (create :| []))
@@ -122,3 +123,22 @@ unhex text = BS.pack <$> go (Text.unpack text)
       [(byte, "")] -> (byte :) <$> go rest
       _ -> fail "Invalid vector hex"
     go _ = fail "Odd vector hex length"
+
+-- Public parsing boundaries must reject URL credentials and reserved overrides.
+targetValidation :: IO ()
+targetValidation = do
+  forM_ ["http://localhost:8123", "https://example.com/", "http://[::1]:8123"] $ \value -> do
+    _ <- right (directEndpoint value)
+    pure ()
+  forM_ ["", "ftp://localhost", "http://user:secret@localhost", "http://localhost/path", "http://localhost?async_insert=1", "http://localhost#fragment", "http://localhost:0", "http://localhost:65536", "http://localhost//", "http://"] $ \value ->
+    assert "reject unsafe endpoint" (directEndpoint value == Left InvalidEndpoint)
+  forM_ ["00000000-0000-0000-0000-000000000000", "01234567-89ab-cdef-0123-456789abcdef"] $ \value -> do
+    _ <- right (serverId value)
+    _ <- right (ledgerId value)
+    pure ()
+  forM_ ["", "01234567-89AB-cdef-0123-456789abcdef", "0123456789ab-cdef-0123-456789abcdef"] $ \value ->
+    assert "canonical UUID required" (serverId value == Left InvalidServerId)
+  assert "invalid request bounds" (either (== InvalidHttpLimits) (const False) (httpLimits 0 1))
+  assert "bounded response allocation" (either (== InvalidHttpLimits) (const False) (httpLimits 1 16777217))
+  assert "credential header injection" (either (== InvalidCredentials) (const False) (basicCredentials "user\r\nheader" "password"))
+  assert "namespace cannot inject SQL" (ledgerNamespace "ledger; DROP DATABASE app" == Left InvalidLedgerNamespace)

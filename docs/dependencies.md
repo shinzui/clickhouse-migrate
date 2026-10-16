@@ -118,3 +118,39 @@ The measured runtime remains the template's 3.16.1.0, tag
 `cabal-install-v3.16.1.0` (`8d1f5a33662be0db0654061fb53fb00e3f4417e0`).
 The workaround is not based only on a lagging local source checkout; no ad hoc
 managed-toolchain pin was changed.
+
+## Direct HTTP and native fixtures — 2026-10-16
+
+Mori discovery located `mori://snoyberg/http-client/packages/http-client` and
+`mori://snoyberg/http-client/packages/http-client-tls`. Core, Manager, Types,
+Request, Response, Internal, KeyedPool and TLS sources were read before use.
+Hackage preferred releases and upstream tags were checked: http-client 0.7.19,
+tag `http-client-0.7.19`, commit `a0b418c12ff3c9878f21bff92bb174c239a9cfe3`;
+http-client-tls 0.4.0, tag `http-client-tls-0.4.0`, commit
+`071d22a3cbf2159ca6b8bace121b036c6d4d5a89`. Internal connection admission requires
+`http-client ==0.7.19`. TLS bounds are >=0.3.6.4 && <0.5; the older Nix-resolved
+0.3.6.4 Hackage source was inspected independently for the same connection factory
+and verification behavior. No matching upstream release tag for that older patch
+was found. Cabal resolves 0.4.0; Nix resolves 0.3.6.4.
+
+Mori found no registered http-types source. Hackage releases and upstream
+`mori://Vlix/http-types` tag `v0.12.6` at
+`3cbf2ab6d075a54de699884c5183b44535575b9b` were checked; the authoritative 0.12.4
+Hackage source supplies status access. Bounds >=0.12.4 && <0.13 cover the tested
+0.12.4 Nix and 0.12.6 Cabal resolutions. Existing Aeson/bytestring/text/process bounds are reused.
+
+Mori found no official ClickHouse or CPython project source. Exact ClickHouse
+release source (`mori://ClickHouse/ClickHouse`, project-relative
+`src/Functions/serverConstants.cpp` and `src/Core/ServerUUID.cpp`, file URIs pending)
+was inspected for identity behavior at the candidate commit in the matrix.
+Official Python http.server/subprocess/ssl documentation informed the test-only
+owned-process HTTP fixture; the development shell supplies Python 3.14.7 and
+OpenSSL, without a production Python dependency.
+
+Mori found no Nixpkgs source checkout. The locked Nixpkgs commit
+`d5dfd8e6716dde34398bc14bc87c10dece9c8c68` was inspected upstream for
+`mori://NixOS/nixpkgs`, project-relative
+`pkgs/development/haskell-modules/lib/compose.nix` (file URI pending).
+Its enableCabalFlag supplies the opt-in Nix internal-test-driver output; the
+production core output retains the default-off flag. No dependency pin was chosen
+from an unverified local corpus version.
