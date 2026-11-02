@@ -23,7 +23,15 @@
           "Nix public suite, private driver and example"
         ],
         "scope": "Native protocol qualification; no production OS, Linux, power-loss or uptime certification",
-        "startupCaveat": "A separate attempt exited SIGSEGV before readiness; cause unknown; preserved in docs/release-evidence.md"
+        "startupCaveat": "A separate attempt exited SIGSEGV before readiness; cause unknown; preserved in docs/release-evidence.md",
+        "requalification": {
+          "date": "2026-11-02",
+          "requiredGroups": 13,
+          "artifactVariants": [
+            "Nix suite, private driver and example",
+            "seven extracted sibling source distributions"
+          ]
+        }
       }
     },
     {
@@ -32,19 +40,22 @@
       "platform": "aarch64-linux",
       "architecture": "arm64",
       "image": "docker.io/altinity/clickhouse-server@sha256:3bafa18ced8daf9b81de70927b40c13b06545363abe3ad7f20ae77848f500c5a",
-      "status": "candidate",
+      "status": "native-qualified",
       "scope": "Owned single local-server Linux container; managed-cloud qualification remains separate",
       "tag": "v26.3.60.10001.altinitystable",
       "commit": "f01425ddbe11657d479571ba5364b7bb0e9bc2e0",
       "releaseDate": "2026-10-29",
       "qualification": {
+        "date": "2026-11-02",
+        "compiler": "ghc-9.12.4",
+        "clientHost": "macOS 26.7 arm64",
         "requiredGroups": 13,
-        "cabalGroupsPassed": 13,
-        "artifactVariantsPending": [
-          "final extracted sibling source distributions"
+        "artifactVariants": [
+          "Nix suite, private driver and example",
+          "seven extracted sibling source distributions"
         ],
-        "startupCaveat": "Docker-host port collision identified from preserved diagnostics. Docker now allocates and retains published ports across owned server restart; final Nix full matrix passes without retries.",
-        "nixGroupsPassed": 13
+        "scope": "Owned single local-server Linux arm64 container; no managed-cloud, Linux client or power-loss claim",
+        "startupCaveat": "Docker-host port collision fixed by allocating and retaining ports on the Docker host. Final 26-case Nix and 26-case source variants pass; no startup retries."
       }
     }
   ],

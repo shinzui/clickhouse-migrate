@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-02",
+  "implementationRevision": "00afa9fa1038f2b90e7bc5f041ac1b56649b639f",
+  "packageCohort": "0.1.0.1",
+  "clientHost": "macOS 26.7 arm64",
+  "compiler": "GHC 9.12.4",
+  "candidateIds": [
+    "lts-native",
+    "altinity-linux-arm64"
+  ],
+  "requiredGroupsPerCandidate": 13,
+  "artifactVariants": {
+    "Nix suite/driver/example": {
+      "passed": 26
+    },
+    "extracted sibling source archives": {
+      "passed": 26,
+      "metadataChecks": 7,
+      "pureSuites": 3,
+      "haddocks": true
+    }
+  },
+  "implementationSha256": {
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/ServerPolicy.hs": "00ccb7fed37ba019dfdebfd098b18b93a376093db75909d39b305daef2217f5e",
+    "clickhouse-migrate-test-support/test/scripts/native_fixture.py": "ea7b8b9cf2e11dc687b75fe6a15505e87f9c0f59ba9a90c6d4d4f144c99cd387",
+    "clickhouse-migrate-test-support/test/Main.hs": "bbee037e2cfd84b086450ad41e32b26209e1047dcafc51ecc5f3cb8e798a25c5"
+  },
+  "sourceArchiveSha256": {
+    "clickhouse-migrate-0.1.0.1.tar.gz": "fbca1084db1392fa7dd5559c2aac2e297efd5f55f88d8c339a5e197855eeb8eb",
+    "clickhouse-migrate-cli-0.1.0.1.tar.gz": "a319453e9d911a838ee909c054834ab53aecce1e6702983e054a145d88dc52eb",
+    "clickhouse-migrate-embed-0.1.0.1.tar.gz": "5574a36e8946861525fd8bc41865d5e1addea69eb33d72e03a4eb48da7bf7785",
+    "clickhouse-migrate-example-0.1.0.1.tar.gz": "0b62fdb5472e5465cfc8d452a0fcb4d99fb758a0cf9cef51048dc9fbaabb4cdb",
+    "clickhouse-migrate-example-analytics-0.1.0.1.tar.gz": "e6ed96c076497bcc2207d2bdd0976fa86a2c1050df849b7880faaf8799eb6370",
+    "clickhouse-migrate-example-catalog-0.1.0.1.tar.gz": "8d71b088c9499db0f16600fc45bac6f0b4c33d2c94bd3efe2bf06cf803a7d497",
+    "clickhouse-migrate-test-support-0.1.0.1.tar.gz": "2978207e3fb3172bd0e4d3f198a083985b084032d78c5318e17359cde8ce4120"
+  },
+  "nixArtifacts": [
+    {
+      "drvPath": "/nix/store/x6p206p3qb9ly9ibgpsbmdxmaqda7l2b-clickhouse-migrate-test-support-0.1.0.1.drv",
+      "outputs": {
+        "out": "/nix/store/gss9yj3pml3xs9966njsdllfscd4ghcc-clickhouse-migrate-test-support-0.1.0.1"
+      }
+    },
+    {
+      "drvPath": "/nix/store/89c87c52nkys38k944j0n7h3pvws0diz-clickhouse-migrate-0.1.0.1.drv",
+      "outputs": {
+        "out": "/nix/store/8q7wh9a7ima5h15nmk9612vgcb3syjmz-clickhouse-migrate-0.1.0.1"
+      }
+    },
+    {
+      "drvPath": "/nix/store/a6r2r8v2lw3s2m4d9d9v5glnngzzypx8-clickhouse-migrate-example-0.1.0.1.drv",
+      "outputs": {
+        "out": "/nix/store/aq7qs38x5hphby7l89yrjqjhy7bfpds1-clickhouse-migrate-example-0.1.0.1"
+      }
+    }
+  ],
+  "scope": "Owned exact server artifacts only; no managed-cloud, Linux amd64 application-image, remote CI, publication or power-loss claim"
+}

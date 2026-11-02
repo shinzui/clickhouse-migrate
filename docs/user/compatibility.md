@@ -23,8 +23,8 @@ and [release](https://github.com/ClickHouse/ClickHouse/releases/tag/v26.8.28.14-
 were checked before selecting the original exact LTS candidate. The developer
 template's ClickHouse version is not release evidence. The original twelve-group
 qualification is retained in [initial release evidence](../release-evidence.md).
-The Altinity patch adds the thirteenth remediation group and explicit owned OCI
-fixtures; see [the dated qualification](../release-evidence/2026-11-02-altinity.md).
+On 2026-11-02 both exact candidates passed all thirteen groups from Nix and
+extracted-source artifacts. The Altinity patch adds explicit owned OCI fixtures; see [the dated qualification](../release-evidence/2026-11-02-altinity.md).
 The clients run on Darwin; this makes no Linux client, managed-cloud or remote CI
 claim. The separate external consumer cutover remains open.
 
