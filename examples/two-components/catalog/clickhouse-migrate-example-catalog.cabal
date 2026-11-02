@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-example-catalog
-version: 0.1.0.0
+version: 0.1.0.1
 synopsis: Private composed migration example component
 description: Private workspace example, not intended for publication.
 license: BSD-3-Clause

@@ -57,7 +57,8 @@ main = do
 integrationMain :: [String] -> IO ()
 integrationMain args = do
   driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"], ["adoption"], ["consumer"], ["cli"], ["example"], ["remediation"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
-  finished <- timeout (if args == ["consumer"] then 600000000 else 180000000) $ withCandidateServer "lts-native" $ \server -> do
+  candidate <- maybe "lts-native" Text.pack <$> lookupEnv "CLICKHOUSE_MIGRATE_CANDIDATE"
+  finished <- timeout (if args == ["consumer"] then 600000000 else 180000000) $ withCandidateServer candidate $ \server -> do
     putStrLn ("Candidate ClickHouse " ++ Text.unpack (serverVersion server))
     case args of
       [] -> transportCases driver server

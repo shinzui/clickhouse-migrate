@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-example
-version: 0.1.0.0
+version: 0.1.0.1
 synopsis: Private two-component migration administrator example
 description: Private workspace executable, not intended for publication.
 license: BSD-3-Clause

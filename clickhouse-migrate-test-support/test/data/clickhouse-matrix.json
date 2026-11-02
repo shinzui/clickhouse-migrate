@@ -1,6 +1,6 @@
 {
   "matrixVersion": 1,
-  "checkedAt": "2026-10-16",
+  "checkedAt": "2026-11-02",
   "policy": "Only exact qualified patches; no prereleases, Cloud, proxies, distributed or replicated execution",
   "entries": [
     {
@@ -24,6 +24,27 @@
         ],
         "scope": "Native protocol qualification; no production OS, Linux, power-loss or uptime certification",
         "startupCaveat": "A separate attempt exited SIGSEGV before readiness; cause unknown; preserved in docs/release-evidence.md"
+      }
+    },
+    {
+      "id": "altinity-linux-arm64",
+      "version": "26.3.60.10001.altinitystable",
+      "platform": "aarch64-linux",
+      "architecture": "arm64",
+      "image": "docker.io/altinity/clickhouse-server@sha256:3bafa18ced8daf9b81de70927b40c13b06545363abe3ad7f20ae77848f500c5a",
+      "status": "candidate",
+      "scope": "Owned single local-server Linux container; managed-cloud qualification remains separate",
+      "tag": "v26.3.60.10001.altinitystable",
+      "commit": "f01425ddbe11657d479571ba5364b7bb0e9bc2e0",
+      "releaseDate": "2026-10-29",
+      "qualification": {
+        "requiredGroups": 13,
+        "cabalGroupsPassed": 13,
+        "artifactVariantsPending": [
+          "final extracted sibling source distributions"
+        ],
+        "startupCaveat": "Docker-host port collision identified from preserved diagnostics. Docker now allocates and retains published ports across owned server restart; final Nix full matrix passes without retries.",
+        "nixGroupsPassed": 13
       }
     }
   ],

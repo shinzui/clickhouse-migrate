@@ -49,10 +49,13 @@ nix flake check --builders ''
 Documentation checks require `okf` 0.9.0.0 or later and `dhall`; see the
 [documentation workflow](docs/user/README.md). CI provisions these tools explicitly.
 
-Only the exact Apple Silicon macOS ClickHouse artifact in the
-[compatibility matrix](docs/user/compatibility.md) is qualified. Linux builders and remote
-CI execution are deferred. Test recipes own new server processes, credentials,
-temporary roots and ports; they never use a persistent application database. The
+The [compatibility matrix](docs/user/compatibility.md) identifies exact qualified
+Apple Silicon macOS and Altinity Linux arm64 server artifacts. The latter requires
+a pre-pulled immutable image and an explicit local Unix Docker context in
+`CLICKHOUSE_MIGRATE_DOCKER_CONTEXT`; it uses fresh owned containers. Client artifacts
+are qualified on Darwin; Linux client builders and remote CI execution remain separate.
+Test recipes own new server processes, credentials, temporary roots and ports; they
+never use a persistent application database. The
 optional process-compose service is a developer convenience, not qualification.
 `just build` and embedding tests use the content-qualified wrapper to catch inputs
 whose modification times were preserved.

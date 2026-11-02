@@ -11,8 +11,8 @@ generated:
 
 # Compatibility evidence
 
-The native-qualified candidate is ClickHouse **26.8.28.14 LTS** on
-Apple Silicon macOS. The exact official binary URL, SHA-256, release tag object
+The exact server candidates are ClickHouse **26.8.28.14 LTS** on Apple Silicon macOS
+and **26.3.60.10001.altinitystable** on Linux arm64 in an owned local container. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
 [test/compatibility/clickhouse-matrix.json](../../test/compatibility/clickhouse-matrix.json).
 The fixture verifies the digest before execution. This file links to the packaged
@@ -20,11 +20,15 @@ matrix in test-support so installed fixtures use the same candidate.
 
 On 2026-10-16, the upstream [security/support policy](https://github.com/ClickHouse/ClickHouse/security/policy)
 and [release](https://github.com/ClickHouse/ClickHouse/releases/tag/v26.8.28.14-lts)
-were checked before selecting this exact LTS candidate. The developer template's
-ClickHouse version is not release evidence. Linux execution is deferred by the
-user; this evidence makes no Linux or remote CI claim. All twelve required groups pass in both Nix and extracted source-distribution artifact sets; local CLI/release qualification is complete. The separate external consumer cutover remains open.
+were checked before selecting the original exact LTS candidate. The developer
+template's ClickHouse version is not release evidence. The original twelve-group
+qualification is retained in [initial release evidence](../release-evidence.md).
+The Altinity patch adds the thirteenth remediation group and explicit owned OCI
+fixtures; see [the dated qualification](../release-evidence/2026-11-02-altinity.md).
+The clients run on Darwin; this makes no Linux client, managed-cloud or remote CI
+claim. The separate external consumer cutover remains open.
 
-Only this exact patch passes the runtime version allowlist. New patches and
+Only these exact patches pass the runtime version allowlist. New patches and
 prereleases fail closed until independently qualified and explicitly added.
 Runtime probes do not attest a binary digest or OS; administrators must install
 the artifact/platform from the matrix. Matching version text alone is not
@@ -58,6 +62,8 @@ a complete server error can have partial effects. Neither authorizes replay.
 Run from the native development environment:
 
 ```bash
+# Pre-pull the exact Linux arm64 digest from the matrix into an isolated local context.
+export CLICKHOUSE_MIGRATE_DOCKER_CONTEXT=<isolated-local-context>
 nix develop --builders '' -c just test-integration
 ```
 
@@ -122,7 +128,11 @@ metadata comparisons are fixture observations, not a general schema-equality cla
 The external consumer runner replacement remains separate.
 
 
-The qualification host is macOS 26.7/arm64. A native server startup SIGSEGV before
+The client qualification host is macOS 26.7/arm64; the Altinity server runs in a
+separate Linux arm64 VM/container. Its ports are allocated on the Docker host and
+reserved across owned ClickHouse restarts. All candidates must be available for
+the full matrix; missing prerequisites fail, without silently skipping candidates.
+The initial qualification host is macOS 26.7/arm64. A native server startup SIGSEGV before
 readiness/logger output is preserved in release-evidence.md and is not counted as
 a passing run; its cause is unknown. Fixture startup failures fail the case rather
 than automatically retrying. Native protocol evidence is not production OS/uptime

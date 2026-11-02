@@ -25,7 +25,7 @@ import Data.Text.Encoding qualified as Encoding
 
 -- Exact tested-patch policy. Keep coordinated with the checked-in candidate matrix.
 supportedVersions :: [Text]
-supportedVersions = ["26.8.28.14"]
+supportedVersions = ["26.8.28.14", "26.3.60.10001.altinitystable"]
 
 data TargetCheckError = ProbeFailure !TransportOutcome | TargetRejected !TransportError
   deriving stock (Eq, Show)

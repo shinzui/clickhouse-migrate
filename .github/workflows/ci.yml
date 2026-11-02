@@ -7,15 +7,23 @@ permissions:
   contents: read
 jobs:
   check:
-    # Linux builders are deliberately deferred. This configuration is not a run.
-    runs-on: macos-14
+    # Darwin clients plus an owned Linux arm64 server; no managed-cloud claim.
+    runs-on: macos-26
     timeout-minutes: 120
+    env:
+      CLICKHOUSE_MIGRATE_DOCKER_CONTEXT: colima-clickhouse-migrate-ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
       - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           name: shinzui
+      - name: Prepare the isolated exact Linux server candidate
+        run: |
+          test "$(uname -m)" = arm64
+          brew install colima docker
+          colima start clickhouse-migrate-ci --activate=false --cpu 4 --memory 8 --disk 30 --mount none --ssh-config=false
+          docker --context "$CLICKHOUSE_MIGRATE_DOCKER_CONTEXT" pull docker.io/altinity/clickhouse-server@sha256:3bafa18ced8daf9b81de70927b40c13b06545363abe3ad7f20ae77848f500c5a
       - run: nix develop --builders '' --accept-flake-config -c ghc --numeric-version
       - run: nix develop --builders '' --accept-flake-config -c cabal update
       - run: nix develop --builders '' --accept-flake-config -c just build
@@ -33,3 +41,6 @@ jobs:
       - run: nix develop --builders '' --accept-flake-config -c just check-production-closure
       - run: nix develop --builders '' --accept-flake-config -c just haddock
       - run: nix develop --builders '' --accept-flake-config -c just qualify-distributions
+      - name: Stop the owned qualification VM
+        if: always()
+        run: colima stop clickhouse-migrate-ci

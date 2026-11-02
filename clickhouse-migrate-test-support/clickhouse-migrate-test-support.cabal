@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-test-support
-version: 0.1.0.0
+version: 0.1.0.1
 synopsis: Isolated server fixtures for ClickHouse migration tests
 description:
   Isolated server fixtures for ClickHouse migration tests.

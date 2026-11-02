@@ -8,14 +8,12 @@ import platform
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
-GROUPS = ['transport', 'completion', 'ledger', 'exclusive', 'runner', 'repair', 'boundaries', 'survivors', 'adoption', 'consumer', 'cli', 'example']
+GROUPS = ['transport', 'completion', 'ledger', 'exclusive', 'runner', 'repair', 'boundaries', 'survivors', 'adoption', 'consumer', 'cli', 'example', 'remediation']
 matrix = json.loads((ROOT / 'test/compatibility/clickhouse-matrix.json').read_text())
 if platform.system() != 'Darwin' or platform.machine() != 'arm64':
     raise SystemExit('Only aarch64-darwin is qualified; Linux builders are deferred')
-if len(matrix['entries']) != 1 or matrix['entries'][0]['id'] != 'lts-native':
-    raise SystemExit('Update runner to enumerate every declared candidate; refusing silent skips')
-entry = matrix['entries'][0]
-print('Required native release matrix:', entry['version'], entry['tag'], entry['sha256'], flush=True)
+if not matrix['entries'] or len({entry['id'] for entry in matrix['entries']}) != len(matrix['entries']):
+    raise SystemExit('A nonempty matrix with unique candidate IDs is required')
 # Explicit overrides permit Nix and extracted-source artifacts to run the SAME
 # cases. Otherwise resolve already built Cabal artifacts from this project.
 def binary(variable, target, flags=()):
@@ -33,7 +31,10 @@ if 'CLICKHOUSE_MIGRATE_SUITE' not in os.environ:
 # coordination, never a production administrative provider or proof of drain.
 with (Path('/tmp') / 'clickhouse-migrate-native-release.lock').open('a') as gate:
     fcntl.flock(gate, fcntl.LOCK_EX)
-    for group in GROUPS:
-        print('Required case:', group, flush=True)
-        subprocess.run([suite, group], cwd=ROOT, env=env, check=True)
-print('All twelve native groups passed; no external consumer cutover, remote CI or publication implied', flush=True)
+    for entry in matrix['entries']:
+        print('Required native release candidate:', entry['id'], entry['version'], entry.get('image', entry.get('sha256')), flush=True)
+        candidate_env = dict(env, CLICKHOUSE_MIGRATE_CANDIDATE=entry['id'])
+        for group in GROUPS:
+            print('Required case:', entry['id'], group, flush=True)
+            subprocess.run([suite, group], cwd=ROOT, env=candidate_env, check=True)
+print('All declared candidates and thirteen native groups passed; no managed-cloud, external consumer cutover, remote CI or publication implied', flush=True)

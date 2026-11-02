@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-11-02
+* **Update**: Document the exact Altinity Linux arm64 engine candidate, owned OCI prerequisites and independent managed-cloud boundary.
+
 ## 2026-10-16
 * **Update**: Clarify execution ordinals versus stable component catalog indices in ledger v1 (DOC-9).
 * **Update**: Document bounded complete history reads and recovery preparation errors (DOC-5, DOC-8, DOC-9, DOC-12).
