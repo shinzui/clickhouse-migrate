@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-11-07
+* **Update**: Qualify exact Altinity 10002 with both artifact variants and retain all existing patches (DOC-5).
+
 ## 2026-11-02
 * **Update**: Document the exact Altinity Linux arm64 engine candidate, owned OCI prerequisites and independent managed-cloud boundary.
 

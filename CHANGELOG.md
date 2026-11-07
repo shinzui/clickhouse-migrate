@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0.2 — 2026-11-07
+
+Add exact Altinity `26.3.60.10002.altinitystable` engine qualification with an
+owned Linux arm64 artifact; retain both previously qualified patches.
+
+
 All published packages share a single version and are released together under
 one `v<version>` tag. Per-package details live in each package's `CHANGELOG.md`.
 

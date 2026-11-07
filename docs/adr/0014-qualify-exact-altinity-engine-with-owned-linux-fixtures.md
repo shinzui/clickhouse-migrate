@@ -46,3 +46,5 @@ or administrative exclusion/drain. Linux arm64 server evidence with Darwin-built
 clients is not Linux amd64 application-image acceptance, power-loss durability or
 production uptime certification. The consumer must complete managed-endpoint,
 scoped-grant, persistent-coordination and packaged recovery acceptance separately.
+
+The independent `0.1.0.2` patch cohort adds exact Altinity `26.3.60.10002.altinitystable` with the same immutable-artifact and two-variant procedure. See [the dated evidence](../release-evidence/2026-11-07-altinity-10002.md) for its suffixed tag and arm64 manifest.

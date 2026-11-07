@@ -22,6 +22,11 @@ provenance:
       at: 2026-11-07T05:24:52Z
       mode: "update"
       note: "Fixed review findings in place, inserted Milestone 2 to centralize server policy and data-drive the matrix, renumbered to eight milestones"
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-11-07T14:47:03Z
+      mode: "implement"
+      note: "Implement exact patch qualification, centralized server policy and replicated fixture acceptance"
 ---
 
 # Run migrations and the ledger on replicated ClickHouse databases
@@ -89,9 +94,11 @@ Kansoku traffic.
 
 ## Progress
 
-- [ ] Milestone 1: `26.3.60.10002.altinitystable` is in the matrix, the runtime allowlist
-  and the CI image pull, all thirteen native groups pass for both artifact variants, and the
-  dated release evidence, changelogs and compatibility guide record it.
+- [x] Milestone 1, 2026-11-07: exact Altinity 10002 is admitted alongside both
+  earlier patches. All 39 candidate/group cases pass for Nix and seven extracted
+  sibling source archives; metadata, three unit suites and Haddocks also pass.
+  Shared patch version `0.1.0.2`, CI pulls and dated evidence record the result.
+  An earlier native pre-readiness SIGSEGV is retained as a failed attempt.
 - [ ] Milestone 2: every server-dependent byte lives in one module, `TargetConfig` is a
   record, the matrix declares each candidate's groups, `just check` fails when the version
   allowlist and the matrix disagree, `scripts/qualify-candidate.py` reproduces the
@@ -118,6 +125,11 @@ Kansoku traffic.
 
 
 ## Surprises & Discoveries
+
+- Observation (implementation, 2026-11-07): the published source tag is
+  `v26.3.60.10002-1.altinitystable`, commit `4d1d8cad81573563e3abece05c39fb4903fce73f`.
+  The image/reported server version omit `-1`; exact artifact identities and both
+  passing 39-case variants are retained in `docs/release-evidence/2026-11-07-altinity-10002.json`.
 
 - Observation: TAN staging was upgraded underneath the qualified allowlist. Evidence from
   2026-11-02 in `mori://tan/tan-app-infrastructure` (`docs/qualification/kansoku-image.json`)

@@ -1,0 +1,44 @@
+{
+  "cohort": "0.1.0.2",
+  "date": "2026-11-07",
+  "sourceArchives": {
+    "clickhouse-migrate-0.1.0.2.tar.gz": "5aeba3bba4d6bdfc0fdd65fff50aedc1e9f785556db010a51161d396fd975bf8",
+    "clickhouse-migrate-cli-0.1.0.2.tar.gz": "6e60f2bf1983d6e83f1cef14abbcf287c926698b488c912b1be9696fb19924f4",
+    "clickhouse-migrate-embed-0.1.0.2.tar.gz": "3cad6b29442c643ef220a7971a5af9726e41439c014db4326bb0defb5f23f8fe",
+    "clickhouse-migrate-example-0.1.0.2.tar.gz": "2789480f9c9143fad906f53fa4f12d6f47ce5c2d09bf59c736fd2b32f5ffae74",
+    "clickhouse-migrate-example-analytics-0.1.0.2.tar.gz": "52db6acbd7fdd3f331bbd818649c0e699fae772643a7c7ce7060614e8b423eb5",
+    "clickhouse-migrate-example-catalog-0.1.0.2.tar.gz": "9aaba33d92501978bae33d3090a2da3c7528bf94e878104026e2610a97e159f0",
+    "clickhouse-migrate-test-support-0.1.0.2.tar.gz": "866abeb43f813b416b1a0213404e270ac24ec884e2c49e9506bedaf1928965de"
+  },
+  "nixArtifacts": [
+    {
+      "drvPath": "/nix/store/xl5h3w47m1dhlm46v01ysh5n7xvpq7wb-clickhouse-migrate-test-support-0.1.0.2.drv",
+      "outputs": {
+        "out": "/nix/store/wpb6n7ivr8622ks5cfc798g39z26ikgc-clickhouse-migrate-test-support-0.1.0.2"
+      }
+    },
+    {
+      "drvPath": "/nix/store/1rsiwibpwlqfb0s7adpprlcnjxcasfjw-clickhouse-migrate-0.1.0.2.drv",
+      "outputs": {
+        "out": "/nix/store/fx58z3syszg9dqb2bb2mhzkl6g7vp540-clickhouse-migrate-0.1.0.2"
+      }
+    },
+    {
+      "drvPath": "/nix/store/fn9k020faaqbzs80ihis0h4ldxz0vwlr-clickhouse-migrate-example-0.1.0.2.drv",
+      "outputs": {
+        "out": "/nix/store/7qagylg8v5wvbkzlgw77xznfm60s02wa-clickhouse-migrate-example-0.1.0.2"
+      }
+    }
+  ],
+  "sourceQualification": {
+    "candidateGroupCases": 39,
+    "metadataPackages": 7,
+    "unitSuites": 3,
+    "haddock": true
+  },
+  "nixQualification": {
+    "status": "passed",
+    "previousFailure": "Native lts-native/example server exited SIGSEGV before readiness; diagnostic root retained at /tmp/clickhouse-migrate-server-4d35oqkq; no fixture retries",
+    "candidateGroupCases": 39
+  }
+}

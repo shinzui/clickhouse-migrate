@@ -12,7 +12,7 @@ generated:
 # Compatibility evidence
 
 The exact server candidates are ClickHouse **26.8.28.14 LTS** on Apple Silicon macOS
-and **26.3.60.10001.altinitystable** on Linux arm64 in an owned local container. The exact official binary URL, SHA-256, release tag object
+and **26.3.60.10001.altinitystable** and **26.3.60.10002.altinitystable** on Linux arm64 in an owned local container. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
 [test/compatibility/clickhouse-matrix.json](../../test/compatibility/clickhouse-matrix.json).
 The fixture verifies the digest before execution. This file links to the packaged
@@ -139,3 +139,5 @@ than automatically retrying. Native protocol evidence is not production OS/uptim
 certification. Final recheck found 26.8.29.10 LTS newly published in the official
 package index (tag/source identity recorded in release evidence); it remains unqualified
 and rejected, as does 26.9 stable. No implicit latest-patch compatibility is claimed.
+
+On 2026-11-07 all three candidates passed all thirteen groups in both artifact variants. See [the 10002 qualification](../release-evidence/2026-11-07-altinity-10002.md).
