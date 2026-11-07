@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Why clickhouse-migrate stops at replicated ClickHouse clusters and the planned design to support them.">
+<title>Migrating Replicated ClickHouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column (~68ch) with full-width figures; light theme only. */
+:root {
+  --bg: #f5f7f9;
+  --surface: #ffffff;
+  --ink: #18212c;
+  --muted: #566272;
+  --line: #d3dae2;
+  --accent: #1d5ea8;
+  --accent-bg: #e8f0fa;
+  --bad: #b3261e;
+  --bad-bg: #fcebea;
+  --good: #22704a;
+  --good-bg: #e6f3eb;
+  --note-bg: #eef3f8;
+  --note-line: #b9cbe0;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+}
+img, svg { max-width: 100%; }
+.page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 48px 72px;
+  display: grid;
+  gap: 56px;
+}
+.prose { max-width: 68ch; display: grid; gap: 14px; min-width: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 600; letter-spacing: -0.01em; }
+h2 { font-size: 1.65rem; font-weight: 600; }
+h3 { font-size: 1.22rem; font-weight: 600; margin-top: 10px; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--accent-bg); color: var(--ink); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+header { display: grid; gap: 16px; }
+.lede { font-size: 1.15rem; color: var(--ink); max-width: 62ch; }
+.meta { color: var(--muted); font-size: 0.9rem; }
+section { display: grid; gap: 22px; }
+.callout {
+  border: 1px solid var(--note-line);
+  background: var(--note-bg);
+  border-radius: 8px;
+  padding: 18px 20px;
+  display: grid;
+  gap: 8px;
+  max-width: 76ch;
+}
+.callout strong { color: var(--accent); font-family: var(--font-display); font-size: 1.08rem; }
+figure { margin: 0; display: grid; gap: 10px; min-width: 0; }
+.fig-frame {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  overflow-x: auto;
+}
+.fig-frame svg { display: block; width: 100%; max-width: none; height: auto; min-width: 560px; color: var(--ink); font-family: var(--font-body); }
+figcaption { color: var(--muted); font-size: 0.92rem; max-width: 72ch; }
+figcaption b { color: var(--ink); font-weight: 600; }
+
+/* SVG roles */
+.d-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.2; }
+.d-soft { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; }
+.d-inner { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 1; }
+.d-keep { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 1.6; }
+.d-bad { fill: var(--bad-bg); stroke: var(--bad); stroke-width: 1.2; }
+.d-good { fill: var(--good-bg); stroke: var(--good); stroke-width: 1.2; }
+.d-line { stroke: var(--ink); stroke-width: 1.3; fill: none; }
+.d-faint { stroke: var(--line); stroke-width: 1.3; fill: none; }
+.d-dash { stroke-dasharray: 5 4; }
+.t { fill: var(--ink); font-size: 12px; }
+.t-s { fill: var(--muted); font-size: 10.5px; }
+.t-h { fill: var(--ink); font-size: 13px; font-weight: 600; }
+.t-title { fill: var(--ink); font-size: 14px; font-weight: 600; font-family: var(--font-display); }
+.t-m { fill: var(--ink); font-size: 10.5px; font-family: var(--font-mono); }
+.t-bad { fill: var(--bad); font-size: 11px; }
+.t-good { fill: var(--good); font-size: 11px; }
+.t-badh { fill: var(--bad); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; }
+.t-goodh { fill: var(--good); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; }
+.mk { fill: var(--ink); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; background: var(--bg); }
+td code { white-space: nowrap; }
+.pill { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+.pill.ok { background: var(--good-bg); color: var(--good); }
+.pill.no { background: var(--bad-bg); color: var(--bad); }
+
+/* Milestones: a real sequence, so numbers carry meaning */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; max-width: 76ch; counter-reset: step; }
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.steps li::before {
+  content: counter(step);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+}
+.steps li.first::before { background: var(--accent); color: var(--surface); }
+.steps .body { display: grid; gap: 4px; min-width: 0; }
+.steps .name { font-weight: 600; }
+.tag { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-left: 6px; }
+
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.panel h3 { margin: 0; font-size: 1.08rem; }
+.panel p { color: var(--ink); font-size: 0.95rem; }
+
+dl { margin: 0; display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 10px 22px; max-width: 80ch; }
+dt { font-weight: 600; }
+dd { margin: 0; color: var(--ink); }
+@media (max-width: 560px) {
+  dl { grid-template-columns: 1fr; gap: 2px; }
+  dd { margin-bottom: 10px; }
+}
+footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <div class="eyebrow">clickhouse-migrate · design note</div>
+  <h1>Migrating Replicated ClickHouse</h1>
+  <p class="lede">Production ClickHouse deployments often keep two or more live copies of every table. clickhouse-migrate currently supports one directly addressed server. This page explains what replication changes, where the tool stops today, and how we plan to support replicated clusters safely.</p>
+  <p class="meta">Written for contributors and users who have not worked with ClickHouse. It summarizes <a href="https://github.com/shinzui/clickhouse-migrate/blob/master/docs/plans/12-run-migrations-and-the-ledger-on-replicated-clickhouse-databases.md">ExecPlan 12</a>, which has the full detail.</p>
+</header>
+
+<div class="callout" role="note">
+  <strong>Planned work, not yet released</strong>
+  <p>Everything below describes a design. Until a release says otherwise, the supported setup is still the one in the <a href="https://github.com/shinzui/clickhouse-migrate/blob/master/docs/user/compatibility.md">compatibility guide</a>: one directly addressed server, ordinary databases, and the exact server versions listed there. Replicated tables, load balancers and cluster endpoints are refused.</p>
+</div>
+
+<section aria-labelledby="s-basics">
+  <div class="prose">
+    <h2 id="s-basics">ClickHouse in two minutes</h2>
+    <p>ClickHouse is a database built for analytics: it stores huge numbers of rows and answers questions like "how many page views per day last month" quickly. Like most databases, a ClickHouse <b>server</b> holds <b>databases</b>, and each database holds <b>tables</b>.</p>
+    <p>Each table declares an <b>engine</b>, which decides how its rows are stored on disk. Nearly every real table uses an engine from the <code>MergeTree</code> family. Variants such as <code>ReplacingMergeTree</code> and <code>AggregatingMergeTree</code> add behaviour like collapsing duplicate rows. Databases have engines too; an ordinary one is <code>Atomic</code>.</p>
+    <p>A production setup usually avoids depending on one machine, so it runs several <b>replicas</b>: servers that each hold a full copy of the data. To keep them in step, ClickHouse uses a small coordination service called <b>Keeper</b>, which keeps a shared log of every change. Clients often reach the cluster through one network address, such as a load balancer or a managed service's endpoint, that may route each new connection to any replica.</p>
+    <p>Rows are only copied between replicas for tables whose engine says so: <code>ReplicatedMergeTree</code> instead of <code>MergeTree</code>, <code>ReplicatedReplacingMergeTree</code> instead of <code>ReplacingMergeTree</code>, and so on. Clusters are commonly set up so that every database is a <code>Replicated</code> database. With the setting <code>database_replicated_allow_only_replicated_engine</code>, a login is made to refuse any table that would not be copied, failing with error code 56. That setting is the reason this design exists.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 820 372" role="img" aria-label="On the left, clickhouse-migrate talks to one ClickHouse server holding an Atomic database with a MergeTree table, so there is a single copy of the data. On the right, clickhouse-migrate talks to one address that routes to either of two replicas; each replica holds a Replicated database with a ReplicatedMergeTree table, rows are copied between them, and both are coordinated through ClickHouse Keeper.">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        </defs>
+        <text x="20" y="28" class="t-title">Supported today: one server</text>
+        <rect x="95" y="56" width="140" height="40" rx="6" class="d-box"/>
+        <text x="165" y="81" text-anchor="middle" class="t">clickhouse-migrate</text>
+        <line x1="165" y1="96" x2="165" y2="168" class="d-line" marker-end="url(#a1)"/>
+        <text x="174" y="136" class="t-s">SQL over HTTP(S)</text>
+        <rect x="70" y="170" width="190" height="120" rx="8" class="d-box"/>
+        <text x="165" y="190" text-anchor="middle" class="t-h">ClickHouse server</text>
+        <rect x="82" y="200" width="166" height="78" rx="6" class="d-soft"/>
+        <text x="165" y="218" text-anchor="middle" class="t">analytics · Atomic</text>
+        <rect x="94" y="228" width="142" height="42" rx="5" class="d-inner"/>
+        <text x="165" y="245" text-anchor="middle" class="t">events</text>
+        <text x="165" y="261" text-anchor="middle" class="t-m">MergeTree</text>
+        <text x="165" y="322" text-anchor="middle" class="t-s">One copy of the data.</text>
+        <text x="165" y="340" text-anchor="middle" class="t-bad">Lose this server and the data goes with it.</text>
+
+        <line x1="335" y1="14" x2="335" y2="360" class="d-faint d-dash"/>
+
+        <text x="360" y="28" class="t-title">Typical production: two replicas, one address</text>
+        <rect x="510" y="56" width="140" height="40" rx="6" class="d-box"/>
+        <text x="580" y="81" text-anchor="middle" class="t">clickhouse-migrate</text>
+        <line x1="580" y1="96" x2="580" y2="114" class="d-line" marker-end="url(#a1)"/>
+        <rect x="490" y="116" width="180" height="30" rx="15" class="d-box"/>
+        <text x="580" y="135" text-anchor="middle" class="t-m">clickhouse.example : 8443</text>
+        <line x1="540" y1="146" x2="472" y2="168" class="d-line" marker-end="url(#a1)"/>
+        <line x1="620" y1="146" x2="688" y2="168" class="d-line" marker-end="url(#a1)"/>
+        <text x="580" y="166" text-anchor="middle" class="t-s">may route to either</text>
+
+        <rect x="365" y="170" width="190" height="120" rx="8" class="d-box"/>
+        <text x="460" y="190" text-anchor="middle" class="t-h">Replica 1</text>
+        <rect x="377" y="200" width="166" height="78" rx="6" class="d-soft"/>
+        <text x="460" y="218" text-anchor="middle" class="t">analytics · Replicated</text>
+        <rect x="389" y="228" width="142" height="42" rx="5" class="d-inner"/>
+        <text x="460" y="245" text-anchor="middle" class="t">events</text>
+        <text x="460" y="261" text-anchor="middle" class="t-m">ReplicatedMergeTree</text>
+
+        <rect x="605" y="170" width="190" height="120" rx="8" class="d-box"/>
+        <text x="700" y="190" text-anchor="middle" class="t-h">Replica 2</text>
+        <rect x="617" y="200" width="166" height="78" rx="6" class="d-soft"/>
+        <text x="700" y="218" text-anchor="middle" class="t">analytics · Replicated</text>
+        <rect x="629" y="228" width="142" height="42" rx="5" class="d-inner"/>
+        <text x="700" y="245" text-anchor="middle" class="t">events</text>
+        <text x="700" y="261" text-anchor="middle" class="t-m">ReplicatedMergeTree</text>
+
+        <line x1="558" y1="250" x2="602" y2="250" class="d-line" marker-start="url(#a1)" marker-end="url(#a1)"/>
+        <text x="580" y="242" text-anchor="middle" class="t-s">rows</text>
+
+        <line x1="460" y1="290" x2="528" y2="316" class="d-line d-dash"/>
+        <line x1="700" y1="290" x2="632" y2="316" class="d-line d-dash"/>
+        <rect x="510" y="316" width="140" height="42" rx="6" class="d-box"/>
+        <text x="580" y="334" text-anchor="middle" class="t">ClickHouse Keeper</text>
+        <text x="580" y="350" text-anchor="middle" class="t-s">shared change log</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 1.</b> The setup clickhouse-migrate supports today (left) and a common production setup (right). On the right, a table only has a second copy if its engine name starts with <code>Replicated</code>, and the tool cannot choose which replica it reaches.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="s-tool">
+  <div class="prose">
+    <h2 id="s-tool">What clickhouse-migrate does</h2>
+    <p>A <b>migration</b> is a numbered SQL change, such as "create the events table" or "add a column". clickhouse-migrate applies pending migrations in order and remembers what it has done in a <b>ledger</b>: an append-only table in the database that records every step. Before anything runs, it does four safety checks.</p>
+    <p>The <b>envelope</b> is a check on each statement's text that only allows familiar kinds of SQL. Each step also gets a <b>checksum</b>, a fingerprint used to detect a migration that was edited after it ran. On every new connection, an <b>admission probe</b> asks the server who it is and which version it runs, and refuses anything unexpected. Every request also carries a fixed set of settings, called the <b>completion policy</b>, which decides when the server may say "done".</p>
+    <p>Each of those checks was written for a single server. Figure 2 shows where each one stops a replicated cluster.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 920 252" role="img" aria-label="Five stages of a migration run: check SQL, connect, run step, record in ledger, read back. Under each, what blocks a replicated cluster today and what the design changes it to.">
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        </defs>
+        <g>
+          <rect x="20" y="20" width="156" height="64" rx="6" class="d-box"/>
+          <text x="98" y="46" text-anchor="middle" class="t-h">Check SQL</text>
+          <text x="98" y="66" text-anchor="middle" class="t-s">envelope + checksum</text>
+          <rect x="200" y="20" width="156" height="64" rx="6" class="d-box"/>
+          <text x="278" y="46" text-anchor="middle" class="t-h">Connect</text>
+          <text x="278" y="66" text-anchor="middle" class="t-s">admission probe</text>
+          <rect x="380" y="20" width="156" height="64" rx="6" class="d-box"/>
+          <text x="458" y="46" text-anchor="middle" class="t-h">Run step</text>
+          <text x="458" y="66" text-anchor="middle" class="t-s">send the SQL</text>
+          <rect x="560" y="20" width="156" height="64" rx="6" class="d-box"/>
+          <text x="638" y="46" text-anchor="middle" class="t-h">Record</text>
+          <text x="638" y="66" text-anchor="middle" class="t-s">append to the ledger</text>
+          <rect x="740" y="20" width="156" height="64" rx="6" class="d-box"/>
+          <text x="818" y="46" text-anchor="middle" class="t-h">Read back</text>
+          <text x="818" y="66" text-anchor="middle" class="t-s">status and verify</text>
+          <line x1="176" y1="52" x2="198" y2="52" class="d-line" marker-end="url(#a2)"/>
+          <line x1="356" y1="52" x2="378" y2="52" class="d-line" marker-end="url(#a2)"/>
+          <line x1="536" y1="52" x2="558" y2="52" class="d-line" marker-end="url(#a2)"/>
+          <line x1="716" y1="52" x2="738" y2="52" class="d-line" marker-end="url(#a2)"/>
+        </g>
+        <g>
+          <rect x="20" y="104" width="156" height="62" rx="5" class="d-bad"/>
+          <text x="98" y="122" text-anchor="middle" class="t-badh">TODAY</text>
+          <text x="98" y="140" text-anchor="middle" class="t-bad">rejects every word</text>
+          <text x="98" y="156" text-anchor="middle" class="t-bad">starting REPLICATED</text>
+          <rect x="200" y="104" width="156" height="62" rx="5" class="d-bad"/>
+          <text x="278" y="122" text-anchor="middle" class="t-badh">TODAY</text>
+          <text x="278" y="140" text-anchor="middle" class="t-bad">exactly one server ID</text>
+          <text x="278" y="156" text-anchor="middle" class="t-bad">per target</text>
+          <rect x="380" y="104" width="156" height="62" rx="5" class="d-bad"/>
+          <text x="458" y="122" text-anchor="middle" class="t-badh">TODAY</text>
+          <text x="458" y="140" text-anchor="middle" class="t-bad">done when one copy</text>
+          <text x="458" y="156" text-anchor="middle" class="t-bad">has the change</text>
+          <rect x="560" y="104" width="156" height="62" rx="5" class="d-bad"/>
+          <text x="638" y="122" text-anchor="middle" class="t-badh">TODAY</text>
+          <text x="638" y="140" text-anchor="middle" class="t-bad">needs Atomic database</text>
+          <text x="638" y="156" text-anchor="middle" class="t-bad">and MergeTree table</text>
+          <rect x="740" y="104" width="156" height="62" rx="5" class="d-bad"/>
+          <text x="818" y="122" text-anchor="middle" class="t-badh">TODAY</text>
+          <text x="818" y="140" text-anchor="middle" class="t-bad">may read a replica</text>
+          <text x="818" y="156" text-anchor="middle" class="t-bad">that is behind</text>
+        </g>
+        <g>
+          <rect x="20" y="180" width="156" height="62" rx="5" class="d-good"/>
+          <text x="98" y="198" text-anchor="middle" class="t-goodh">PLANNED</text>
+          <text x="98" y="216" text-anchor="middle" class="t-good">accepts Replicated…</text>
+          <text x="98" y="232" text-anchor="middle" class="t-good">MergeTree engines</text>
+          <rect x="200" y="180" width="156" height="62" rx="5" class="d-good"/>
+          <text x="278" y="198" text-anchor="middle" class="t-goodh">PLANNED</text>
+          <text x="278" y="216" text-anchor="middle" class="t-good">any ID in a configured</text>
+          <text x="278" y="232" text-anchor="middle" class="t-good">replica set</text>
+          <rect x="380" y="180" width="156" height="62" rx="5" class="d-good"/>
+          <text x="458" y="198" text-anchor="middle" class="t-goodh">PLANNED</text>
+          <text x="458" y="216" text-anchor="middle" class="t-good">done only when every</text>
+          <text x="458" y="232" text-anchor="middle" class="t-good">replica has it</text>
+          <rect x="560" y="180" width="156" height="62" rx="5" class="d-good"/>
+          <text x="638" y="198" text-anchor="middle" class="t-goodh">PLANNED</text>
+          <text x="638" y="216" text-anchor="middle" class="t-good">Replicated database,</text>
+          <text x="638" y="232" text-anchor="middle" class="t-good">ReplicatedMergeTree</text>
+          <rect x="740" y="180" width="156" height="62" rx="5" class="d-good"/>
+          <text x="818" y="198" text-anchor="middle" class="t-goodh">PLANNED</text>
+          <text x="818" y="216" text-anchor="middle" class="t-good">reads only fully</text>
+          <text x="818" y="232" text-anchor="middle" class="t-good">replicated rows</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><b>Figure 2.</b> A migration run, left to right. The red row is why a run against a replicated cluster fails today; the green row is what each stage will do. A failure at any stage stops the run before the next one.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="s-changes">
+  <div class="prose">
+    <h2 id="s-changes">The changes, one at a time</h2>
+    <p>Single-server targets keep working exactly as they do now: same requests, same checksums, same ledger. Everything below applies only when a target is configured as a replicated cluster.</p>
+
+    <h3>Keep the version list current</h3>
+    <p>The tool accepts only exact server versions it has tested, because a new release can change behaviour the safety checks rely on. Managed ClickHouse services upgrade patch releases on their own schedule, so a server that worked yesterday can be refused today. As a first, separate step, the plan qualifies Altinity's <code>26.3.60.10002.altinitystable</code> build with the full existing test suite and adds it to the list. Replicated support is then tested on that build.</p>
+
+    <h3>Trust a set of replicas, not one server</h3>
+    <p>Every ClickHouse server has a permanent ID, which ClickHouse calls its server UUID. Today you configure the one ID you expect, and the tool checks it on every new connection so a request can never land on the wrong machine. Behind a load-balanced address, a second connection can land on another replica, which has a different ID and would be refused.</p>
+    <p>A replicated target will instead name the cluster and the exact set of replica IDs. Each connection is accepted if its ID is in the set. At the start of each run, the tool also asks the cluster which replicas it has and refuses to continue unless that list matches the configured set exactly.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 800 222" role="img" aria-label="Before: the tool expects one server ID, so connection 2, which lands on replica 2, is rejected. After: the tool expects a set of two IDs, so connections to either replica are admitted.">
+        <text x="20" y="26" class="t-title">Today</text>
+        <rect x="20" y="38" width="230" height="54" rx="6" class="d-box"/>
+        <text x="135" y="60" text-anchor="middle" class="t">Expects one server</text>
+        <text x="135" y="79" text-anchor="middle" class="t-m">a1f3…</text>
+        <rect x="290" y="38" width="150" height="54" rx="6" class="d-good"/>
+        <text x="365" y="60" text-anchor="middle" class="t">Conn 1 → replica 1</text>
+        <text x="365" y="79" text-anchor="middle" class="t-good">admitted ✓</text>
+        <rect x="455" y="38" width="150" height="54" rx="6" class="d-bad"/>
+        <text x="530" y="60" text-anchor="middle" class="t">Conn 2 → replica 2</text>
+        <text x="530" y="79" text-anchor="middle" class="t-bad">rejected ✗ wrong ID</text>
+        <rect x="620" y="38" width="150" height="54" rx="6" class="d-good"/>
+        <text x="695" y="60" text-anchor="middle" class="t">Conn 3 → replica 1</text>
+        <text x="695" y="79" text-anchor="middle" class="t-good">admitted ✓</text>
+
+        <text x="20" y="138" class="t-title">Planned</text>
+        <rect x="20" y="150" width="230" height="54" rx="6" class="d-keep"/>
+        <text x="135" y="172" text-anchor="middle" class="t">Expects a replica set</text>
+        <text x="135" y="191" text-anchor="middle" class="t-m">{a1f3…, 7c20…}</text>
+        <rect x="290" y="150" width="150" height="54" rx="6" class="d-good"/>
+        <text x="365" y="172" text-anchor="middle" class="t">Conn 1 → replica 1</text>
+        <text x="365" y="191" text-anchor="middle" class="t-good">admitted ✓</text>
+        <rect x="455" y="150" width="150" height="54" rx="6" class="d-good"/>
+        <text x="530" y="172" text-anchor="middle" class="t">Conn 2 → replica 2</text>
+        <text x="530" y="191" text-anchor="middle" class="t-good">admitted ✓</text>
+        <rect x="620" y="150" width="150" height="54" rx="6" class="d-good"/>
+        <text x="695" y="172" text-anchor="middle" class="t">Conn 3 → replica 1</text>
+        <text x="695" y="191" text-anchor="middle" class="t-good">admitted ✓</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 3.</b> The same three connections through one load-balanced address. The check stays as strict as before: a server outside the set is still refused, and a cluster that gained or lost a replica fails the membership check before any SQL is sent.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <h3>Say "done" only when every replica has the change</h3>
+    <p>When the tool records a step in the ledger, it must be certain the record survives. With one server, "the server said OK" is enough. With two replicas, the replica that received the write can say OK and then fail before it has passed the row to the other one. The acknowledged record would then be gone.</p>
+    <p>Replicated targets will ask ClickHouse to wait for all of them. An <b>insert quorum</b> equal to the number of replicas makes an insert succeed only after every replica stores it. <code>alter_sync=2</code> and <code>mutations_sync=2</code> make schema changes wait for every replica, and reads use <b>sequential consistency</b> so a replica that is behind refuses to answer instead of returning stale data. If a replica is down, migrations stop instead of running half-way.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 820 306" role="img" aria-label="Two sequence diagrams. Today: the migrator sends an insert to replica 1, replica 1 replies OK, and only later copies the row to replica 2, leaving a window where a failure loses the acknowledged row. Planned: replica 1 copies the row to replica 2, waits for confirmation, and only then replies OK.">
+        <defs>
+          <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        </defs>
+        <text x="200" y="22" text-anchor="middle" class="t-title">Without a quorum: OK after one copy</text>
+        <text x="60" y="50" text-anchor="middle" class="t-h">migrator</text>
+        <text x="200" y="50" text-anchor="middle" class="t-h">replica 1</text>
+        <text x="340" y="50" text-anchor="middle" class="t-h">replica 2</text>
+        <line x1="60" y1="60" x2="60" y2="250" class="d-faint"/>
+        <line x1="200" y1="60" x2="200" y2="250" class="d-faint"/>
+        <line x1="340" y1="60" x2="340" y2="250" class="d-faint"/>
+        <rect x="194" y="120" width="12" height="80" class="d-bad"/>
+        <line x1="60" y1="88" x2="198" y2="88" class="d-line" marker-end="url(#a4)"/>
+        <text x="130" y="81" text-anchor="middle" class="t-s">insert ledger row</text>
+        <line x1="200" y1="120" x2="62" y2="120" class="d-line" marker-end="url(#a4)"/>
+        <text x="130" y="113" text-anchor="middle" class="t-s">OK</text>
+        <line x1="200" y1="200" x2="338" y2="200" class="d-line d-dash" marker-end="url(#a4)"/>
+        <text x="270" y="193" text-anchor="middle" class="t-s">copy, later</text>
+        <text x="200" y="276" text-anchor="middle" class="t-bad">If replica 1 fails inside the red window,</text>
+        <text x="200" y="294" text-anchor="middle" class="t-bad">the row the tool was told is safe is lost.</text>
+
+        <line x1="410" y1="14" x2="410" y2="296" class="d-faint d-dash"/>
+
+        <text x="620" y="22" text-anchor="middle" class="t-title">Planned: OK after every copy</text>
+        <text x="480" y="50" text-anchor="middle" class="t-h">migrator</text>
+        <text x="620" y="50" text-anchor="middle" class="t-h">replica 1</text>
+        <text x="760" y="50" text-anchor="middle" class="t-h">replica 2</text>
+        <line x1="480" y1="60" x2="480" y2="250" class="d-faint"/>
+        <line x1="620" y1="60" x2="620" y2="250" class="d-faint"/>
+        <line x1="760" y1="60" x2="760" y2="250" class="d-faint"/>
+        <line x1="480" y1="88" x2="618" y2="88" class="d-line" marker-end="url(#a4)"/>
+        <text x="550" y="81" text-anchor="middle" class="t-s">insert, quorum = 2</text>
+        <line x1="620" y1="122" x2="758" y2="122" class="d-line" marker-end="url(#a4)"/>
+        <text x="690" y="115" text-anchor="middle" class="t-s">copy</text>
+        <line x1="760" y1="156" x2="622" y2="156" class="d-line" marker-end="url(#a4)"/>
+        <text x="690" y="149" text-anchor="middle" class="t-s">stored</text>
+        <line x1="620" y1="190" x2="482" y2="190" class="d-line" marker-end="url(#a4)"/>
+        <text x="550" y="183" text-anchor="middle" class="t-s">OK</text>
+        <text x="620" y="276" text-anchor="middle" class="t-good">OK arrives only once both replicas</text>
+        <text x="620" y="294" text-anchor="middle" class="t-good">hold the row.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 4.</b> Time runs downward. The quorum moves the "OK" after the copy, which closes the window on the left. The quorum size comes from the configured replica set: a one-replica cluster uses one, a three-replica cluster uses three.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <h3>Give replicated targets their own fingerprint</h3>
+    <p>A migration's checksum covers its exact SQL, its names, and the completion policy. That policy is included on purpose: running the same SQL with different "when is it done" rules is a different operation, and the ledger should not treat the two as the same. Waiting for every replica is such a change, so replicated targets get a new policy and a new checksum format, <code>sha256-v2</code>. The existing <code>sha256-v1</code> format and every published test vector stay byte-for-byte the same, so existing ledgers remain valid.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 800 196" role="img" aria-label="Three inputs, the migration SQL, the component and migration names, and the completion policy, feed a SHA-256 hash. A single-server target produces the unchanged sha256-v1 fingerprint; a replicated target produces the new sha256-v2 fingerprint.">
+        <defs>
+          <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        </defs>
+        <rect x="20" y="16" width="230" height="38" rx="6" class="d-box"/>
+        <text x="135" y="40" text-anchor="middle" class="t">Migration SQL, exact bytes</text>
+        <rect x="20" y="68" width="230" height="38" rx="6" class="d-box"/>
+        <text x="135" y="92" text-anchor="middle" class="t">Component and migration names</text>
+        <rect x="20" y="120" width="230" height="56" rx="6" class="d-keep"/>
+        <text x="135" y="142" text-anchor="middle" class="t">Completion policy</text>
+        <text x="135" y="161" text-anchor="middle" class="t-m">local-sync-v1 | replicated-sync-v1</text>
+        <line x1="250" y1="35" x2="318" y2="88" class="d-line" marker-end="url(#a5)"/>
+        <line x1="250" y1="87" x2="318" y2="96" class="d-line" marker-end="url(#a5)"/>
+        <line x1="250" y1="148" x2="318" y2="104" class="d-line" marker-end="url(#a5)"/>
+        <rect x="320" y="72" width="120" height="48" rx="6" class="d-box"/>
+        <text x="380" y="101" text-anchor="middle" class="t-h">SHA-256</text>
+        <line x1="440" y1="90" x2="518" y2="58" class="d-line" marker-end="url(#a5)"/>
+        <line x1="440" y1="102" x2="518" y2="136" class="d-line" marker-end="url(#a5)"/>
+        <rect x="520" y="32" width="260" height="50" rx="6" class="d-box"/>
+        <text x="650" y="53" text-anchor="middle" class="t">Single-server target</text>
+        <text x="650" y="71" text-anchor="middle" class="t-m">sha256-v1 · unchanged</text>
+        <rect x="520" y="112" width="260" height="50" rx="6" class="d-keep"/>
+        <text x="650" y="133" text-anchor="middle" class="t">Replicated target</text>
+        <text x="650" y="151" text-anchor="middle" class="t-m">sha256-v2 · new</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 5.</b> Only the policy input differs, so the same migration has one fingerprint per kind of target. The ledger records which format it uses, and a tool configured for one kind refuses a ledger of the other.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <h3>Allow replicated table engines in migration SQL</h3>
+    <p>The envelope check is deliberately narrow and works on the text of each statement. It will start accepting the six <code>Replicated…MergeTree</code> engine names, but only where an engine name belongs. It will keep rejecting SQL that tries to manage replication by hand, which a <code>Replicated</code> database already does. Migrations that create databases are refused on replicated targets: the cluster operator creates those databases ahead of time on every replica.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Statement fragment</th><th>Planned result</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>ENGINE = ReplicatedMergeTree ORDER BY id</code></td><td><span class="pill ok">accepted</span></td><td>The normal way to create a copied table.</td></tr>
+        <tr><td><code>ENGINE = ReplicatedReplacingMergeTree(updated_at)</code></td><td><span class="pill ok">accepted</span></td><td>Ordinary engine arguments are fine.</td></tr>
+        <tr><td><code>ReplicatedMergeTree('/clickhouse/tables/x', 'r1')</code></td><td><span class="pill no">rejected</span></td><td>An explicit Keeper path. The server fills in the right one and refuses paths that differ.</td></tr>
+        <tr><td><code>… ON CLUSTER my_cluster</code></td><td><span class="pill no">rejected</span></td><td>A Replicated database already sends table changes to every replica.</td></tr>
+        <tr><td><code>CREATE DATABASE analytics ENGINE = Replicated(…)</code></td><td><span class="pill no">rejected</span></td><td>Databases are created by the cluster operator, not by migrations.</td></tr>
+        <tr><td><code>ENGINE = Distributed(…)</code></td><td><span class="pill no">rejected</span></td><td>Spreading data across shards is out of scope.</td></tr>
+        <tr><td><code>ENGINE = MergeTree</code> inside a Replicated database</td><td><span class="pill ok">passes the check</span></td><td>A login restricted to replicated tables makes the server refuse it with error code 56. The run fails loudly before anything is half-applied.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>Keep the ledger on replicated storage</h3>
+    <p>The ledger is a table too, so the same rules apply to it. On a replicated target it lives in a <code>Replicated</code> database that already exists and uses a <code>ReplicatedMergeTree</code> table. The tool checks the table's exact layout as reported by ClickHouse, as it does today.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ledger</th><th>Single server (unchanged)</th><th>Replicated cluster (planned)</th></tr></thead>
+      <tbody>
+        <tr><td>Database</td><td>Created by the tool as <code>Atomic</code></td><td>Must already exist as <code>Replicated</code>; the tool never creates it</td></tr>
+        <tr><td>Table engine</td><td><code>MergeTree</code></td><td><code>ReplicatedMergeTree</code>, no Keeper arguments</td></tr>
+        <tr><td>Appending an entry</td><td>Done when the server stores it</td><td>Done when every replica stores it</td></tr>
+        <tr><td>Reading history</td><td>Plain read</td><td>Sequentially consistent read</td></tr>
+        <tr><td>Checksum format recorded</td><td><code>sha256-v1</code></td><td><code>sha256-v2</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="s-order">
+  <div class="prose">
+    <h2 id="s-order">Order of work</h2>
+    <p>The first step ships by itself. The second is an experiment whose measurements fix the exact settings and expected text the later steps rely on.</p>
+  </div>
+  <ol class="steps">
+    <li class="first"><div class="body"><span class="name">Qualify Altinity 26.3.60.10002 <span class="tag">ships first</span></span><span>Run the full test suite against the new build, add it to the list of accepted versions, and release a patch version.</span></div></li>
+    <li><div class="body"><span class="name">Build a two-replica test cluster and measure <span class="tag">prototype</span></span><span>Start two ClickHouse servers and Keeper in local containers and record how ClickHouse really behaves: the exact engine text it reports, which settings make writes wait, what a stopped replica does, and the error-56 refusal. If no setting makes acknowledged writes wait for every replica, we stop and rethink.</span></div></li>
+    <li><div class="body"><span class="name">Replicated targets and admission</span><span>Configure a cluster name and replica set, admit each connection against the set, and check cluster membership at the start of each run.</span></div></li>
+    <li><div class="body"><span class="name">New completion policy and <code>sha256-v2</code></span><span>Replicated targets get their own fingerprints. Every existing checksum and ledger test must pass unchanged.</span></div></li>
+    <li><div class="body"><span class="name">Replicated engines in the SQL check</span><span>Accept the six engine names where an engine belongs; keep rejecting manual replication; refuse database creation on replicated targets.</span></div></li>
+    <li><div class="body"><span class="name">Replicated ledger</span><span>Initialize, append and read in a pre-existing Replicated database, and survive each replica restarting in turn.</span></div></li>
+    <li><div class="body"><span class="name">End-to-end test, docs, release</span><span>A new <code>just test-replicated</code> run applies an example migration set through an address that alternates between replicas. Then the supported setup is documented in a new design record and the library is released.</span></div></li>
+  </ol>
+</section>
+
+<section aria-labelledby="s-scope">
+  <div class="prose">
+    <h2 id="s-scope">What this means for you</h2>
+    <p>clickhouse-migrate will not rewrite anyone's SQL. Quietly turning <code>MergeTree</code> into <code>ReplicatedMergeTree</code> at run time would mean the ledger records SQL that never ran, and the checksum could no longer prove which SQL ran. Migration authors write the replicated engines themselves.</p>
+  </div>
+  <div class="split">
+    <div class="panel">
+      <h3>Migration authors</h3>
+      <p>Write <code>Replicated…MergeTree</code> engines without Keeper path arguments, leave out <code>ON CLUSTER</code>, and do not create databases. A project that also supports single servers keeps separate migration sets for the two kinds of target.</p>
+    </div>
+    <div class="panel">
+      <h3>Cluster operators</h3>
+      <p>Create the application and ledger databases as <code>Replicated</code> on every replica before the first run. Give the migration login the replica set's server UUIDs and cluster name. A replicated target starts a fresh ledger; existing single-server ledgers are not converted.</p>
+    </div>
+    <div class="panel">
+      <h3>Still out of scope</h3>
+      <p>Multiple shards, <code>Distributed</code> tables, <code>ON CLUSTER</code> DDL, automatic SQL rewriting, and any server version that has not been tested. Evidence from local test clusters does not certify a particular managed service.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-terms">
+  <div class="prose"><h2 id="s-terms">Terms used on this page</h2></div>
+  <dl>
+    <dt>Replica</dt><dd>One ClickHouse server holding a full copy of the data. Production clusters commonly run two or three.</dd>
+    <dt>Keeper</dt><dd>ClickHouse's coordination service. It keeps the shared log that tells replicas which changes and data they must apply.</dd>
+    <dt>Engine</dt><dd>The storage method a table or database declares. <code>ReplicatedMergeTree</code> tables copy their rows to every replica; <code>MergeTree</code> tables do not.</dd>
+    <dt>Replicated database</dt><dd>A database whose table definitions are kept identical on every replica through Keeper. It does not copy rows by itself.</dd>
+    <dt>Error code 56</dt><dd>ClickHouse's refusal to create a non-copied table inside a Replicated database when <code>database_replicated_allow_only_replicated_engine</code> is on for the login.</dd>
+    <dt>Ledger</dt><dd>clickhouse-migrate's append-only record of every migration step, stored in the database it manages.</dd>
+    <dt>Envelope</dt><dd>A text-level check that only lets known, reviewable kinds of SQL into a migration.</dd>
+    <dt>Checksum</dt><dd>A fingerprint of a migration that detects edits after it ran.</dd>
+    <dt>Admission probe</dt><dd>A query sent on every new connection to confirm the server's ID, version and settings before any real work.</dd>
+    <dt>Completion policy</dt><dd>The settings sent with every request that define when the server may report "done".</dd>
+    <dt>Insert quorum</dt><dd>A setting that makes an insert succeed only after a given number of replicas store it.</dd>
+    <dt>Sequential consistency</dt><dd>A read setting that refuses to answer from a replica that has not caught up.</dd>
+  </dl>
+</section>
+
+<footer>
+  <span>Full design: <a href="https://github.com/shinzui/clickhouse-migrate/blob/master/docs/plans/12-run-migrations-and-the-ledger-on-replicated-clickhouse-databases.md">docs/plans/12-run-migrations-and-the-ledger-on-replicated-clickhouse-databases.md</a></span>
+  <span>Current support: <a href="https://github.com/shinzui/clickhouse-migrate/blob/master/docs/user/compatibility.md">docs/user/compatibility.md</a></span>
+</footer>
+
+</div>
+</body>
+</html>
