@@ -33,4 +33,4 @@ up :: MutationContext -> UpOptions -> MigrationPlan -> IO (Either RunFailure Run
 up context (UpOptions audit authorization) plan = withRuntime context audit authorization Nothing plan $ \runtime -> do
   projection <- runtimeProjection runtime
   when (unresolved projection) (abort (LedgerFailed L.UnresolvedHistory))
-  mapM_ (uncurry (executeMigration runtime)) (drop (length (L.completed projection)) (orderedMigrations plan))
+  mapM_ (uncurry (executeMigration runtime)) (drop (length (L.completed projection)) (orderedMigrations (L.projectionChecksumFormat projection) plan))

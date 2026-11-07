@@ -95,7 +95,8 @@
             ]
           }
         ],
-        "unresolved": true
+        "unresolved": true,
+        "checksumFormat": null
       },
       "migrations": [
         {

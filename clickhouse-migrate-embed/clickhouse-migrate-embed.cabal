@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-embed
-version: 0.1.0.2
+version: 0.1.1.0
 synopsis: Compile-time embedding for ClickHouse migration definitions
 description:
   Compile-time embedding for ClickHouse migration definitions.

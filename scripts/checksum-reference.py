@@ -7,25 +7,28 @@ import struct
 
 POLICY = b'clickhouse-migrate/local-sync-v1;async_insert=0;mutations_sync=1;alter_sync=1'
 
+POLICY_V2 = b'clickhouse-migrate/replicated-sync-v1;async_insert=0;mutations_sync=2;alter_sync=2;insert_quorum=all;insert_quorum_parallel=0;distributed_ddl_output_mode=none;select_sequential_consistency=1'
 
 def field(value):
     return struct.pack('>Q', len(value)) + value
 
 
-def step(component, migration, name, sql):
-    return (b'clickhouse-migrate/step\0v1\0' + field(POLICY)
+def step(component, migration, name, sql, version="v1"):
+    policy = POLICY if version == "v1" else POLICY_V2
+    return (b'clickhouse-migrate/step\0' + version.encode() + b'\0' + field(policy)
             + field(component.encode()) + field(migration.encode())
             + field(name.encode()) + field(sql))
 
 
-def migration(component, name, steps):
-    return (b'clickhouse-migrate/migration\0v1\0' + field(POLICY)
+def migration(component, name, steps, version="v1"):
+    policy = POLICY if version == "v1" else POLICY_V2
+    return (b'clickhouse-migrate/migration\0' + version.encode() + b'\0' + field(policy)
             + field(component.encode()) + field(name.encode())
             + struct.pack('>Q', len(steps))
-            + b''.join(field(step(component, name, key, sql)) for key, sql in steps))
+            + b''.join(field(step(component, name, key, sql, version)) for key, sql in steps))
 
 
-def render():
+def render(version="v1"):
     create = ('create', b'CREATE TABLE app.events (id UInt64) ENGINE=MergeTree ORDER BY id')
     insert = ('seed', b"INSERT INTO app.events VALUES (1)")
     cases = [
@@ -46,7 +49,7 @@ def render():
     for label, component, name, steps in cases:
         for kind in ['step', 'migration']:
             selected = steps[:1] if kind == 'step' else steps
-            encoded = step(component, name, *selected[0]) if kind == 'step' else migration(component, name, selected)
+            encoded = step(component, name, *selected[0], version=version) if kind == 'step' else migration(component, name, selected, version)
             source = ','.join(key + ':' + sql.hex() for key, sql in selected)
             lines.append('\t'.join([label, kind, component, name, source, encoded.hex(), hashlib.sha256(encoded).hexdigest()]))
     return '\n'.join(lines) + '\n'
@@ -55,11 +58,13 @@ def render():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--version', choices=['v1', 'v2'], default='v1')
     args = parser.parse_args()
-    target = Path(__file__).resolve().parent.parent / 'clickhouse-migrate/test/vectors/checksum-v1.tsv'
-    if args.check:
-        if target.read_text() != render():
-            raise SystemExit('Checksum reference vectors differ')
-        print('24 independent checksum vectors verified')
-    else:
-        target.write_text(render())
+    for version in ['v1', 'v2']:
+        target = Path(__file__).resolve().parent.parent / ('clickhouse-migrate/test/vectors/checksum-' + version + '.tsv')
+        if args.check:
+            if target.read_text() != render(version):
+                raise SystemExit('Checksum reference vectors differ: ' + version)
+            print('24 independent ' + version + ' checksum vectors verified')
+        elif version == args.version:
+            target.write_text(render(version))

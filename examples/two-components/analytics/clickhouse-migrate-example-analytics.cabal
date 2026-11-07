@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-example-analytics
-version: 0.1.0.2
+version: 0.1.1.0
 synopsis: Private composed migration example component
 description: Private workspace example, not intended for publication.
 license: BSD-3-Clause
@@ -11,6 +11,8 @@ category: Database
 build-type: Simple
 extra-doc-files: README.md
 extra-source-files:
+  migrations-replicated/*.json
+  migrations-replicated/*.sql
   migrations/*.json
   migrations/*.sql
 
@@ -26,7 +28,10 @@ library
 
   ghc-options: -Wall
   hs-source-dirs: src
-  exposed-modules: Example.Analytics
+  exposed-modules:
+    Example.Analytics
+    Example.Analytics.Replicated
+
   build-depends:
     base >=4.21 && <4.22,
     clickhouse-migrate ==0.1.*,

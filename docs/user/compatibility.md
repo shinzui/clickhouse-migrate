@@ -33,10 +33,11 @@ prereleases fail closed until independently qualified and explicitly added.
 Runtime probes do not attest a binary digest or OS; administrators must install
 the artifact/platform from the matrix. Matching version text alone is not
 qualification. Supported operation is one directly addressed, persistently identified server
-using local synchronous effects. The ledger uses the explicitly selected default
+using local synchronous effects, or a single-shard replicated cluster with an exact
+configured replica set and Keeper-backed pre-existing Replicated databases. The ledger uses the explicitly selected default
 storage policy backed only by healthy writable Local disks, with verified metadata
-and part fsync settings. Cloud, HTTP reverse proxies/load balancers,
-failover aliases, distributed execution and replicated engines are excluded.
+and part fsync settings. Owned replica-fixture evidence is not managed-cloud certification. Arbitrary cloud
+proxies, multi-shard clusters, Distributed tables and SQL rewriting remain excluded.
 The fault proxy is test infrastructure, not a supported production topology.
 
 The identity probe reads `serverUUID()`, `version()`, `hostName()` and effective
@@ -140,4 +141,47 @@ certification. Final recheck found 26.8.29.10 LTS newly published in the officia
 package index (tag/source identity recorded in release evidence); it remains unqualified
 and rejected, as does 26.9 stable. No implicit latest-patch compatibility is claimed.
 
-On 2026-11-07 all three candidates passed all thirteen groups in both artifact variants. See [the 10002 qualification](../release-evidence/2026-11-07-altinity-10002.md).
+
+## Qualifying a new ClickHouse build
+
+Use the exact published upstream tag (which can differ from the image version):
+
+```bash
+python3 scripts/qualify-candidate.py --tag <upstream-tag> --repo <upstream-repository> --image <image:version>
+```
+
+The resolver prints immutable source and image identities, a CI pull line and an
+evidence skeleton. It writes only with `--write`, refusing duplicate IDs or versions.
+Add the version to `supportedVersions` in
+`clickhouse-migrate/src/ClickHouseMigrate/Internal/ServerPolicy.hs` and name it in
+this guide. Declare the candidate's groups in the matrix and add its exact CI pull.
+Run `python3 scripts/check-candidate-policy.py` to identify omissions, pre-pull into
+the isolated context, then run `just test-release-matrix` and `just qualify-distributions`.
+Record dated evidence for both artifact variants before marking the candidate
+qualified and bumping the shared patch version. `just check-public-invariants`
+checks agreement between the runtime allowlist, matrix, CI and this guide.
+
+
+## Replicated completion and admission
+
+Replicated targets admit each new connection only to an expected UUID, qualified
+version, matching cluster macro, effective completion settings and healthy writable
+Local default storage. Restricted logins use the local `system.clusters` replica
+count and require one shard. This check does not attest UUIDs of unvisited replicas;
+operators must independently verify the configured UUID inventory. Every socket
+that is used still requires UUID admission. Neither counts nor DNS prove identity.
+
+Every replicated write uses synchronous ALTER/mutations and full-count nonparallel
+INSERT quorum. DDL uses output mode `none`, which waits for inactive replicas and
+throws on timeout. Reads use sequential consistency. Acknowledged writes must be
+visible on every configured replica; sequential consistency alone is insufficient
+for weaker quorum-one writes. The three server wait bounds share the HTTP deadline
+minus a two-second response margin. The request deadline is at least five seconds.
+Replicated ledgers record checksum format v2. The owned two-replica fixture and its
+64-observation spike are retained under `docs/release-evidence/`.
+
+The independent patch cohort is `0.1.0.2`; the replicated feature candidate is the shared `0.1.1.0` cohort. Its package version does not imply Hackage publication or managed-cluster readiness.
+
+On 2026-11-07 all three exact candidates passed all thirteen existing groups in both Nix and extracted-source variants (39 cases per variant). See [the independent 10002 evidence](../release-evidence/2026-11-07-altinity-10002.md).
+
+The `0.1.1.0` candidate passes the final 41-case matrix plus both installed-Nix replicated groups; see [the replicated qualification](../release-evidence/2026-11-07-replicated.md).

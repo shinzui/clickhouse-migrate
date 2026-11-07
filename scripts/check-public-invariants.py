@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory(prefix='clickhouse-migrate-public-') as directo
     subprocess.run([*common, str(fixtures / 'Valid.hs'), '-o', executable], cwd=root, check=True)
     subprocess.run([executable], check=True)
     for file, expected in [
-        ('Constructor.hs', 'SqlStep'), ('Coercion.hs', 'Coercible'),
+        ('Constructor.hs', 'SqlStep'), ('TargetConstructor.hs', 'TargetConfig'), ('TargetCoercion.hs', 'match'), ('Coercion.hs', 'Coercible'),
         ('Generic.hs', 'Generic'), ('Deserialize.hs', 'Read SqlStep'),
         ('Optic.hs', 'stepSql'), ('Private.hs', 'hidden module'),
         ('LedgerConstructor.hs', 'LedgerPosition'), ('PrivateLedger.hs', 'hidden module'),
@@ -30,4 +30,4 @@ with tempfile.TemporaryDirectory(prefix='clickhouse-migrate-public-') as directo
         if result.returncode == 0 or not any(term in result.stdout for term in alternatives):
             raise SystemExit(f'{file}: expected invariant failure, got:\n{result.stdout}')
         print(f'{file}: rejected as expected')
-print('Public composition runs; all fourteen definition/ledger/runtime/adoption invariant bypasses rejected')
+print('Public composition runs; all definition/target/ledger/runtime/adoption invariant bypasses rejected')

@@ -2,7 +2,7 @@
 module ClickHouseMigrate.Internal.Reporting where
 
 import ClickHouseMigrate.Internal.ExclusiveTypes (AccessDescription)
-import ClickHouseMigrate.Internal.LedgerCodec (definitions)
+import ClickHouseMigrate.Internal.LedgerCodec (definitionsFor)
 import ClickHouseMigrate.Internal.LedgerStore qualified as Store
 import ClickHouseMigrate.Internal.LedgerTypes qualified as L
 import ClickHouseMigrate.Internal.TargetTypes qualified as T
@@ -99,9 +99,9 @@ pendingSummary definition =
     Nothing
     [R.StepSummary name checksum R.StepPending Nothing Nothing | L.StepDefinition name checksum <- L.steps definition]
 
-inspectHistory :: Plan.MigrationPlan -> R.HistoryReport -> R.InspectionReport
-inspectHistory plan history@(R.HistoryReport _ _ _ _ _ events recorded unresolved) =
-  let supplied = definitions plan
+inspectHistoryFor :: Plan.ChecksumFormat -> Plan.MigrationPlan -> R.HistoryReport -> R.InspectionReport
+inspectHistoryFor format plan history@(R.HistoryReport _ _ _ _ _ events recorded unresolved) =
+  let supplied = definitionsFor format plan
       actual = [definition | R.MigrationSummary definition _ _ _ <- recorded]
       expected = map summaryDefinition supplied
       changes = [R.DefinitionChanged index (at index expected) (Just definition) | (index, definition) <- zip [0 ..] actual, at index expected /= Just definition]
@@ -133,16 +133,16 @@ runHistory (R.RunReport _ _ _ _ history _ _ _) = history
 runPosition :: R.RunReport -> Maybe L.LedgerPosition
 runPosition report = case runHistory report of R.HistoryReport _ _ _ position _ _ _ _ -> position
 
-updateRun :: Plan.MigrationPlan -> R.HistoryReport -> R.RunReport -> R.RunReport
-updateRun plan history (R.RunReport identity target access acquired _ _ observations initialized) = let R.InspectionReport _ migrations _ = inspectHistory plan history in R.RunReport identity target access acquired history migrations observations initialized
+updateRunFor :: Plan.ChecksumFormat -> Plan.MigrationPlan -> R.HistoryReport -> R.RunReport -> R.RunReport
+updateRunFor format plan history (R.RunReport identity target access acquired _ _ observations initialized) = let R.InspectionReport _ migrations _ = inspectHistoryFor format plan history in R.RunReport identity target access acquired history migrations observations initialized
 
 recordSql :: R.SqlObservation -> R.RunReport -> R.RunReport
 recordSql value report@(R.RunReport _ _ _ _ _ _ observations _) = report {R.observations = observations ++ [value]}
 
-initialRun :: Text -> TargetKey -> AccessDescription -> Plan.MigrationPlan -> R.RunReport
-initialRun run target access plan =
+initialRunFor :: Plan.ChecksumFormat -> Text -> TargetKey -> AccessDescription -> Plan.MigrationPlan -> R.RunReport
+initialRunFor format run target access plan =
   let history = emptyHistory target (R.GuardedObservation access)
-      R.InspectionReport _ migrations _ = inspectHistory plan history
+      R.InspectionReport _ migrations _ = inspectHistoryFor format plan history
    in R.RunReport run target access False history migrations [] Nothing
 
 historyPosition :: R.HistoryReport -> Maybe L.LedgerPosition
@@ -169,6 +169,7 @@ eventReport (L.LedgerEvent number event ledger run attempt time audit runner con
 
 bodyReport :: L.EventBody -> R.HistoryBody
 bodyReport = \case
+  L.InitializeFor target Plan.ChecksumV2 -> R.LedgerInitializedReplicated target
   L.Initialize target -> R.LedgerInitialized target
   L.StartMigration definition -> R.MigrationDefinition (summaryDefinition definition)
   L.StartStep index query -> R.StepIntent index (T.QueryId query)
@@ -206,3 +207,18 @@ at :: Int -> [a] -> Maybe a
 at index values
   | index < 0 = Nothing
   | otherwise = case drop index values of value : _ -> Just value; _ -> Nothing
+
+-- Legacy pure helpers keep their v1/recorded-history defaults. Production paths
+-- pass the target format explicitly, including before ledger initialization.
+inspectHistory :: Plan.MigrationPlan -> R.HistoryReport -> R.InspectionReport
+inspectHistory plan history = inspectHistoryFor (historyChecksumFormat history) plan history
+
+updateRun :: Plan.MigrationPlan -> R.HistoryReport -> R.RunReport -> R.RunReport
+updateRun plan history = updateRunFor (historyChecksumFormat history) plan history
+
+initialRun :: Text -> TargetKey -> AccessDescription -> Plan.MigrationPlan -> R.RunReport
+initialRun = initialRunFor Plan.ChecksumV1
+
+historyChecksumFormat :: R.HistoryReport -> Plan.ChecksumFormat
+historyChecksumFormat (R.HistoryReport _ _ _ _ _ events _ _) =
+  if any (\(R.HistoryEvent _ _ _ _ _ _ _ _ _ kind) -> case kind of R.LedgerInitializedReplicated _ -> True; _ -> False) events then Plan.ChecksumV2 else Plan.ChecksumV1

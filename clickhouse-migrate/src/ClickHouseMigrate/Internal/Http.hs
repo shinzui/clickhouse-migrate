@@ -1,6 +1,7 @@
 -- | Dedicated direct HTTP resources, bounded full responses, and no replay.
 module ClickHouseMigrate.Internal.Http (Http, withHttp, withHttpAdmission, withHttpAdmissionChecked, withHttpFinalizer, probeConnection, submit, readJsonRowStream) where
 
+import ClickHouseMigrate.Internal.ServerProfile qualified as Profile
 import ClickHouseMigrate.Internal.TargetTypes
 import ClickHouseMigrate.Internal.Transport hiding (request)
 import ClickHouseMigrate.Prelude
@@ -125,14 +126,14 @@ withHttpOwned config admit check finalizer action = mask $ \restore -> do
     Right value -> pure (ScopeResult (Right value) cleanup)
 
 submit :: Http -> QueryId -> RequestKind -> ByteString -> IO TransportOutcome
-submit (Http (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials user password) (HttpLimits micros maxBytes)) manager submitted gate active inflight) (QueryId identity) kind sql = registered inflight $ withMVar gate $ \() -> do
+submit (Http config@(TargetConfig {configEndpoint = DirectEndpoint endpoint, configCredentials = Credentials user password, configLimits = HttpLimits micros maxBytes}) manager submitted gate active inflight) (QueryId identity) kind sql = registered inflight $ withMVar gate $ \() -> do
   writeIORef submitted False
   live <- readIORef active
   if not live || BS.null sql || BS.elem 0 sql
     then pure (NotSubmitted (safeError InvalidRequest))
     else do
       result <- try @SomeException $ timeout micros $ do
-        request <- makeRequest endpoint user password micros identity kind sql
+        request <- makeRequest config endpoint user password micros identity kind sql
         HTTP.withResponse request manager $ \response -> do
           let status = statusCode (HTTP.responseStatus response)
               exceptionHeader = lookup "X-ClickHouse-Exception-Code" (HTTP.responseHeaders response)
@@ -216,9 +217,9 @@ classify kind status exceptionHeader body
 -- dummyManaged supplies no cleanup/replay; the factory owns this socket and closes
 -- it on failure. The bounded response parser is the same as for ordinary requests.
 probeConnection :: TargetConfig -> Internal.Connection -> QueryId -> ByteString -> IO TransportOutcome
-probeConnection (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials user password) (HttpLimits micros maxBytes)) connection (QueryId identity) sql = do
+probeConnection config@(TargetConfig {configEndpoint = DirectEndpoint endpoint, configCredentials = Credentials user password, configLimits = HttpLimits micros maxBytes}) connection (QueryId identity) sql = do
   result <- try @SomeException $ timeout micros $ do
-    request <- makeRequest endpoint user password micros identity JsonRows sql
+    request <- makeRequest config endpoint user password micros identity JsonRows sql
     continuation <- Internal.requestBuilder request connection
     bracket
       (Internal.getResponse (Just (Internal.MaxHeaderLength 4096)) (Just (Internal.MaxNumberHeaders 64)) (Just micros) request (Internal.dummyManaged connection) continuation)
@@ -236,33 +237,13 @@ probeConnection (TargetConfig _ (DirectEndpoint endpoint) _ _ _ (Credentials use
     Right Nothing -> pure (SubmissionUncertain (safeError DeadlineExpired))
     Right (Just outcome) -> pure outcome
 
-makeRequest :: Text -> ByteString -> ByteString -> Int -> Text -> RequestKind -> ByteString -> IO HTTP.Request
-makeRequest endpoint user password micros identity kind sql = do
+makeRequest :: TargetConfig -> Text -> ByteString -> ByteString -> Int -> Text -> RequestKind -> ByteString -> IO HTTP.Request
+makeRequest config endpoint user password micros identity kind sql = do
   base <- HTTP.parseRequest (Text.unpack endpoint)
   let request =
         HTTP.applyBasicAuth user password $
           HTTP.setQueryString
-            ( [ ("query_id", Just (Encoding.encodeUtf8 identity)),
-                ("async_insert", Just "0"),
-                ("mutations_sync", Just "1"),
-                ("alter_sync", Just "1"),
-                ("fsync_metadata", Just "1"),
-                ("wait_end_of_query", Just "1"),
-                ("default_format", Just "JSONEachRow")
-              ]
-                ++ if kind /= Command
-                  then
-                    [ ("max_rows_to_read", Just "0"),
-                      ("max_bytes_to_read", Just "0"),
-                      ("max_result_rows", Just "0"),
-                      ("max_result_bytes", Just "0"),
-                      ("read_overflow_mode", Just "throw"),
-                      ("result_overflow_mode", Just "throw"),
-                      ("timeout_overflow_mode", Just "throw"),
-                      ("sort_overflow_mode", Just "throw")
-                    ]
-                  else []
-            )
+            (Profile.requestSettings (configTopology config) (configLimits config) identity kind)
             base
               { HTTP.method = "POST",
                 HTTP.requestBody = HTTP.RequestBodyBS sql,

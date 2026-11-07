@@ -74,3 +74,22 @@ must not admit a successor until every prior SQL, ledger INSERT and initializati
 DDL has drained. A timeout, closed client socket or empty process/history read does
 not establish this. All maintenance/backfills/manual DDL must use the same external
 coordination. Follow [operations](operations.md) for diagnosis and recovery.
+
+
+## Replicated migrations
+
+Author an explicit replicated baseline for fresh replicated installations; do not
+rewrite the SQL in a bound migration. Omit CREATE DATABASE because infrastructure
+owns those pre-existing `Replicated` databases. Use an argument-free
+`ReplicatedMergeTree` family engine, for example:
+
+```sql
+CREATE TABLE analytics.events (id UInt64, ver UInt64)
+ENGINE=ReplicatedReplacingMergeTree(ver) ORDER BY id;
+```
+
+Keeper path and replica names come from server defaults. Explicit paths,
+ON CLUSTER and Distributed tables remain outside the envelope. The same bound plan
+carries v1 and v2 checksums; replicated execution selects v2 and requires a fresh
+ledger with that policy. See [SQL envelope v2](contracts/sql-envelope-v2.md) and
+[checksum v2](contracts/checksum-v2.md).

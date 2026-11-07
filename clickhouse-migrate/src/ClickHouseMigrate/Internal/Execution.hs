@@ -6,14 +6,15 @@ import ClickHouseMigrate.Internal.EventTypes (DiagnosticPolicy (..), SqlDiagnost
 import ClickHouseMigrate.Internal.Exclusive (checkGuard, guardDescription, withExclusive)
 import ClickHouseMigrate.Internal.ExclusiveTypes (AccessDescription (..), AccessResult (..), ExclusiveAccess (..), Guard)
 import ClickHouseMigrate.Internal.Identity (diagnosticTime, freshUuid)
-import ClickHouseMigrate.Internal.LedgerCodec (contextFor, definitions)
+import ClickHouseMigrate.Internal.LedgerCodec (contextFor, definitionsFor)
 import ClickHouseMigrate.Internal.LedgerStore qualified as Store
 import ClickHouseMigrate.Internal.LedgerTypes qualified as L
-import ClickHouseMigrate.Internal.Preflight (preflight, validateRecoveryEvent)
+import ClickHouseMigrate.Internal.Preflight (preflight, preflightPending, validateRecoveryEvent)
 import ClickHouseMigrate.Internal.Projection (appendProjection)
 import ClickHouseMigrate.Internal.Reporting qualified as Reporting
 import ClickHouseMigrate.Internal.RuntimeTypes
 import ClickHouseMigrate.Internal.ServerPolicy (TargetCheckError (..), withTransportChecked)
+import ClickHouseMigrate.Internal.ServerProfile qualified as Profile
 import ClickHouseMigrate.Internal.TargetTypes qualified as T
 import ClickHouseMigrate.Internal.Transport qualified as Transport
 import ClickHouseMigrate.Ledger qualified as Ledger
@@ -59,10 +60,11 @@ withRuntimeCheck prerequisite = withRuntimeObservation prerequisite Nothing
 -- Adoption validates its fresh read before openStore may initialize anything.
 -- Ordinary execution retains its existing single-load path.
 withRuntimeObservation :: Either R.RunError () -> Maybe (R.HistoryReport -> Either R.RunError Bool) -> MutationContext -> L.AuditContext -> Maybe L.InitializationAuthorization -> Maybe L.QuiescenceEvidence -> Plan.MigrationPlan -> (Runtime -> IO ()) -> IO (Either R.RunFailure R.RunReport)
-withRuntimeObservation prerequisite validateObservation context@(MutationContext config@(T.TargetConfig target _ _ _ _ _ _) provider@(ExclusiveAccess description _ _ _ _) _ _) audit initialization quiet plan action = do
+withRuntimeObservation prerequisite validateObservation context@(MutationContext config@(T.TargetConfig {T.configKey = target}) provider@(ExclusiveAccess description _ _ _ _) _ _) audit initialization quiet plan action = do
   seed <- try @SomeException freshUuid
-  let identity = either (const "00000000-0000-4000-8000-000000000000") id seed
-  latest <- newIORef (Reporting.initialRun identity target description plan)
+  let format = Profile.checksumFormat (T.configTopology config)
+      identity = either (const "00000000-0000-4000-8000-000000000000") id seed
+  latest <- newIORef (Reporting.initialRunFor format identity target description plan)
   secondary <- newIORef []
   result <- case seed of
     Left exception | isAsync exception -> throwIO exception
@@ -89,7 +91,7 @@ withRuntimeObservation prerequisite validateObservation context@(MutationContext
               modifyIORef'
                 latest
                 ( \report -> case Reporting.runHistory report of
-                    R.HistoryReport key _ presence position access events migrations unresolved -> Reporting.updateRun plan (R.HistoryReport key server presence position access events migrations unresolved) report
+                    R.HistoryReport key _ presence position access events migrations unresolved -> Reporting.updateRunFor format plan (R.HistoryReport key server presence position access events migrations unresolved) report
                 )
               let AccessDescription strategy scope = guardDescription guard
                   -- The caller's coordinator contract is the authority for a new
@@ -101,25 +103,29 @@ withRuntimeObservation prerequisite validateObservation context@(MutationContext
                 Just validate -> do
                   observation <- callStore (Store.load (Just guard) transport config)
                   let snapshot = Reporting.observationReport target server (R.GuardedObservation (guardDescription guard)) observation
-                  modifyIORef' latest (Reporting.updateRun plan snapshot)
+                  modifyIORef' latest (Reporting.updateRunFor format plan snapshot)
                   either abort pure (validate snapshot)
               if observationOnly
                 then do
                   emitAt context identity latest Event.RunCompleted Nothing Nothing Nothing
                   callStore (Store.checkAccess guard)
                 else do
+                  when (Profile.requiresLedgerDatabase (T.configTopology config)) $ do
+                    before <- callStore (Store.load (Just guard) transport config)
+                    let applied = case before of Store.History projection -> length (L.completed projection); _ -> 0
+                    either abort pure (preflightPending config plan applied)
                   opened <- Store.storeResult (Store.openStore guard transport config initialization established identity)
                   store <- case opened of
-                    Left (Store.LedgerProblem L.InitializationNotAuthorized) | T.TargetConfig _ _ _ _ (T.ExistingLedger _) _ _ <- config, isNothing initialization -> abort R.LedgerRequired
+                    Left (Store.LedgerProblem L.InitializationNotAuthorized) | T.TargetConfig {T.configBinding = T.ExistingLedger _} <- config, isNothing initialization -> abort R.LedgerRequired
                     Left failure -> abort (Reporting.storeError failure)
                     Right value -> pure value
                   let runtime = Runtime context audit plan guard transport store identity latest secondary
                   refresh runtime
                   case (config, initialization) of
-                    (T.TargetConfig _ _ _ _ T.FirstUse _ _, Just (L.InitializationAuthorization _ ledger _)) -> modifyIORef' latest (\report -> report {R.initialized = Just ledger})
+                    (T.TargetConfig {T.configBinding = T.FirstUse}, Just (L.InitializationAuthorization _ ledger _)) -> modifyIORef' latest (\report -> report {R.initialized = Just ledger})
                     _ -> pure ()
                   report <- readIORef latest
-                  let R.InspectionReport _ _ issues = Reporting.inspectHistory plan (Reporting.runHistory report)
+                  let R.InspectionReport _ _ issues = Reporting.inspectHistoryFor format plan (Reporting.runHistory report)
                       changes = [issue | issue@R.DefinitionChanged {} <- issues]
                   unless (null changes) (abort (R.IncompatibleHistory changes))
                   action runtime
@@ -168,7 +174,7 @@ refresh :: Runtime -> IO ()
 refresh runtime@(Runtime _ _ plan guard transport _ _ latest _) = do
   projection <- runtimeProjection runtime
   let snapshot = Reporting.fromProjection (Just (Transport.transportIdentity transport)) (R.GuardedObservation (guardDescription guard)) projection
-  modifyIORef' latest (Reporting.updateRun plan snapshot)
+  modifyIORef' latest (Reporting.updateRunFor (L.projectionChecksumFormat projection) plan snapshot)
 
 emitAt :: MutationContext -> Text -> IORef R.RunReport -> Event.EventPhase -> Maybe L.Definition -> Maybe Int -> Maybe T.QueryId -> IO ()
 emitAt (MutationContext _ _ sink _) identity latest phase definition index query = do
@@ -276,5 +282,5 @@ finishMigration runtime definition attempt = do
   appendEvent runtime (Just attempt) L.CompleteMigration context
   emit runtime Event.MigrationCompleted (Just definition) Nothing Nothing
 
-orderedMigrations :: Plan.MigrationPlan -> [(L.Definition, Plan.MigrationView)]
-orderedMigrations plan = zip (definitions plan) (NE.toList (Plan.inspectSchedule plan))
+orderedMigrations :: Plan.ChecksumFormat -> Plan.MigrationPlan -> [(L.Definition, Plan.MigrationView)]
+orderedMigrations format plan = zip (definitionsFor format plan) (NE.toList (Plan.inspectSchedule plan))

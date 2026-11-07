@@ -1,7 +1,9 @@
 # Bundle Update Log
 
 ## 2026-11-07
-* **Update**: Qualify exact Altinity 10002 with both artifact variants and retain all existing patches (DOC-5).
+* **Add**: Replicated checksum v2 (DOC-14) and SQL envelope v2 (DOC-15).
+* **Update**: Document replicated configuration, completion, ledger storage, JSON additions and errors (DOC-3, DOC-5, DOC-8, DOC-9, DOC-11, DOC-12, DOC-13); link v1 checksums to v2 (DOC-7).
+* **Update**: Add the exact Altinity 10002 Linux arm64 candidate and qualification evidence (DOC-5).
 
 ## 2026-11-02
 * **Update**: Document the exact Altinity Linux arm64 engine candidate, owned OCI prerequisites and independent managed-cloud boundary.

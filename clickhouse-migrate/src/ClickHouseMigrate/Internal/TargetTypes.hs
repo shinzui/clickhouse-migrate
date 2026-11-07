@@ -21,6 +21,18 @@ data Credentials = Credentials !ByteString !ByteString
 
 data HttpLimits = HttpLimits !Int !Int deriving stock (Eq, Show)
 
-data TargetConfig = TargetConfig !TargetKey !DirectEndpoint !ServerId !LedgerNamespace !LedgerBinding !Credentials !HttpLimits
+data ClusterName = ClusterName !Text deriving stock (Eq, Ord, Show)
+
+data TargetTopology = DirectServer !ServerId | ReplicatedCluster !ClusterName !(NonEmpty ServerId) deriving stock (Eq, Show)
+
+data TargetConfig = TargetConfig
+  { configKey :: !TargetKey,
+    configEndpoint :: !DirectEndpoint,
+    configTopology :: !TargetTopology,
+    configNamespace :: !LedgerNamespace,
+    configBinding :: !LedgerBinding,
+    configCredentials :: !Credentials,
+    configLimits :: !HttpLimits
+  }
 
 data ServerIdentity = ServerIdentity !ServerId !Text !Text deriving stock (Eq, Show)

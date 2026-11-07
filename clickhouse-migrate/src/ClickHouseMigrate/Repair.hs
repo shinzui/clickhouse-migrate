@@ -75,7 +75,7 @@ requestParts = \case
   FinalizeRequest position attempt evidence -> (position, attempt, evidence)
 
 repair :: MutationContext -> Plan.MigrationPlan -> RepairRequest -> IO (Either R.RunFailure R.RunReport)
-repair context@(MutationContext (T.TargetConfig target _ _ _ binding _ _) _ _ _) plan request =
+repair context@(MutationContext (T.TargetConfig {T.configKey = target, T.configBinding = binding}) _ _ _) plan request =
   let (expected@(L.LedgerPosition ledger _ _), requested, RecoveryEvidence audit quiet receipts) = requestParts request
       prerequisite = case binding of
         T.FirstUse -> Left R.ExistingBindingRequired
@@ -94,7 +94,7 @@ repair context@(MutationContext (T.TargetConfig target _ _ _ binding _ _) _ _ _)
         let queries = Set.toAscList (Set.fromList ([T.QueryId query | event <- L.events projection, L.StartStep _ query <- [L.body event]] ++ [query | L.AppendReceipt _ _ _ _ _ query <- receipts]))
         active <- activeQueries runtime queries
         unless (null active) (abort (R.PriorQueriesActive active))
-        migration <- case drop (L.ordinal definition) (orderedMigrations plan) of
+        migration <- case drop (L.ordinal definition) (orderedMigrations (L.projectionChecksumFormat projection) plan) of
           (actual, migration) : _ | actual == definition -> pure migration
           _ -> abort (R.LedgerFailed L.DefinitionMismatch)
         (action, selection, query) <- case request of

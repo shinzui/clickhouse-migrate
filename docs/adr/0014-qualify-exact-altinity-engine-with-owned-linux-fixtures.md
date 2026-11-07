@@ -47,4 +47,6 @@ clients is not Linux amd64 application-image acceptance, power-loss durability o
 production uptime certification. The consumer must complete managed-endpoint,
 scoped-grant, persistent-coordination and packaged recovery acceptance separately.
 
-The independent `0.1.0.2` patch cohort adds exact Altinity `26.3.60.10002.altinitystable` with the same immutable-artifact and two-variant procedure. See [the dated evidence](../release-evidence/2026-11-07-altinity-10002.md) for its suffixed tag and arm64 manifest.
+[ADR 0015](0015-qualify-replicated-targets-by-replica-set-and-quorum.md) adds the separately qualified replicated topology while preserving the direct policy.
+
+The independent `0.1.0.2` patch cohort adds exact Altinity `26.3.60.10002.altinitystable` using the same immutable-artifact and two-variant qualification procedure. Its suffixed upstream tag and arm64 manifest are retained in [the dated evidence](../release-evidence/2026-11-07-altinity-10002.md).

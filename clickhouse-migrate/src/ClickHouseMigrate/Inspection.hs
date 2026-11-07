@@ -16,6 +16,7 @@ import ClickHouseMigrate.Internal.LedgerStore qualified as Store
 import ClickHouseMigrate.Internal.Reporting qualified as Reporting
 import ClickHouseMigrate.Internal.RuntimeTypes (InspectionOptions (..), VerifyOptions (..))
 import ClickHouseMigrate.Internal.ServerPolicy (TargetCheckError (..), withTransportChecked)
+import ClickHouseMigrate.Internal.ServerProfile qualified as Profile
 import ClickHouseMigrate.Internal.TargetTypes (QueryId (..), TargetConfig (..))
 import ClickHouseMigrate.Internal.Transport qualified as Transport
 import ClickHouseMigrate.Plan (MigrationPlan)
@@ -28,7 +29,7 @@ verifyOptions :: Bool -> VerifyOptions
 verifyOptions = VerifyOptions
 
 history :: InspectionOptions -> TargetConfig -> IO (Either R.InspectionFailure R.HistoryReport)
-history options config@(TargetConfig target _ _ _ _ _ _) = do
+history options config@(TargetConfig {configKey = target}) = do
   latest <- newIORef Nothing
   observed <- try @SomeException $ do
     probe <- QueryId . ("chm-" <>) <$> freshUuid
@@ -64,7 +65,7 @@ history options config@(TargetConfig target _ _ _ _ _ _) = do
     Right (Right report, []) -> pure (Right report)
 
 status :: InspectionOptions -> TargetConfig -> MigrationPlan -> IO (Either R.InspectionFailure R.InspectionReport)
-status options config plan = fmap (Reporting.inspectHistory plan) <$> history options config
+status options config plan = fmap (Reporting.inspectHistoryFor (Profile.checksumFormat (configTopology config)) plan) <$> history options config
 
 verify :: InspectionOptions -> TargetConfig -> VerifyOptions -> MigrationPlan -> IO (Either R.InspectionFailure R.VerificationReport)
 verify options config (VerifyOptions requireCurrent) plan = do

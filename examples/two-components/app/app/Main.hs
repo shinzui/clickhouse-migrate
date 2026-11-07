@@ -7,10 +7,13 @@ import ClickHouseMigrate.TestSupport.ExclusiveAccess (hostLocalExclusiveAccess)
 import Control.Applicative ((<**>))
 import Control.Exception (IOException, try)
 import Data.ByteString qualified as BS
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Example.Analytics qualified as Analytics
+import Example.Analytics.Replicated qualified as ReplicatedAnalytics
 import Example.Catalog qualified as Catalog
+import Example.Catalog.Replicated qualified as ReplicatedCatalog
 import Options.Applicative qualified as O
 import System.Environment (getArgs, getEnv, lookupEnv)
 import System.Exit (ExitCode (..), exitWith)
@@ -18,21 +21,21 @@ import System.IO (stderr, stdout)
 
 -- These outer flags belong to this application. The library parser is mounted
 -- unchanged; other applications can put it beneath their own subcommand.
-data AppOptions = AppOptions !Bool !Bool !Invocation
+data AppOptions = AppOptions !Bool !Bool !Bool !Invocation
 
 main :: IO ()
 main = do
   args <- getArgs
-  let parser = O.info ((AppOptions <$> O.switch (O.long "progress" <> O.help "Write safe progress to stderr") <*> O.switch (O.long "sql-diagnostics" <> O.help "Explicitly write authored SQL to stderr; may disclose secrets") <*> commandParser) <**> O.helper) (O.fullDesc <> O.progDesc "Private two-component migration example")
+  let parser = O.info ((AppOptions <$> O.switch (O.long "replicated-example" <> O.help "Use the explicitly authored replicated example") <*> O.switch (O.long "progress" <> O.help "Write safe progress to stderr") <*> O.switch (O.long "sql-diagnostics" <> O.help "Explicitly write authored SQL to stderr; may disclose secrets") <*> commandParser) <**> O.helper) (O.fullDesc <> O.progDesc "Private two-component migration example")
   case O.execParserPure O.defaultPrefs parser args of
     O.Failure failure -> case O.renderFailure failure "clickhouse-migrate-example" of
       (helpText, ExitSuccess) -> putStrLn helpText
       _ -> emit JsonOutput (CommandResult "parse" (Left (CommandRejected InvalidArguments)))
     O.CompletionInvoked _ -> emit JsonOutput (CommandResult "parse" (Left (CommandRejected InvalidArguments)))
-    O.Success (AppOptions progress rawSql (Invocation format command)) -> do
+    O.Success (AppOptions replicated progress rawSql (Invocation format command)) -> do
       let identity c m = migrationIdFromNames <$> componentName c <*> migrationName m
       order <- either (const (fail "Invalid schedule identity")) pure (traverse (uncurry identity) [("catalog", "0001"), ("analytics", "0001")])
-      plan <- either (const (fail "Invalid compiled example plan")) pure (scheduledMigrationPlanFromList [Catalog.component, Analytics.component] order)
+      plan <- either (const (fail "Invalid compiled example plan")) pure (scheduledMigrationPlanFromList (if replicated then [ReplicatedCatalog.component, ReplicatedAnalytics.component] else [Catalog.component, Analytics.component]) order)
       -- Offline plan never reads configuration or even constructs a provider.
       environment <- if requiresTarget command then loadEnvironment command progress rawSql else pure (Right (commandEnvironment Nothing Nothing E.quietEvents E.redactedDiagnostics AdministrativeCommands))
       result <- case environment of Left problem -> pure (CommandResult (commandName command) (Left (CommandRejected problem))); Right configured -> handleCommand configured plan command
@@ -53,13 +56,22 @@ loadCommandEnvironment command progress rawSql = do
   loaded <- try @IOException $ do
     key <- required "CHM_TARGET" targetKey
     endpoint <- required "CHM_ENDPOINT" directEndpoint
-    identity <- required "CHM_SERVER_ID" serverId
     namespace <- required "CHM_LEDGER_DATABASE" ledgerNamespace
     binding <- lookupEnv "CHM_LEDGER_ID" >>= maybe (pure FirstUse) (fmap ExistingLedger . validated ledgerId . Text.pack)
     user <- maybe "default" Text.pack <$> lookupEnv "CHM_USER"
     password <- Text.pack <$> getEnv "CHM_PASSWORD"
     credentials <- validated (basicCredentials user) password
-    pure (targetConfig key endpoint identity namespace binding credentials defaultHttpLimits)
+    topology <- lookupEnv "CHM_CLUSTER"
+    case topology of
+      Nothing -> do
+        identity <- required "CHM_SERVER_ID" serverId
+        pure (targetConfig key endpoint identity namespace binding credentials defaultHttpLimits)
+      Just value -> do
+        cluster <- validated clusterName (Text.pack value)
+        replicas <- getEnv "CHM_REPLICA_IDS" >>= mapM (validated serverId) . Text.splitOn "," . Text.pack
+        case replicas of
+          first : rest -> either (const (fail "Invalid replicated target")) pure (replicatedTargetConfig key endpoint cluster (first :| rest) namespace binding credentials defaultHttpLimits)
+          _ -> fail "Missing replica IDs"
   case loaded of
     Left _ -> pure (Left MissingTargetConfiguration)
     Right config -> case quiescenceForCommand (configuredTargetKey config) command of

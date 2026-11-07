@@ -8,12 +8,15 @@ import platform
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
-GROUPS = ['transport', 'completion', 'ledger', 'exclusive', 'runner', 'repair', 'boundaries', 'survivors', 'adoption', 'consumer', 'cli', 'example', 'remediation']
 matrix = json.loads((ROOT / 'test/compatibility/clickhouse-matrix.json').read_text())
 if platform.system() != 'Darwin' or platform.machine() != 'arm64':
     raise SystemExit('Only aarch64-darwin is qualified; Linux builders are deferred')
 if not matrix['entries'] or len({entry['id'] for entry in matrix['entries']}) != len(matrix['entries']):
     raise SystemExit('A nonempty matrix with unique candidate IDs is required')
+for entry in matrix['entries']:
+    groups = entry.get('groups')
+    if not isinstance(groups, list) or not groups or not all(isinstance(g, str) and g for g in groups) or len(groups) != len(set(groups)):
+        raise SystemExit('Expected nonempty unique declared groups: ' + entry['id'])
 # Explicit overrides permit Nix and extracted-source artifacts to run the SAME
 # cases. Otherwise resolve already built Cabal artifacts from this project.
 def binary(variable, target, flags=()):
@@ -34,7 +37,7 @@ with (Path('/tmp') / 'clickhouse-migrate-native-release.lock').open('a') as gate
     for entry in matrix['entries']:
         print('Required native release candidate:', entry['id'], entry['version'], entry.get('image', entry.get('sha256')), flush=True)
         candidate_env = dict(env, CLICKHOUSE_MIGRATE_CANDIDATE=entry['id'])
-        for group in GROUPS:
+        for group in entry['groups']:
             print('Required case:', entry['id'], group, flush=True)
             subprocess.run([suite, group], cwd=ROOT, env=candidate_env, check=True)
-print('All declared candidates and thirteen native groups passed; no managed-cloud, external consumer cutover, remote CI or publication implied', flush=True)
+print('All declared candidates and their declared native groups passed; no managed-cloud, external consumer cutover, remote CI or publication implied', flush=True)

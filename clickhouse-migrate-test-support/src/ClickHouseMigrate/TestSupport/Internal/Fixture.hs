@@ -3,6 +3,7 @@ module ClickHouseMigrate.TestSupport.Internal.Fixture
   ( Fixture,
     Server (..),
     withFixture,
+    withFixtureMode,
     fixtureRpc,
     fixtureEndpoint,
     fixtureRoot,
@@ -38,13 +39,16 @@ field key (Object value) = case KM.lookup key value of
 field _ _ = fail "Invalid fixture response object"
 
 withFixture :: Text -> (Fixture -> IO a) -> IO a
-withFixture entry action = mask $ \restore -> do
+withFixture = withFixtureMode []
+
+withFixtureMode :: [String] -> Text -> (Fixture -> IO a) -> IO a
+withFixtureMode options entry action = mask $ \restore -> do
   script <- getDataFileName "test/scripts/native_fixture.py"
   matrix <- getDataFileName "test/data/clickhouse-matrix.json"
   (logPath, logHandle) <- openTempFile "/tmp" "clickhouse-migrate-fixture.log"
   pipes <-
     createProcess
-      ( (proc "python3" [script, "--matrix", matrix, "--entry", Text.unpack entry])
+      ( (proc "python3" ([script, "--matrix", matrix, "--entry", Text.unpack entry] ++ options))
           { std_in = CreatePipe,
             std_out = CreatePipe,
             std_err = UseHandle logHandle
@@ -54,7 +58,7 @@ withFixture entry action = mask $ \restore -> do
   case pipes of
     (Just input, Just output, _, process) -> do
       ready <- try @SomeException $ do
-        line <- timeout 40000000 (BS.hGetLine output)
+        line <- timeout (if null options then 40000000 else 90000000) (BS.hGetLine output)
         value <- maybe (fail "Fixture startup deadline expired") (either (const (fail "Fixture startup failed")) pure . Aeson.eitherDecodeStrict') line
         endpoint <- field "endpoint" value
         root <- field "root" value
@@ -75,7 +79,7 @@ withFixture entry action = mask $ \restore -> do
           result <- try @SomeException (restore (action fixture))
           cleanup <- try @SomeException $ do
             _ <- fixtureRpc fixture (object ["operation" .= ("stop" :: Text), "success" .= either (const False) (const True) result])
-            stopped <- timeout 20000000 (waitForProcess process)
+            stopped <- timeout 60000000 (waitForProcess process)
             case stopped of
               Nothing -> terminateProcess process >> void (timeout 20000000 (waitForProcess process)) >> fail "Fixture cleanup deadline expired"
               Just _ -> pure ()
@@ -99,7 +103,7 @@ fixtureRpc (Fixture input output _ gate _ root _) request = withMVar gate $ \() 
   Lazy.hPutStrLn input (Aeson.encode request)
   -- ByteString writes to a Handle still use its buffering policy.
   hFlush input
-  let deadline = case request of Object fields | KM.lookup "operation" fields == Just (String "restart") -> 40000000; _ -> 15000000
+  let deadline = case request of Object fields | KM.lookup "operation" fields == Just (String "restart") -> 40000000; Object fields | KM.lookup "operation" fields == Just (String "start-replica") -> 70000000; Object fields | KM.lookup "operation" fields == Just (String "stop") -> 60000000; _ -> 15000000
   line <- timeout deadline (BS.hGetLine output)
   reply <- maybe (fail ("Fixture RPC deadline expired; evidence: " ++ root)) (either (const (fail "Invalid fixture protocol")) pure . Aeson.eitherDecodeStrict') line
   case reply of

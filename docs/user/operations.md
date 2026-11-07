@@ -111,3 +111,42 @@ safe event role, preserving the original position and attempt. Supply smaller
 reviewed evidence in a new explicit request; successful requests retain evidence
 verbatim. Once a valid event is submitted, existing uncertainty, receipts and
 external quiescence rules still apply.
+
+
+## Replicated targets
+
+Obtain and retain every server UUID with an administrative login:
+
+```sql
+SELECT hostName(), toString(serverUUID()) FROM clusterAllReplicas('<cluster>', system.one);
+```
+
+Construct a `ClusterName` with `clusterName`, then call `replicatedTargetConfig`
+with the exact nonempty UUID list, endpoint, namespace, binding, credentials and
+HTTP limits. It returns `Either TargetError TargetConfig`; duplicate UUIDs and
+request deadlines under five seconds are refused. Supply a caller-owned coordinator
+that serializes all administrators across the cluster and drains every prior
+request before any successor mutation. The development host-local adapter is only
+for administrators sharing one host and lock root.
+
+Precreate every application and ledger database as `Replicated` on the cluster.
+Application credentials need local system reads of cluster membership and ledger
+replica health, plus disks/storage policy metadata. They do not require REMOTE.
+Read `status --json` before fencing application traffic: it performs admission and
+ledger reads without initialization. A refusal should be diagnosed before the
+application enters maintenance.
+
+The example mounts replicated SQL with `--replicated-example` and takes
+`CHM_CLUSTER` and comma-separated `CHM_REPLICA_IDS` in place of `CHM_SERVER_ID`.
+The core library never reads these environment variables itself.
+
+A stopped replica makes new writes fail or become uncertain. DDL may already be
+queued in Keeper and a timed-out insert may commit later. Restart, establish
+external quiescence across every replica, inspect history and reconcile pending
+receipts, then use explicit accept/finalize or retry/resume as appropriate. The
+restricted login's active-query diagnostic is local to the admitted replica;
+absence there is never proof of cluster-wide drain.
+
+Legacy adoption currently binds v1 mapping checksums and is supported on direct targets. Replicated adoption refuses with `unsupported-ledger-version` before writes. Replicated installations start with a fresh native baseline.
+
+Server waits can include coordination overhead: the spike observed a metadata ALTER error after about twelve seconds with a five-second inactive-replica wait. The HTTP deadline remains authoritative; if it expires before a complete response, preserve submission uncertainty and never infer non-submission or retry automatically.

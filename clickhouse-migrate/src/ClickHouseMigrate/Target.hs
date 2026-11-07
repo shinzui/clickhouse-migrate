@@ -27,6 +27,12 @@ module ClickHouseMigrate.Target
     defaultHttpLimits,
     TargetConfig,
     targetConfig,
+    TargetTopology (DirectServer, ReplicatedCluster),
+    ClusterName,
+    clusterName,
+    clusterNameText,
+    replicatedTargetConfig,
+    configuredTopology,
     configuredTargetKey,
     configuredLedgerBinding,
     TargetError (..),
@@ -41,11 +47,13 @@ import ClickHouseMigrate.Internal.Identity (freshUuid)
 import ClickHouseMigrate.Internal.TargetTypes
 import ClickHouseMigrate.Prelude
 import Data.Char (isAsciiLower, isAsciiUpper)
+import Data.List.NonEmpty qualified as NE
+import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Encoding
 import Text.Read (readMaybe)
 
-data TargetError = InvalidTargetKey | InvalidEndpoint | InvalidServerId | InvalidQueryId | InvalidLedgerId | InvalidLedgerNamespace | InvalidCredentials | InvalidHttpLimits
+data TargetError = InvalidTargetKey | InvalidEndpoint | InvalidServerId | InvalidQueryId | InvalidLedgerId | InvalidLedgerNamespace | InvalidCredentials | InvalidHttpLimits | InvalidClusterName | DuplicateReplica
   deriving stock (Eq, Ord, Show)
 
 targetKey :: Text -> Either TargetError TargetKey
@@ -103,7 +111,7 @@ defaultHttpLimits :: HttpLimits
 defaultHttpLimits = HttpLimits 30000000 1048576
 
 targetConfig :: TargetKey -> DirectEndpoint -> ServerId -> LedgerNamespace -> LedgerBinding -> Credentials -> HttpLimits -> TargetConfig
-targetConfig = TargetConfig
+targetConfig key endpoint identity = TargetConfig key endpoint (DirectServer identity)
 
 targetKeyText :: TargetKey -> Text
 targetKeyText (TargetKey value) = value
@@ -151,8 +159,28 @@ newLedgerId = LedgerId <$> freshUuid
 
 -- | Read-only nonsecret configuration identity for application adapters.
 configuredTargetKey :: TargetConfig -> TargetKey
-configuredTargetKey (TargetConfig key _ _ _ _ _ _) = key
+configuredTargetKey = configKey
 
 -- | Binding mode is explicit; this accessor grants no initialization authority.
 configuredLedgerBinding :: TargetConfig -> LedgerBinding
-configuredLedgerBinding (TargetConfig _ _ _ _ binding _ _) = binding
+configuredLedgerBinding = configBinding
+
+-- | The admitted server topology, without credentials.
+configuredTopology :: TargetConfig -> TargetTopology
+configuredTopology = configTopology
+
+clusterName :: Text -> Either TargetError ClusterName
+clusterName value
+  | valid 128 (\c -> lowerDigit c || c `elem` ("_-" :: String)) value && maybe False (\(c, _) -> isAsciiLower c || c == '_') (Text.uncons value) = Right (ClusterName value)
+  | otherwise = Left InvalidClusterName
+
+clusterNameText :: ClusterName -> Text
+clusterNameText (ClusterName value) = value
+
+-- | Every expected replica participates in acknowledged writes. The deadline must
+-- leave room for bounded server waits and a complete HTTP error response.
+replicatedTargetConfig :: TargetKey -> DirectEndpoint -> ClusterName -> NonEmpty ServerId -> LedgerNamespace -> LedgerBinding -> Credentials -> HttpLimits -> Either TargetError TargetConfig
+replicatedTargetConfig key endpoint cluster replicas namespace binding credentials limits@(HttpLimits micros _)
+  | Set.size (Set.fromList (NE.toList replicas)) /= NE.length replicas = Left DuplicateReplica
+  | micros < 5000000 = Left InvalidHttpLimits
+  | otherwise = Right (TargetConfig key endpoint (ReplicatedCluster cluster replicas) namespace binding credentials limits)

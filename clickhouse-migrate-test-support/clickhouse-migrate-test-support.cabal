@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-test-support
-version: 0.1.0.2
+version: 0.1.1.0
 synopsis: Isolated server fixtures for ClickHouse migration tests
 description:
   Isolated server fixtures for ClickHouse migration tests.
@@ -22,6 +22,7 @@ data-files:
   test/fixtures/kansoku/*.json
   test/fixtures/kansoku/original/migrate.sh
   test/scripts/native_fixture.py
+  test/scripts/replicated_fixture.py
 
 extra-source-files:
   test/scripts/transport_smoke.py
@@ -91,6 +92,7 @@ test-suite clickhouse-migrate-integration
     Paths_clickhouse_migrate_test_support
     RepairBoundaries
     RepairIntegration
+    ReplicatedIntegration
     ReviewRemediation
     RunnerIntegration
     SurvivingWork

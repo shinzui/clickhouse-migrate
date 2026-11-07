@@ -20,14 +20,14 @@ data MigrationComponent = MigrationComponent !ComponentName !(Set ComponentName)
 
 data MigrationPlan = MigrationPlan !(NonEmpty ComponentView) !(NonEmpty MigrationView) deriving stock (Eq)
 
-data ChecksumFormat = ChecksumV1 deriving stock (Eq, Ord, Show)
+data ChecksumFormat = ChecksumV1 | ChecksumV2 deriving stock (Eq, Ord, Show)
 
-data StepChecksum = StepChecksum !ByteString deriving stock (Eq, Ord)
+data StepChecksum = StepChecksum !ByteString | StepChecksumV2 !ByteString deriving stock (Eq, Ord)
 
-data MigrationChecksum = MigrationChecksum !ByteString deriving stock (Eq, Ord)
+data MigrationChecksum = MigrationChecksum !ByteString | MigrationChecksumV2 !ByteString deriving stock (Eq, Ord)
 
 data ComponentView = ComponentView !ComponentName !(Set ComponentName) !(NonEmpty MigrationView) deriving stock (Eq)
 
-data MigrationView = MigrationView !MigrationId !(Maybe Text) !(NonEmpty StepView) !MigrationChecksum deriving stock (Eq)
+data MigrationView = MigrationView !MigrationId !(Maybe Text) !(NonEmpty StepView) !MigrationChecksum !MigrationChecksum deriving stock (Eq)
 
-data StepView = StepView !StepName !ByteString !StepChecksum deriving stock (Eq)
+data StepView = StepView !StepName !ByteString !StepChecksum !StepChecksum deriving stock (Eq)

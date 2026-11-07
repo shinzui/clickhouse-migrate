@@ -75,3 +75,13 @@ canonical 65,536-byte limit. Its safe `event` field is `authorization`, `accepta
 application SQL has been submitted by the rejected request. Review smaller evidence
 and issue a new explicit request against the unchanged expected position. Evidence
 is never truncated. Corrupt stored events continue to use ledger errors.
+
+
+Replicated targets additionally report `replica-set-mismatch` in the transport
+family when cluster membership or the configured macro disagrees;
+`ledger-database-missing` in the ledger family when its pre-existing database is
+absent; and `database-creation-on-replicated-target` in the run family for a pending
+CREATE DATABASE step. `unsupported-ledger-version` also rejects a ledger whose
+checksum format/policy belongs to the other topology.
+
+On replicated targets, `invalid-runtime-plan` also refuses pending SQL that mentions protected quorum/read-consistency or replicated wait settings. The same definitions remain valid for direct targets.

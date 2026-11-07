@@ -1,5 +1,29 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 -- | Command values contain input, never an acquired administrative capability.
-module ClickHouseMigrate.CLI.Types where
+module ClickHouseMigrate.CLI.Types
+  ( OutputFormat (..),
+    Invocation (..),
+    AuditInput (..),
+    UpInput (..),
+    RepairOperation (..),
+    RepairInput (..),
+    AdoptionOperation (..),
+    ExpectedInput (..),
+    AdoptionInput (..),
+    Command (..),
+    CommandPolicy (..),
+    CommandEnvironment (..),
+    CommandError (..),
+    CommandFailure (..),
+    PlanStep (PlanStep, PlanStepChecksums),
+    PlanMigration (PlanMigration, PlanMigrationChecksums),
+    PlanComponent (..),
+    CommandReport (..),
+    CommandResult (..),
+    ParseIssue (..),
+  )
+where
 
 import ClickHouseMigrate.Adoption (AdoptionError)
 import ClickHouseMigrate.Event (DiagnosticPolicy, EventSink)
@@ -69,9 +93,25 @@ data CommandFailure
   | AdoptionRejected !AdoptionError !R.HistoryReport
   deriving stock (Show)
 
-data PlanStep = PlanStep !Text !Text deriving stock (Eq, Show)
+data PlanStep = PlanStepChecksums !Text !Text !(Maybe Text) deriving stock (Eq, Show)
 
-data PlanMigration = PlanMigration !Text !(Maybe Text) !Text ![PlanStep] deriving stock (Eq, Show)
+data PlanMigration = PlanMigrationChecksums !Text !(Maybe Text) !Text !(Maybe Text) ![PlanStep] deriving stock (Eq, Show)
+
+-- Preserve existing construction and matching arities while retaining additive
+-- v2 data. Manually constructed legacy reports have no known v2 digest.
+pattern PlanStep :: Text -> Text -> PlanStep
+pattern PlanStep name checksum <- PlanStepChecksums name checksum _
+  where
+    PlanStep name checksum = PlanStepChecksums name checksum Nothing
+
+pattern PlanMigration :: Text -> Maybe Text -> Text -> [PlanStep] -> PlanMigration
+pattern PlanMigration name description checksum steps <- PlanMigrationChecksums name description checksum _ steps
+  where
+    PlanMigration name description checksum steps = PlanMigrationChecksums name description checksum Nothing steps
+
+{-# COMPLETE PlanStep #-}
+
+{-# COMPLETE PlanMigration #-}
 
 data PlanComponent = PlanComponent !Text ![Text] ![PlanMigration] deriving stock (Eq, Show)
 

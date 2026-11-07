@@ -2,7 +2,7 @@ default:
     @just --list
 
 build:
-    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- build all
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json --input examples/two-components/catalog migrations-replicated/manifest.json --input examples/two-components/analytics migrations-replicated/manifest.json -- build all
 
 check-packages:
     #!/usr/bin/env bash
@@ -13,7 +13,7 @@ check-packages:
 
 # Behavioral suites are added by their owning implementation plans.
 test-unit:
-    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- test clickhouse-migrate-unit clickhouse-migrate-embed-test clickhouse-migrate-cli-test --test-show-details=direct
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json --input examples/two-components/catalog migrations-replicated/manifest.json --input examples/two-components/analytics migrations-replicated/manifest.json -- test clickhouse-migrate-unit clickhouse-migrate-embed-test clickhouse-migrate-cli-test --test-show-details=direct
 
 test-integration: test-release-matrix
 
@@ -40,6 +40,7 @@ sdist:
     cabal sdist all
 
 check-public-invariants:
+    python3 scripts/check-candidate-policy.py
     python3 scripts/check-public-invariants.py
     python3 scripts/checksum-reference.py --check
     python3 scripts/adoption-reference.py --check
@@ -90,7 +91,7 @@ test-consumer-fixtures:
 
 # Build all live-test artifacts with every embedded input declared.
 build-qualification:
-    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest.json --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest-first.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- build clickhouse-migrate-test-support:test:clickhouse-migrate-integration clickhouse-migrate:exe:clickhouse-migrate-test-driver clickhouse-migrate-example -fintegration -finternal-test-driver
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest.json --input clickhouse-migrate-test-support test/fixtures/kansoku/manifest-first.json --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json --input examples/two-components/catalog migrations-replicated/manifest.json --input examples/two-components/analytics migrations-replicated/manifest.json -- build clickhouse-migrate-test-support:test:clickhouse-migrate-integration clickhouse-migrate:exe:clickhouse-migrate-test-driver clickhouse-migrate-example -fintegration -finternal-test-driver
 
 test-release-matrix: build-qualification
     python3 scripts/test-release-matrix.py
@@ -109,7 +110,7 @@ check-production-closure:
     python3 scripts/check-production-closure.py
 
 haddock:
-    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json -- haddock all
+    cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input examples/two-components/catalog migrations/manifest.json --input examples/two-components/analytics migrations/manifest.json --input examples/two-components/catalog migrations-replicated/manifest.json --input examples/two-components/analytics migrations-replicated/manifest.json -- haddock all
 
 qualify-distributions:
     python3 scripts/qualify-distributions.py
@@ -117,3 +118,11 @@ qualify-distributions:
 # REV-1 public reproductions and the combined MasterPlan 2 native gate.
 test-review-remediation:
     cabal test clickhouse-migrate-integration -fintegration --test-show-details=direct --test-options=remediation
+
+# Two owned replicas and Keeper; no application endpoint or private driver.
+test-replicated: build-qualification
+    #!/usr/bin/env bash
+    set -euo pipefail
+    suite=$(cabal list-bin clickhouse-migrate-integration -fintegration)
+    example=$(cabal list-bin clickhouse-migrate-example)
+    CLICKHOUSE_MIGRATE_CANDIDATE=altinity-linux-arm64-10002 CLICKHOUSE_MIGRATE_EXAMPLE="$example" clickhouse_migrate_test_support_datadir="$PWD/clickhouse-migrate-test-support" "$suite" replicated

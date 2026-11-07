@@ -51,3 +51,5 @@ numbers or issuing successor mutations; an empty read is insufficient.
 
 [ADR 0013](0013-retain-http-transport-and-revisit-clickhaskell.md) records the later
 ClickHaskell evaluation and the criteria for revisiting the transport choice.
+
+[ADR 0015](0015-qualify-replicated-targets-by-replica-set-and-quorum.md) adds the separately qualified replicated topology while preserving the direct policy.

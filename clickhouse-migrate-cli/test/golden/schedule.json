@@ -17,14 +17,22 @@
             "name": "one",
             "description": null,
             "checksum": "a1-hash",
-            "steps": []
+            "steps": [],
+            "checksums": {
+              "sha256-v1": "a1-hash",
+              "sha256-v2": null
+            }
           },
           {
             "ordinal": 2,
             "name": "two",
             "description": "upgrade",
             "checksum": "a2-hash",
-            "steps": []
+            "steps": [],
+            "checksums": {
+              "sha256-v1": "a2-hash",
+              "sha256-v2": null
+            }
           }
         ]
       },
@@ -40,7 +48,11 @@
             "name": "one",
             "description": null,
             "checksum": "b1-hash",
-            "steps": []
+            "steps": [],
+            "checksums": {
+              "sha256-v1": "b1-hash",
+              "sha256-v2": null
+            }
           }
         ]
       }
@@ -61,6 +73,10 @@
         "component": "a",
         "migration": "two"
       }
+    ],
+    "checksumFormats": [
+      "sha256-v1",
+      "sha256-v2"
     ]
   },
   "error": null

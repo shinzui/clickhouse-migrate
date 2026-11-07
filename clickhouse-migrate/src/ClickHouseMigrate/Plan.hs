@@ -16,13 +16,15 @@ module ClickHouseMigrate.Plan
     migrationDescription,
     migrationSteps,
     migrationChecksum,
+    migrationChecksumFor,
     StepView,
     stepViewName,
     stepSql,
     stepChecksum,
+    stepChecksumFor,
     StepChecksum,
     MigrationChecksum,
-    ChecksumFormat (ChecksumV1),
+    ChecksumFormat (ChecksumV1, ChecksumV2),
     checksumFormatName,
     parseChecksumFormat,
     stepChecksumFormat,
@@ -133,11 +135,12 @@ bindComponent :: MigrationComponent -> ComponentView
 bindComponent (MigrationComponent component deps migrations) = ComponentView component deps (fmap bindMigration migrations)
   where
     bindMigration (Migration name description steps) =
-      let encodings = fmap (encodeStep name) steps
-          boundSteps = NE.zipWith (\(SqlStep step sql) encoded -> StepView step sql (StepChecksum (Checksum.digest encoded))) steps encodings
-          checksum = MigrationChecksum (Checksum.digest (Checksum.encodeMigrationV1 (componentNameText component) (migrationNameText name) (NE.toList encodings)))
-       in MigrationView (MigrationId component name) description boundSteps checksum
-    encodeStep migration (SqlStep step sql) = Checksum.encodeStepV1 (componentNameText component) (migrationNameText migration) (stepNameText step) sql
+      let encode encoder (SqlStep step sql) = encoder (componentNameText component) (migrationNameText name) (stepNameText step) sql
+          encodingsV1 = fmap (encode Checksum.encodeStepV1) steps
+          encodingsV2 = fmap (encode Checksum.encodeStepV2) steps
+          boundSteps = NE.zipWith (\(SqlStep step sql) (v1, v2) -> StepView step sql (StepChecksum (Checksum.digest v1)) (StepChecksumV2 (Checksum.digest v2))) steps (NE.zip encodingsV1 encodingsV2)
+          checksum encoder encodings = Checksum.digest (encoder (componentNameText component) (migrationNameText name) (NE.toList encodings))
+       in MigrationView (MigrationId component name) description boundSteps (MigrationChecksum (checksum Checksum.encodeMigrationV1 encodingsV1)) (MigrationChecksumV2 (checksum Checksum.encodeMigrationV2 encodingsV2))
 
 inspectPlan :: MigrationPlan -> NonEmpty ComponentView
 inspectPlan (MigrationPlan components _) = components
@@ -152,44 +155,58 @@ componentMigrations :: ComponentView -> NonEmpty MigrationView
 componentMigrations (ComponentView _ _ migrations) = migrations
 
 migrationId :: MigrationView -> MigrationId
-migrationId (MigrationView identity _ _ _) = identity
+migrationId (MigrationView identity _ _ _ _) = identity
 
 migrationDescription :: MigrationView -> Maybe Text
-migrationDescription (MigrationView _ description _ _) = description
+migrationDescription (MigrationView _ description _ _ _) = description
 
 migrationSteps :: MigrationView -> NonEmpty StepView
-migrationSteps (MigrationView _ _ steps _) = steps
+migrationSteps (MigrationView _ _ steps _ _) = steps
 
 migrationChecksum :: MigrationView -> MigrationChecksum
-migrationChecksum (MigrationView _ _ _ checksum) = checksum
+migrationChecksum (MigrationView _ _ _ checksum _) = checksum
 
 stepViewName :: StepView -> StepName
-stepViewName (StepView name _ _) = name
+stepViewName (StepView name _ _ _) = name
 
 stepSql :: StepView -> ByteString
-stepSql (StepView _ sql _) = sql
+stepSql (StepView _ sql _ _) = sql
 
 stepChecksum :: StepView -> StepChecksum
-stepChecksum (StepView _ _ checksum) = checksum
+stepChecksum (StepView _ _ checksum _) = checksum
 
 checksumFormatName :: ChecksumFormat -> Text
 checksumFormatName ChecksumV1 = "sha256-v1"
+checksumFormatName ChecksumV2 = "sha256-v2"
 
 parseChecksumFormat :: Text -> Either DefinitionError ChecksumFormat
 parseChecksumFormat "sha256-v1" = Right ChecksumV1
+parseChecksumFormat "sha256-v2" = Right ChecksumV2
 parseChecksumFormat _ = Left (DefinitionError UnknownChecksumFormat ["checksum", "format"] Nothing)
 
 stepChecksumFormat :: StepChecksum -> ChecksumFormat
-stepChecksumFormat _ = ChecksumV1
+stepChecksumFormat (StepChecksum _) = ChecksumV1
+stepChecksumFormat (StepChecksumV2 _) = ChecksumV2
 
 migrationChecksumFormat :: MigrationChecksum -> ChecksumFormat
-migrationChecksumFormat _ = ChecksumV1
+migrationChecksumFormat (MigrationChecksum _) = ChecksumV1
+migrationChecksumFormat (MigrationChecksumV2 _) = ChecksumV2
 
 stepChecksumHex :: StepChecksum -> Text
 stepChecksumHex (StepChecksum bytes) = Checksum.digestHex bytes
+stepChecksumHex (StepChecksumV2 bytes) = Checksum.digestHex bytes
 
 migrationChecksumHex :: MigrationChecksum -> Text
 migrationChecksumHex (MigrationChecksum bytes) = Checksum.digestHex bytes
+migrationChecksumHex (MigrationChecksumV2 bytes) = Checksum.digestHex bytes
 
 completionPolicy :: ByteString
 completionPolicy = Checksum.completionPolicyV1
+
+migrationChecksumFor :: ChecksumFormat -> MigrationView -> MigrationChecksum
+migrationChecksumFor ChecksumV1 = migrationChecksum
+migrationChecksumFor ChecksumV2 = \(MigrationView _ _ _ _ checksum) -> checksum
+
+stepChecksumFor :: ChecksumFormat -> StepView -> StepChecksum
+stepChecksumFor ChecksumV1 = stepChecksum
+stepChecksumFor ChecksumV2 = \(StepView _ _ _ checksum) -> checksum

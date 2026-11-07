@@ -1,5 +1,5 @@
 -- | Conservative lexical envelope; never a general SQL safety proof.
-module ClickHouseMigrate.Internal.SqlEnvelope (validateSql, mentionsIdentifier) where
+module ClickHouseMigrate.Internal.SqlEnvelope (validateSql, mentionsIdentifier, createsDatabase, validateReplicatedPolicy, replicatedEngines, replicatedEngineSuffix) where
 
 import ClickHouseMigrate.Error
 import ClickHouseMigrate.Prelude
@@ -116,7 +116,7 @@ checkEnvelope tokens = do
   case find protected tokens of
     Just (Token n _) -> failure ProtectedSetting (Just n)
     Nothing -> pure ()
-  case find forbidden (localViewHeader tokens) of
+  case find forbidden (withoutReplicatedEngines (localViewHeader tokens)) of
     Just (Token n _) -> failure UnsupportedSql (Just n)
     Nothing -> pure ()
   if any onCluster (pairs tokens) || quotedSettings tokens then failure UnsupportedSql Nothing else pure ()
@@ -145,6 +145,22 @@ localViewHeader tokens = tokens
 
 protectedNames :: [Text]
 protectedNames = ["ASYNC_INSERT", "MUTATIONS_SYNC", "ALTER_SYNC"]
+
+-- Target-independent binding keeps all previously valid v1 definitions valid.
+-- Additional replicated policy identifiers are refused only for pending work on
+-- that topology, before any ledger/bootstrap or application write.
+validateReplicatedPolicy :: ByteString -> Either DefinitionError ()
+validateReplicatedPolicy sql = do
+  text <- either (const (failure InvalidUtf8 Nothing)) Right (Encoding.decodeUtf8' sql)
+  tokens <- scan 0 (Text.unpack text)
+  case find protected tokens of
+    Just (Token offset _) -> failure ProtectedSetting (Just offset)
+    Nothing -> Right ()
+  where
+    names = ["INSERT_QUORUM", "INSERT_QUORUM_PARALLEL", "INSERT_QUORUM_TIMEOUT", "DISTRIBUTED_DDL_OUTPUT_MODE", "DISTRIBUTED_DDL_TASK_TIMEOUT", "REPLICATION_WAIT_FOR_INACTIVE_REPLICA_TIMEOUT", "SELECT_SEQUENTIAL_CONSISTENCY"]
+    protected (Token _ (Word name)) = name `elem` names
+    protected (Token _ (Identifier name)) = name `elem` names
+    protected _ = False
 
 forbiddenWords :: [Text]
 forbiddenWords =
@@ -210,3 +226,44 @@ mentionsIdentifier name sql = do
       matches (Token _ (Identifier value)) = wanted `elem` Text.splitOn "." value
       matches _ = False
   pure (any matches tokens)
+
+replicatedEngines :: [Text]
+replicatedEngines = ["REPLICATEDMERGETREE", "REPLICATEDREPLACINGMERGETREE", "REPLICATEDAGGREGATINGMERGETREE", "REPLICATEDSUMMINGMERGETREE", "REPLICATEDCOLLAPSINGMERGETREE", "REPLICATEDVERSIONEDCOLLAPSINGMERGETREE"]
+
+-- Remove only an engine word in the table/MV engine position. Quoted engine
+-- spellings, explicit string arguments and every other occurrence stay forbidden.
+withoutReplicatedEngines :: [Token] -> [Token]
+withoutReplicatedEngines tokens
+  | tableCreate tokens = walk tokens
+  | otherwise = tokens
+  where
+    tableCreate (a : b : _) | keyword "CREATE" a && keyword "TABLE" b = True
+    tableCreate (a : b : c : _) = keyword "CREATE" a && keyword "MATERIALIZED" b && keyword "VIEW" c
+    tableCreate _ = False
+    walk (engine : equal : Token _ (Word word) : rest)
+      | keyword "ENGINE" engine && equalIs equal && word `elem` replicatedEngines && allowed rest = engine : equal : walk rest
+    walk (engine : Token _ (Word word) : rest)
+      | keyword "ENGINE" engine && word `elem` replicatedEngines && allowed rest = engine : walk rest
+    walk (token : rest) = token : walk rest
+    walk [] = []
+    equalIs (Token _ (Symbol '=')) = True
+    equalIs _ = False
+    allowed (Token _ (Symbol '(') : Token _ Literal : _) = False
+    allowed _ = True
+
+createsDatabase :: ByteString -> Either DefinitionError Bool
+createsDatabase sql = do
+  text <- either (const (failure InvalidUtf8 Nothing)) Right (Encoding.decodeUtf8' sql)
+  tokens <- scan 0 (Text.unpack text)
+  pure (case tokens of a : b : _ -> keyword "CREATE" a && keyword "DATABASE" b; _ -> False)
+
+-- Validate the server's canonical argument prefix, preserving the suffix bytes.
+replicatedEngineSuffix :: Text -> Maybe Text
+replicatedEngineSuffix text = case scan 0 (Text.unpack text) of
+  Right (Token _ (Word engine) : Token _ (Symbol '(') : Token first Literal : Token _ (Symbol ',') : Token second Literal : Token end (Symbol ')') : _)
+    | engine == "REPLICATEDMERGETREE",
+      engine `elem` replicatedEngines,
+      Text.isPrefixOf "'" (Text.drop first text),
+      Text.isPrefixOf "'" (Text.drop second text) ->
+        Just (Text.drop (end + 1) text)
+  _ -> Nothing

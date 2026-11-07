@@ -5,8 +5,11 @@ import ClickHouseMigrate
 import ClickHouseMigrate.Internal.Checksum qualified as Checksum
 import ClickHouseMigrate.Internal.Http (readJsonRowStream)
 import ClickHouseMigrate.Internal.LedgerCodec qualified as Codec
+import ClickHouseMigrate.Internal.Preflight qualified as Preflight
+import ClickHouseMigrate.Internal.ServerProfile qualified as Profile
 import ClickHouseMigrate.Internal.Transport qualified as Transport
-import Control.Monad (forM_, unless)
+import ClickHouseMigrate.Report qualified as Report
+import Control.Monad (forM_, unless, void)
 import Data.Aeson qualified as Aeson
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
@@ -45,6 +48,8 @@ main = do
   streamValidation
   scheduleValidation
   targetValidation
+  directProfilePins
+  replicatedTargetValidation
   let sql = "CREATE TABLE app.events (id UInt64) ENGINE=MergeTree ORDER BY id"
   create <- right (sqlStep "create" sql)
   migration <- right (sqlMigration "0001" (create :| []))
@@ -80,7 +85,7 @@ main = do
     assert "multiple SQL statements" (isDefinitionError MultipleStatements (sqlStep "x" multiple))
   forM_ ["INSERT INTO app.t VALUES ('open", "INSERT INTO app.t VALUES ($x$open)", "CREATE TABLE app.t (x UInt8) /*", "CREATE TABLE app.\"t (x UInt8)"] $ \unterminated ->
     assert "unterminated SQL construct" (isDefinitionError UnterminatedSql (sqlStep "x" unterminated))
-  forM_ ["BEGIN", "COMMIT", "ROLLBACK", "USE app", "SET x=1", "SELECT 1", "SYSTEM FLUSH LOGS", "CREATE TABLE app.t ON /* gap */ CLUSTER c (x UInt8)", "INSERT INTO app.t FORMAT CSV\n1", "CREATE MATERIALIZED VIEW app.v REFRESH EVERY 1 SECOND AS SELECT 1", "ALTER TABLE app.t MOVE PARTITION 1 TO TABLE app.other", "CREATE TABLE app.t ENGINE=ReplicatedMergeTree ORDER BY tuple()", "CREATE TABLE unqualified (x UInt8)", "\\i file.sql"] $ \unsupported ->
+  forM_ ["BEGIN", "COMMIT", "ROLLBACK", "USE app", "SET x=1", "SELECT 1", "SYSTEM FLUSH LOGS", "CREATE TABLE app.t ON /* gap */ CLUSTER c (x UInt8)", "INSERT INTO app.t FORMAT CSV\n1", "CREATE MATERIALIZED VIEW app.v REFRESH EVERY 1 SECOND AS SELECT 1", "ALTER TABLE app.t MOVE PARTITION 1 TO TABLE app.other", "CREATE TABLE unqualified (x UInt8)", "\\i file.sql"] $ \unsupported ->
     assert "unsupported SQL" (isDefinitionError UnsupportedSql (sqlStep "x" unsupported))
   forM_ ["async_insert", "mutations_sync", "alter_sync", "AsYnC_InSeRt", "`alter_sync`", "\"mutations_sync\""] $ \setting ->
     assert "protected setting" (isDefinitionError ProtectedSetting (sqlStep "x" (Encoding.encodeUtf8 ("INSERT INTO app.t VALUES (1) SETTINGS " <> setting <> " /*comment*/ = 0"))))
@@ -90,6 +95,8 @@ main = do
     c <- right (migrationComponent "c" Set.empty (m :| []))
     p <- right (migrationPlan (c :| []))
     assert "SQL exact bytes preserved" (stepSql (NE.head (migrationSteps (NE.head (componentMigrations (NE.head (inspectPlan p)))))) == valid)
+  forM_ ["CREATE TABLE app.t (x UInt64) ENGINE=ReplicatedMergeTree ORDER BY x", "CREATE TABLE app.t (x UInt64, updated_at UInt64) ENGINE=ReplicatedReplacingMergeTree(updated_at) ORDER BY x", "CREATE MATERIALIZED VIEW app.v ENGINE ReplicatedAggregatingMergeTree ORDER BY x AS SELECT x FROM app.t"] $ \sql -> void (right (sqlStep "replicated" sql))
+  forM_ ["CREATE TABLE app.t (x UInt8) ENGINE=ReplicatedMergeTree('/keeper','replica') ORDER BY x", "CREATE DATABASE app ENGINE=Replicated", "CREATE TABLE app.\"ReplicatedMergeTree\" (x UInt8) ENGINE=Memory", "CREATE TABLE app.t (x UInt8) ENGINE=Distributed(c,app,t)"] $ \sql -> assert "replicated envelope refuses unsafe form" (either (const True) (const False) (sqlStep "replicated" sql))
   -- Boundary combinations cover escaped delimiters, comment forms and heredoc tags.
   forM_ [";", "'; DROP TABLE app.t; --", "/* ; */", "雪;", "\\;", "# ;"] $ \payload ->
     forM_ ["tag", "other", "_x9"] $ \tag -> do
@@ -100,18 +107,20 @@ main = do
   let firstMigration = NE.head . componentMigrations . NE.head . inspectPlan
   assert "description excluded from checksum" (migrationChecksum (firstMigration plan) == migrationChecksum (firstMigration describedPlan))
   assert "description available" (migrationDescription (firstMigration describedPlan) == Just "metadata")
-  assert "unknown checksum format" (isDefinitionError UnknownChecksumFormat (parseChecksumFormat "sha256-v2"))
+  assert "unknown checksum format" (isDefinitionError UnknownChecksumFormat (parseChecksumFormat "sha256-v3"))
   assert "known checksum format" (parseChecksumFormat "sha256-v1" == Right ChecksumV1)
   vectorLines <- filter (not . Text.isPrefixOf "#") . Text.lines <$> Text.readFile "test/vectors/checksum-v1.tsv"
-  forM_ vectorLines checkVector
-  putStrLn "Definition, ordering, SQL boundary and 24 independent checksum-vector checks passed."
+  forM_ vectorLines (checkVectorFor ChecksumV1)
+  vectorV2 <- filter (not . Text.isPrefixOf "#") . Text.lines <$> Text.readFile "test/vectors/checksum-v2.tsv"
+  forM_ vectorV2 (checkVectorFor ChecksumV2)
+  putStrLn "Definition, ordering, SQL boundary and 48 independent checksum-vector checks passed."
 
-checkVector :: Text -> IO ()
-checkVector line = case Text.splitOn "\t" line of
+checkVectorFor :: ChecksumFormat -> Text -> IO ()
+checkVectorFor format line = case Text.splitOn "\t" line of
   [label, kind, component, name, sources, expectedInput, expectedDigest] -> do
     steps <- mapM parseStep (Text.splitOn "," sources)
-    let encodedSteps = fmap (\(key, sql) -> Checksum.encodeStepV1 component name key sql) (NE.fromList steps)
-        input = if kind == "step" then NE.head encodedSteps else Checksum.encodeMigrationV1 component name (NE.toList encodedSteps)
+    let encodedSteps = fmap (\(key, sql) -> (if format == ChecksumV1 then Checksum.encodeStepV1 else Checksum.encodeStepV2) component name key sql) (NE.fromList steps)
+        input = if kind == "step" then NE.head encodedSteps else (if format == ChecksumV1 then Checksum.encodeMigrationV1 else Checksum.encodeMigrationV2) component name (NE.toList encodedSteps)
     expected <- unhex expectedInput
     assert (Text.unpack (label <> " encoded bytes")) (input == expected)
     assert (Text.unpack (label <> " SHA-256")) (Checksum.digestHex (Checksum.digest input) == expectedDigest)
@@ -120,7 +129,7 @@ checkVector line = case Text.splitOn "\t" line of
     c <- right (migrationComponent component Set.empty (m :| []))
     p <- right (migrationPlan (c :| []))
     let bound = NE.head (componentMigrations (NE.head (inspectPlan p)))
-        actual = if kind == "step" then stepChecksumHex (stepChecksum (NE.head (migrationSteps bound))) else migrationChecksumHex (migrationChecksum bound)
+        actual = if kind == "step" then stepChecksumHex (stepChecksumFor format (NE.head (migrationSteps bound))) else migrationChecksumHex (migrationChecksumFor format bound)
     assert (Text.unpack (label <> " public bound checksum")) (actual == expectedDigest)
   _ -> fail "Invalid checked-in checksum vector"
   where
@@ -203,3 +212,66 @@ streamValidation = do
   late <- run 1024 [bytes <> "\nCode: 999. synthetic failure\n"]
   assert "late error discards rows" (case late of Transport.ObservedServerFailure (Transport.TransportError Transport.ServerRejected _ (Just 999)) -> True; _ -> False)
   assert "empty stream" . success 0 =<< run 1024 []
+
+-- Exact direct policy bytes are compatibility obligations, not inferred behavior.
+directProfilePins :: IO ()
+directProfilePins = do
+  identity <- right (serverId "00000000-0000-0000-0000-000000000000")
+  namespace <- right (ledgerNamespace "ledger")
+  let topology = DirectServer identity
+      base = [("query_id", Just "pin"), ("async_insert", Just "0"), ("mutations_sync", Just "1"), ("alter_sync", Just "1"), ("fsync_metadata", Just "1"), ("wait_end_of_query", Just "1"), ("default_format", Just "JSONEachRow")]
+      readSettings = [("max_rows_to_read", Just "0"), ("max_bytes_to_read", Just "0"), ("max_result_rows", Just "0"), ("max_result_bytes", Just "0"), ("read_overflow_mode", Just "throw"), ("result_overflow_mode", Just "throw"), ("timeout_overflow_mode", Just "throw"), ("sort_overflow_mode", Just "throw")]
+  assert "direct command settings byte pin" (Profile.requestSettings topology defaultHttpLimits "pin" Transport.Command == base)
+  forM_ [Transport.JsonRows, Transport.JsonRowStream] $ \kind ->
+    assert "direct read settings byte pin" (Profile.requestSettings topology defaultHttpLimits "pin" kind == base ++ readSettings)
+  assert "direct policy byte pin" (Profile.completionPolicy topology == "clickhouse-migrate/local-sync-v1;async_insert=0;mutations_sync=1;alter_sync=1")
+  assert "direct checksum format pin" (Profile.checksumFormat topology == ChecksumV1)
+  assert "direct database DDL pin" (Profile.createDatabase topology namespace == Just "CREATE DATABASE IF NOT EXISTS `ledger` ENGINE=Atomic")
+  assert "direct table DDL pin" (Profile.createTable topology namespace == "CREATE TABLE IF NOT EXISTS `ledger`.`events` (sequence UInt64, event_id UUID, ledger_id UUID, event String) ENGINE=MergeTree ORDER BY sequence SETTINGS fsync_after_insert=1, fsync_part_directory=1, storage_policy='default'")
+  assert "direct engine metadata pin" (Profile.expectedEngine topology == "MergeTree ORDER BY sequence SETTINGS fsync_after_insert = 1, fsync_part_directory = 1, storage_policy = 'default', index_granularity = 8192")
+  assert "direct create metadata pin" (Profile.expectedCreate topology namespace == "CREATE TABLE ledger.events (`sequence` UInt64, `event_id` UUID, `ledger_id` UUID, `event` String) ENGINE = MergeTree ORDER BY sequence SETTINGS fsync_after_insert = 1, fsync_part_directory = 1, storage_policy = 'default', index_granularity = 8192")
+
+replicatedTargetValidation :: IO ()
+replicatedTargetValidation = do
+  identity <- right (serverId "00000000-0000-0000-0000-000000000000")
+  key <- right (targetKey "replicated/unit")
+  endpoint <- right (directEndpoint "https://example.com")
+  cluster <- right (clusterName "tan-production")
+  namespace <- right (ledgerNamespace "ledger")
+  credentials <- right (basicCredentials "app" "password")
+  let build replicas limits = replicatedTargetConfig key endpoint cluster replicas namespace FirstUse credentials limits
+  assert "duplicate replicas rejected" (either (== DuplicateReplica) (const False) (build (identity :| [identity]) defaultHttpLimits))
+  short <- right (httpLimits 4999999 1024)
+  assert "replicated deadline leaves a response margin" (either (== InvalidHttpLimits) (const False) (build (identity :| []) short))
+  config <- right (build (identity :| []) defaultHttpLimits)
+  assert "replicated topology retained" (configuredTopology config == ReplicatedCluster cluster (identity :| []))
+  forM_ ["", "x' OR 1=1", "x.y", "-start", "雪"] $ \value -> assert "cluster name cannot inject SQL" (clusterName value == Left InvalidClusterName)
+  let topology = configuredTopology config
+      engine = "ReplicatedMergeTree('/operator/path', 'replica')" <> Profile.engineTail
+      create = "CREATE TABLE ledger.events (`sequence` UInt64, `event_id` UUID, `ledger_id` UUID, `event` String) ENGINE = " <> engine
+      shape = ["events", "ReplicatedMergeTree", engine, "sequence", "sequence", "", "", create]
+  assert "replicated engine metadata accepts operator paths" (Profile.validTableShape topology namespace shape)
+  assert "replicated metadata rejects trailing engine changes" (not (Profile.validTableShape topology namespace ["events", "ReplicatedMergeTree", engine <> " SETTINGS a=0", "sequence", "sequence", "", "", create]))
+
+  let probe actual version macro =
+        Aeson.object ([("server_id", Aeson.String actual), ("version", Aeson.String version), ("host", Aeson.String "owned-host"), ("cluster", Aeson.String macro), ("storage_ok", Aeson.Number 1)] ++ [(key, Aeson.String value) | (key, value) <- Profile.replicatedEffective topology])
+      outcome value = case Aeson.fromJSON value of Aeson.Success row -> Transport.AcknowledgedSuccess (Transport.Rows [row]); Aeson.Error _ -> error "Invalid probe fixture"
+      validate actual version macro = Profile.validateOutcome ["26.3.60.10002.altinitystable"] topology (outcome (probe actual version macro))
+      rejects code = \case Left (Profile.TargetRejected (Transport.TransportError actual _ _)) -> actual == code; _ -> False
+  assert "replicated probe admits expected socket" (fmap identityServerId (validate (serverIdText identity) "26.3.60.10002.altinitystable" "tan-production") == Right identity)
+  assert "replicated probe refuses a foreign socket" (rejects Transport.ServerIdentityMismatch (validate "11111111-1111-1111-1111-111111111111" "26.3.60.10002.altinitystable" "tan-production"))
+  assert "replicated probe refuses unqualified versions" (rejects Transport.UnsupportedServer (validate (serverIdText identity) "unlisted" "tan-production"))
+  assert "replicated probe refuses wrong cluster macros" (rejects Transport.ReplicaSetMismatch (validate (serverIdText identity) "26.3.60.10002.altinitystable" "other-cluster"))
+
+  let heredocEngine = "ReplicatedMergeTree($$path$$, $$replica$$)" <> Profile.engineTail
+      heredocCreate = "CREATE TABLE ledger.events (`sequence` UInt64, `event_id` UUID, `ledger_id` UUID, `event` String) ENGINE = " <> heredocEngine
+  assert "replicated metadata requires single-quoted engine arguments" (not (Profile.validTableShape topology namespace ["events", "ReplicatedMergeTree", heredocEngine, "sequence", "sequence", "", "", heredocCreate]))
+
+  guardedStep <- right (sqlStep "guarded" "INSERT INTO app.t VALUES (1) SETTINGS insert_quorum=0")
+  guardedMigration <- right (sqlMigration "guarded" (guardedStep :| []))
+  guardedComponent <- right (migrationComponent "guarded" Set.empty (guardedMigration :| []))
+  guardedPlan <- right (migrationPlan (guardedComponent :| []))
+  let direct = targetConfig key endpoint identity namespace FirstUse credentials defaultHttpLimits
+  assert "direct v1 definitions keep accepting unrelated settings" (Preflight.preflightPending direct guardedPlan 0 == Right ())
+  assert "replicated pending policy overrides rejected" (case Preflight.preflightPending config guardedPlan 0 of Left (Report.InvalidRuntimePlan _) -> True; _ -> False)
+  assert "applied replicated definitions are not rechecked" (Preflight.preflightPending config guardedPlan 1 == Right ())

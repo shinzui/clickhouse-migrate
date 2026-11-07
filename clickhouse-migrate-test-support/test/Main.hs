@@ -26,6 +26,7 @@ import FailureBoundaries (failureBoundaryCases)
 import LedgerIntegration (ledgerFaultCases)
 import RepairBoundaries (repairBoundaryCases)
 import RepairIntegration (repairEarlyCases)
+import ReplicatedIntegration (replicatedCases)
 import ReviewRemediation (remediationCases)
 import RunnerIntegration (runnerEarlyCases, runnerValidationCases)
 import SurvivingWork (runnerChild, survivingWorkCases)
@@ -56,27 +57,33 @@ main = do
 
 integrationMain :: [String] -> IO ()
 integrationMain args = do
-  driver <- if args `elem` [["exclusive"], ["runner"], ["repair"], ["boundaries"], ["survivors"], ["adoption"], ["consumer"], ["cli"], ["example"], ["remediation"]] then pure "" else getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER"
+  let name = case args of [] -> "transport"; [group] -> group; _ -> ""
+  (needsDriver, run) <- maybe (fail "Unknown integration group") pure (lookup name integrationGroups)
+  driver <- if needsDriver then getEnv "CLICKHOUSE_MIGRATE_TEST_DRIVER" else pure ""
   candidate <- maybe "lts-native" Text.pack <$> lookupEnv "CLICKHOUSE_MIGRATE_CANDIDATE"
-  finished <- timeout (if args == ["consumer"] then 600000000 else 180000000) $ withCandidateServer candidate $ \server -> do
+  finished <- timeout (if name `elem` ["consumer", "replicated"] then 600000000 else 180000000) $ (if name == "replicated" then withReplicatedCandidate else withCandidateServer) candidate $ \server -> do
     putStrLn ("Candidate ClickHouse " ++ Text.unpack (serverVersion server))
-    case args of
-      [] -> transportCases driver server
-      ["transport"] -> transportCases driver server
-      ["completion"] -> completionCases driver server
-      ["ledger"] -> ledgerCases driver server
-      ["consumer"] -> consumerFixtureCases server
-      ["cli"] -> cliCases server
-      ["example"] -> exampleCases server
-      ["adoption"] -> adoptionEarlyCases server >> adoptionFaultCases server
-      ["remediation"] -> remediationCases server
-      ["runner"] -> runnerEarlyCases server >> runnerValidationCases server
-      ["repair"] -> repairEarlyCases server >> repairBoundaryCases server
-      ["survivors"] -> survivingWorkCases server
-      ["boundaries"] -> failureBoundaryCases server
-      ["exclusive"] -> exclusiveCases server
-      _ -> fail "Unknown integration group"
+    run driver server
   case finished of Nothing -> fail "Integration watchdog expired"; Just () -> pure ()
+
+-- Every group and its private-driver requirement is declared once here.
+integrationGroups :: [(String, (Bool, FilePath -> Server -> IO ()))]
+integrationGroups =
+  [ ("replicated", (False, const replicatedCases)),
+    ("transport", (True, transportCases)),
+    ("completion", (True, completionCases)),
+    ("ledger", (True, ledgerCases)),
+    ("consumer", (False, const consumerFixtureCases)),
+    ("cli", (False, const cliCases)),
+    ("example", (False, const exampleCases)),
+    ("adoption", (False, \_ server -> adoptionEarlyCases server >> adoptionFaultCases server)),
+    ("remediation", (False, const remediationCases)),
+    ("runner", (False, \_ server -> runnerEarlyCases server >> runnerValidationCases server)),
+    ("repair", (False, \_ server -> repairEarlyCases server >> repairBoundaryCases server)),
+    ("survivors", (False, const survivingWorkCases)),
+    ("boundaries", (False, const failureBoundaryCases)),
+    ("exclusive", (False, const exclusiveCases))
+  ]
 
 runDriver :: FilePath -> Server -> Text -> String -> String -> ByteString -> Int -> Int -> IO Value
 runDriver = runDriverExpected Nothing

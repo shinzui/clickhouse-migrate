@@ -149,3 +149,29 @@ safe event role, preserving the original position and attempt. Supply smaller
 reviewed evidence in a new explicit request; successful requests retain evidence
 verbatim. Once a valid event is submitted, existing uncertainty, receipts and
 external quiescence rules still apply.
+
+
+## Replicated ledgers
+
+A replicated target requires a pre-existing `Replicated` ledger database. The
+library creates only its `ReplicatedMergeTree` events table, without explicit
+Keeper arguments. Missing databases fail with `ledger-database-missing`; Atomic
+or malformed storage fails with `invalid-ledger-schema`. Events retain v1 framing,
+with the initialized event carrying the `sha256-v2` format and replicated policy.
+The wrong topology's format fails with `unsupported-ledger-version`.
+
+The shape validator requires the exact columns and keys, exact durability/storage
+settings, and exactly two server-supplied string arguments in `engine_full`.
+It allows the argument contents to vary with server configuration. It checks
+`system.replicas.is_readonly=0` and `total_replicas` against the configured count.
+Every newly admitted replica is checked for healthy writable Local default storage
+and effective metadata fsync. Table part fsync settings are checked when loading
+its schema. Replication deduplication is not used to justify retries: every append
+is still submitted once, and any unacknowledged submitted append blocks progress.
+
+Acknowledged INSERTs wait for the full configured replica count with parallel
+quorum inserts disabled; sequential reads preserve that completion policy across
+connections. A quorum timeout may still commit later. A stopped replica can leave
+DDL queued in Keeper and an append uncertain; restart and explicit external drain,
+receipt reconciliation and audited recovery are required before continuation.
+Owned process restarts provide no power-loss or managed-cloud certification.

@@ -10,6 +10,7 @@ import ClickHouseMigrate.Internal.LedgerCodec (decodeEvent, encodeEvent, encodeV
 import ClickHouseMigrate.Internal.LedgerSchema qualified as Schema
 import ClickHouseMigrate.Internal.LedgerTypes
 import ClickHouseMigrate.Internal.Projection (appendProjection, project)
+import ClickHouseMigrate.Internal.ServerProfile qualified as Profile
 import ClickHouseMigrate.Internal.TargetTypes (TargetConfig (..))
 import ClickHouseMigrate.Internal.Transport
 import ClickHouseMigrate.Prelude
@@ -74,8 +75,10 @@ keys expected row = unless (Set.fromList expected == Set.fromList (KM.keys row))
 
 -- Shape state is separate from event projection to avoid inventing an empty
 -- ledger identity. Return False for absent table after checking every object.
-shape :: Maybe Guard -> Transport -> LedgerNamespace -> IO (Bool, Bool)
-shape guard transport namespace = do
+shape :: Maybe Guard -> Transport -> TargetConfig -> IO (Bool, Bool)
+shape guard transport config = do
+  let namespace = configNamespace config
+      topology = configTopology config
   checkLocalStorage guard transport
   settings <- readRows guard transport "SELECT toUInt8(getSetting('fsync_metadata')) AS fsync_metadata"
   case settings of
@@ -86,21 +89,24 @@ shape guard transport namespace = do
     _ -> invalid
   databases <- readRows guard transport (Schema.databaseQuery namespace)
   case databases of
-    [] -> pure (False, False)
+    [] -> if Profile.requiresLedgerDatabase topology then abort (LedgerProblem LedgerDatabaseMissing) else pure (False, False)
     [row] -> do
       keys ["name", "engine"] row
       name <- member "name" row
       engine <- member "engine" row :: IO Text
-      unless (name == ledgerNamespaceText namespace && engine == "Atomic") invalid
+      unless (name == ledgerNamespaceText namespace && engine == Profile.databaseEngine topology) invalid
       tables <- readRows guard transport (Schema.tableQuery namespace)
       case tables of
         [] -> pure (True, False)
         [table] -> do
           keys ["name", "engine", "engine_full", "sorting_key", "primary_key", "partition_key", "sampling_key", "create_table_query"] table
           actual <- mapM (`member` table) ["name", "engine", "engine_full", "sorting_key", "primary_key", "partition_key", "sampling_key", "create_table_query"] :: IO [Text]
-          let base = ["events", "MergeTree", Schema.expectedEngine, "sequence", "sequence", "", ""]
-              quotedCreate = Text.replace ("CREATE TABLE " <> ledgerNamespaceText namespace <> ".") ("CREATE TABLE " <> Schema.quoteIdentifier (ledgerNamespaceText namespace) <> ".") (Schema.expectedCreate namespace)
-          unless (actual == base ++ [Schema.expectedCreate namespace] || actual == base ++ [quotedCreate]) invalid
+          unless (Profile.validTableShape topology namespace actual) invalid
+          case Profile.replicaHealthQuery topology namespace of
+            Nothing -> pure ()
+            Just sql -> do
+              health <- readRows guard transport sql
+              unless (Profile.validReplicaHealth topology health) invalid
           pure (True, True)
         _ -> invalid
     _ -> invalid
@@ -136,8 +142,8 @@ checkLocalStorage guard transport = do
     invalid = abort (LedgerProblem UnsupportedLedgerStorage)
 
 load :: Maybe Guard -> Transport -> TargetConfig -> IO Observation
-load guard transport (TargetConfig target _ _ namespace binding _ _) = do
-  (database, table) <- shape guard transport namespace
+load guard transport config@(TargetConfig {configKey = target, configNamespace = namespace, configBinding = binding}) = do
+  (database, table) <- shape guard transport config
   if not database
     then pure Missing
     else
@@ -150,6 +156,7 @@ load guard transport (TargetConfig target _ _ namespace binding _ _) = do
             else do
               events <- mapM decodeRow rows
               projection <- checked (project target events)
+              unless (projectionChecksumFormat projection == Profile.checksumFormat (configTopology config)) (abort (LedgerProblem UnsupportedLedgerVersion))
               case binding of
                 ExistingLedger expected -> let LedgerPosition actual _ _ = position projection in unless (expected == actual) (abort (LedgerProblem LedgerIdentityMismatch))
                 FirstUse -> pure ()
@@ -168,7 +175,7 @@ decodeRow row = do
   pure event
 
 openStore :: Guard -> Transport -> TargetConfig -> Maybe InitializationAuthorization -> QuiescenceEvidence -> Text -> IO LedgerStore
-openStore guard transport config@(TargetConfig target _ _ namespace binding _ _) authorization (QuiescenceEvidence quietTarget _) run = do
+openStore guard transport config@(TargetConfig {configKey = target, configNamespace = namespace, configBinding = binding}) authorization (QuiescenceEvidence quietTarget _) run = do
   checkAccess guard
   case authorization of
     Just (InitializationAuthorization authorized identity _) -> do
@@ -195,15 +202,15 @@ openStore guard transport config@(TargetConfig target _ _ namespace binding _ _)
   pure (LedgerStore guard transport target namespace state gate)
 
 initialize :: Guard -> Transport -> TargetConfig -> LedgerId -> AuditContext -> Text -> IO Projection
-initialize guard transport (TargetConfig target _ _ namespace _ _ _) ledger audit run = do
+initialize guard transport config@(TargetConfig {configKey = target, configNamespace = namespace}) ledger audit run = do
   identity <- freshUuid
   time <- diagnosticTime
-  let first = LedgerEvent 1 identity ledger run Nothing time audit "0.1.0.0" Nothing (Initialize target)
+  let first = LedgerEvent 1 identity ledger run Nothing time audit "0.1.0.0" Nothing (InitializeFor target (Profile.checksumFormat (configTopology config)))
   _ <- checked (project target [first])
-  ddl "database" (Schema.createDatabase namespace)
-  _ <- shape (Just guard) transport namespace
-  ddl "table" (Schema.createTable namespace)
-  (_, exists) <- shape (Just guard) transport namespace
+  mapM_ (ddl "database") (Profile.createDatabase (configTopology config) namespace)
+  _ <- shape (Just guard) transport config
+  ddl "table" (Profile.createTable (configTopology config) namespace)
+  (_, exists) <- shape (Just guard) transport config
   unless exists (abort (LedgerProblem InvalidLedgerSchema))
   -- Even under exclusivity do not write over preexisting nonempty history.
   rows <- readRowsKind JsonRowStream (Just guard) transport (Schema.readQuery namespace)
@@ -242,7 +249,7 @@ append store@(LedgerStore guard transport target namespace state gate) event = w
 -- A fresh guarded FULL read, including strict corruption validation. NotObserved
 -- is evidence of this read only; it grants no authority to reuse a sequence.
 reconcile :: Guard -> Transport -> TargetConfig -> AppendReceipt -> IO (Reconciliation, Observation)
-reconcile guard transport config@(TargetConfig target _ _ _ _ _ _) (AppendReceipt expected ledger number identity digest _) = do
+reconcile guard transport config@(TargetConfig {configKey = target}) (AppendReceipt expected ledger number identity digest _) = do
   unless (target == expected) (abort (LedgerProblem LedgerIdentityMismatch))
   observation <- load (Just guard) transport config
   let result = case observation of

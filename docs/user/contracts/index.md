@@ -7,3 +7,6 @@
 - [Manifest format v1 and qualified embedding builds](manifest-v1.md) - Look up the manifest v1 format, path containment, and qualified embedding build procedure.
 - [SQL envelope v1](sql-envelope-v1.md) - Look up accepted SQL statement boundaries, command families, and completion settings.
 
+
+- [Checksum format v2](checksum-v2.md) - Replicated completion policy and independent vectors.
+- [SQL envelope v2](sql-envelope-v2.md) - Replicated engines and protected completion settings.

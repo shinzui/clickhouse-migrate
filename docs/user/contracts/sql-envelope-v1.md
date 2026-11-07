@@ -11,6 +11,8 @@ generated:
 
 # SQL envelope v1
 
+Superseded by [SQL envelope v2](sql-envelope-v2.md).
+
 Each step is exact UTF-8 bytes with no NUL. Validation scans boundaries without
 rewriting SQL. The server still validates SQL grammar and semantics; accepted
 input does not prove application safety or completion on an unqualified server.

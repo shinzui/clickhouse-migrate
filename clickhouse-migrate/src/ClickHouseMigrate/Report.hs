@@ -72,6 +72,7 @@ data FailureSummary = FailureSummary !Text !(Maybe Int) !(Maybe Int) deriving st
 
 data HistoryBody
   = LedgerInitialized !TargetKey
+  | LedgerInitializedReplicated !TargetKey
   | MigrationDefinition !DefinitionSummary
   | StepIntent !Int !QueryId
   | StepCompletion !Int !QueryId
@@ -155,6 +156,7 @@ data RecoveryEventKind = RecoveryAuthorizationEvent | RecoveryAcceptanceEvent | 
 data RunError
   = InvalidRuntimePlan !StepReference
   | LedgerNamespaceInSql !StepReference
+  | DatabaseCreationOnReplicatedTarget !StepReference
   | DefinitionTooLarge !DefinitionSummary
   | AccessFailed !AccessError
   | TargetFailed !TransportError
@@ -191,6 +193,7 @@ data InspectionFailure = InspectionFailure
 
 historyKind :: HistoryBody -> Text
 historyKind = \case
+  LedgerInitializedReplicated _ -> "initialized"
   LedgerInitialized _ -> "initialized"
   MigrationDefinition _ -> "migration-started"
   StepIntent _ _ -> "step-started"

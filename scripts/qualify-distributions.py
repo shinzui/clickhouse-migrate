@@ -26,6 +26,8 @@ for package, manifest in [
     ('clickhouse-migrate-test-support', 'test/fixtures/kansoku/manifest-first.json'),
     ('clickhouse-migrate-example-catalog', 'migrations/manifest.json'),
     ('clickhouse-migrate-example-analytics', 'migrations/manifest.json'),
+    ('clickhouse-migrate-example-catalog', 'migrations-replicated/manifest.json'),
+    ('clickhouse-migrate-example-analytics', 'migrations-replicated/manifest.json'),
 ]:
     wrapper += ['--input', package + '-' + VERSION, manifest]
 wrapper += ['--']

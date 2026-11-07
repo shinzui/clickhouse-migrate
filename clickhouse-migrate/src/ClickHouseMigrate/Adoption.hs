@@ -61,7 +61,7 @@ resumeAdoption :: MutationContext -> Plan.MigrationPlan -> AdoptionPlan -> IO (E
 resumeAdoption = executeAdoption True
 
 executeAdoption :: Bool -> MutationContext -> Plan.MigrationPlan -> AdoptionPlan -> IO (Either R.RunFailure R.RunReport)
-executeAdoption resume context@(MutationContext (T.TargetConfig actual _ _ _ binding _ _) _ _ _) plan (AdoptionPlan request@(AdoptionRequest target _ authorization quiet audit _ _ _ _) batch entries) =
+executeAdoption resume context@(MutationContext (T.TargetConfig {T.configKey = actual, T.configBinding = binding, T.configTopology = topology}) _ _ _) plan (AdoptionPlan request@(AdoptionRequest target _ authorization quiet audit _ _ _ _) batch entries) =
   let validate snapshot = either (Left . R.AdoptionRejected) Right $ do
         (current, definitions) <- Validation.buildBatch plan request
         Validation.require MappingDefinitionMismatch (current == batch && definitions == entries)
@@ -74,7 +74,9 @@ executeAdoption resume context@(MutationContext (T.TargetConfig actual _ _ _ bin
           R.HistoryReport _ _ presence _ _ _ _ _ | presence `elem` [R.LedgerMissing, R.LedgerUninitialized] -> Validation.require AdoptionInitializationRequired (binding == T.FirstUse && isJust authorization)
           _ -> pure ()
         pure committed
-      prerequisite = if target == actual then Right () else Left (R.AdoptionRejected AdoptionTargetMismatch)
+      prerequisite = case topology of
+        T.ReplicatedCluster _ _ -> Left (R.LedgerFailed L.UnsupportedLedgerVersion)
+        T.DirectServer _ -> if target == actual then Right () else Left (R.AdoptionRejected AdoptionTargetMismatch)
    in withRuntimeObservation prerequisite (Just validate) context audit authorization (Just quiet) plan $ \runtime -> do
         projection <- runtimeProjection runtime
         case L.adoption projection of

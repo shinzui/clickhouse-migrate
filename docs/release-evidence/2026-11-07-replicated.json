@@ -1,0 +1,147 @@
+{
+  "version": "0.1.1.0",
+  "sourceArchives": {
+    "clickhouse-migrate-0.1.1.0.tar.gz": "7c50a6ad397c56a4841525ad3d438c08111a831cdd4e8977dce691c2d413a449",
+    "clickhouse-migrate-cli-0.1.1.0.tar.gz": "9e4c944965842da62b5c300262c075e0f2e30facaa0675d688953568bf907604",
+    "clickhouse-migrate-embed-0.1.1.0.tar.gz": "cad42c2a442b994cdba0885b95e76c48acb7a5a307423f2b3fd1e26627095be5",
+    "clickhouse-migrate-example-0.1.1.0.tar.gz": "a6ed15a4bf0f3ce112432a33be7c70d8987156a10040359c641eda3ec225e168",
+    "clickhouse-migrate-example-analytics-0.1.1.0.tar.gz": "f23b95d622db1157dd1217080e20560e960e22af33fce4d454b3e217b64f8795",
+    "clickhouse-migrate-example-catalog-0.1.1.0.tar.gz": "3f6d77fb9aa5519600922abd6f5f783c2c7e10fdbc9cc61fbe3983f15bc28fcc",
+    "clickhouse-migrate-test-support-0.1.1.0.tar.gz": "1e0a7cc14d14cb236ded02041ba27b46903ec111c3dbd54853fd17f51d6db3d5"
+  },
+  "archiveContentsVerified": {
+    "clickhouse-migrate": [
+      "src/ClickHouseMigrate/Internal/ServerProfile.hs",
+      "test/vectors/checksum-v2.tsv",
+      "test/public/TargetConstructor.hs",
+      "test/public/TargetCoercion.hs"
+    ],
+    "clickhouse-migrate-test-support": [
+      "test/scripts/replicated_fixture.py",
+      "test/ReplicatedIntegration.hs"
+    ],
+    "clickhouse-migrate-example-catalog": [
+      "migrations-replicated/manifest.json",
+      "migrations-replicated/create.sql",
+      "src/Example/Catalog/Replicated.hs"
+    ],
+    "clickhouse-migrate-example-analytics": [
+      "migrations-replicated/manifest.json",
+      "migrations-replicated/create.sql",
+      "src/Example/Analytics/Replicated.hs"
+    ]
+  },
+  "v1VectorBytesUnchanged": true,
+  "pureChecks": "just check passed; 48 checksum vectors, public invariant and JSON compatibility tests, package metadata, docs/reviews and formatting",
+  "matrixStatus": "passed",
+  "nixReplicatedStatus": "passed",
+  "nixArtifacts": [
+    {
+      "drvPath": "/nix/store/jz3z62rmzrmhs4zkbdjmb9djcx1zwcc1-clickhouse-migrate-test-support-0.1.1.0.drv",
+      "outputs": {
+        "out": "/nix/store/fbk52s4ap7zrj3k9b5ia38zwqlnj16hh-clickhouse-migrate-test-support-0.1.1.0"
+      }
+    },
+    {
+      "drvPath": "/nix/store/q23ir9lpqqqrwan9zl7chpgf3wrnwc6n-clickhouse-migrate-0.1.1.0.drv",
+      "outputs": {
+        "out": "/nix/store/n7qvk3h5v484w454ddi79nsvgrfn873i-clickhouse-migrate-0.1.1.0"
+      }
+    },
+    {
+      "drvPath": "/nix/store/qrb48qnf9n6asglz7ymf0zqkrlxbwbq8-clickhouse-migrate-example-0.1.1.0.drv",
+      "outputs": {
+        "out": "/nix/store/xlvfib3m4qs6fpma9zqx57433h0i5jjm-clickhouse-migrate-example-0.1.1.0"
+      }
+    }
+  ],
+  "date": "2026-11-07",
+  "independentPatchCommit": "0d4f889",
+  "matrixCandidateGroupCases": 41,
+  "nixReplicatedCandidates": [
+    "altinity-linux-arm64",
+    "altinity-linux-arm64-10002"
+  ],
+  "archiveFilesComparedToWorkingTree": 444,
+  "managedStagingAcceptance": "pending consumer baseline, scoped grants, inventory and managed staging run",
+  "publication": "Source candidate only; no Hackage upload or release tag",
+  "implementationHashes": {
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/ServerProfile.hs": "03180b892cdb3ffc9323017265ece6d82e1d9fc5427772a7df64c05934c28685",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/ServerPolicy.hs": "4aed52f4b682b863eb7dd0dbafb2dd9a9fe9289be616adcd66bad7cf1610c52e",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/Checksum.hs": "cc0870817f4fb32928f6e2929cc2b6732a84a068b9c39d4f7af3c1cf6a9c477f",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/SqlEnvelope.hs": "894340f45a000ea7bc0d899595a3572494acf8c224b939b5f41a2e379df2375a",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/LedgerCodec.hs": "f86fd740d0d0aa0cf26d524a325f8024c6a5b4a7040786b089ca53f6d0abeeb0",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/LedgerStore.hs": "939081d7e771a3933b7a54593ddd4db86718d63017b103b38f2d052f03a833c3",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/Preflight.hs": "e52cfc0f66d65c38c69f3271aa4e15090a5a9f4921042f92fe0f7eb8a5ef1488",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/Reporting.hs": "651cbd3d3e006636cb99b6b7e3d7f205dc582fb17fb971222ec31ff22ebd052f",
+    "clickhouse-migrate/src/ClickHouseMigrate/Internal/Execution.hs": "42ecdda64d01087f6dc39dc9b56b838bf5cfef0837eaa1fe677e5664a9925fef"
+  },
+  "qualificationAnnotationNote": "Matrix scope/qualification annotations were added after successful execution; IDs, versions, artifacts and declared groups are unchanged.",
+  "runtimeCandidates": [
+    {
+      "id": "lts-native",
+      "version": "26.8.28.14",
+      "platform": "aarch64-darwin",
+      "groups": [
+        "transport",
+        "completion",
+        "ledger",
+        "exclusive",
+        "runner",
+        "repair",
+        "boundaries",
+        "survivors",
+        "adoption",
+        "consumer",
+        "cli",
+        "example",
+        "remediation"
+      ],
+      "sha256": "ab5a04de4a6b705e0f1f02e6a0e0a44feff8b4455b6dfcc4a03b7571f98fbb60"
+    },
+    {
+      "id": "altinity-linux-arm64",
+      "version": "26.3.60.10001.altinitystable",
+      "platform": "aarch64-linux",
+      "groups": [
+        "transport",
+        "completion",
+        "ledger",
+        "exclusive",
+        "runner",
+        "repair",
+        "boundaries",
+        "survivors",
+        "adoption",
+        "consumer",
+        "cli",
+        "example",
+        "remediation",
+        "replicated"
+      ],
+      "image": "docker.io/altinity/clickhouse-server@sha256:3bafa18ced8daf9b81de70927b40c13b06545363abe3ad7f20ae77848f500c5a"
+    },
+    {
+      "id": "altinity-linux-arm64-10002",
+      "version": "26.3.60.10002.altinitystable",
+      "platform": "aarch64-linux",
+      "groups": [
+        "transport",
+        "completion",
+        "ledger",
+        "exclusive",
+        "runner",
+        "repair",
+        "boundaries",
+        "survivors",
+        "adoption",
+        "consumer",
+        "cli",
+        "example",
+        "remediation",
+        "replicated"
+      ],
+      "image": "docker.io/altinity/clickhouse-server@sha256:7e72405bf85df6d163205ee2e56251ebc35daf6dc71142f58bdee7a461690ffb"
+    }
+  ]
+}

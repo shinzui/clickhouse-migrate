@@ -1,0 +1,21 @@
+{
+  "manifestVersion": 1,
+  "component": "catalog",
+  "dependencies": [],
+  "migrations": [
+    {
+      "name": "0001",
+      "description": "Create catalog storage",
+      "steps": [
+        {
+          "name": "create",
+          "file": "create.sql"
+        },
+        {
+          "name": "seed",
+          "file": "seed.sql"
+        }
+      ]
+    }
+  ]
+}

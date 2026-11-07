@@ -178,3 +178,21 @@ where kind is `authorization`, `acceptance`, `completion`, `step-start`,
 history snapshot is the last acknowledged observation; a local preparation
 rejection preserves its position and active attempt. Text errors include this
 same safe structured detail.
+
+
+## Additions for replicated targets
+
+The existing offline `plan` fields retain v1 values. `checksumFormats` lists
+`sha256-v1` and `sha256-v2`; each migration and step additionally contains a
+`checksums` object keyed by those names. Status/history observations add
+`checksumFormat`, the format recorded at initialization, or null when no ledger
+initialization was observed. Their existing `server.serverId` and
+`server.hostName` identify the replica admitted for this scope. A replicated
+initialized event additionally carries `checksumFormat: "sha256-v2"`.
+
+New structured codes are transport `replica-set-mismatch`, ledger
+`ledger-database-missing`, and run `database-creation-on-replicated-target` (with
+its step reference). The text renderer retains the same complete safe structured
+failure detail as JSON. These fields are additive under schemaVersion 1.
+
+Legacy `PlanStep` and `PlanMigration` construction/matching arities remain available. Manually constructed legacy reports render an unknown v2 digest as null; reports from `planReport` contain both computed digests.

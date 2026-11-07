@@ -99,37 +99,88 @@ Kansoku traffic.
   sibling source archives; metadata, three unit suites and Haddocks also pass.
   Shared patch version `0.1.0.2`, CI pulls and dated evidence record the result.
   An earlier native pre-readiness SIGSEGV is retained as a failed attempt.
-- [ ] Milestone 2: every server-dependent byte lives in one module, `TargetConfig` is a
-  record, the matrix declares each candidate's groups, `just check` fails when the version
-  allowlist and the matrix disagree, `scripts/qualify-candidate.py` reproduces the
-  Milestone 1 matrix entry, and direct-target request bytes, checksums and ledger shape are
-  proven unchanged.
-- [ ] Milestone 3 (prototype): an owned two-replica Keeper fixture exists, and the spike
-  report records the observed engine metadata, DDL response bodies, timeout behaviour,
-  insert and read consistency, replica-set observation and Code 56 behaviour that fix the
-  replicated completion policy.
-- [ ] Milestone 4: a replicated target can be configured and admitted. Each connection is
-  admitted only to an expected replica, the cluster membership is checked, and every request
-  carries the replicated completion settings. Direct targets are unchanged.
-- [ ] Milestone 5: replicated targets bind checksums under a separate `sha256-v2` replicated
-  completion policy, while every `sha256-v1` vector and direct-target ledger stays
-  byte-for-byte unchanged.
-- [ ] Milestone 6: the SQL envelope accepts argument-free `Replicated*MergeTree` engines and
-  still rejects `ON CLUSTER`, Keeper paths and other replicated or distributed forms. Plans
-  with `CREATE DATABASE` are refused before submission on replicated targets.
-- [ ] Milestone 7: the ledger initializes, appends and reads in a pre-existing `Replicated`
-  database on the fixture, and survives a replica restart.
-- [ ] Milestone 8: `just test-replicated` passes end to end on the two-replica fixture. The
-  compatibility guide, contracts and an ADR describe the supported replicated topology, and
-  a release candidate version is cut for the Kansoku handoff.
+- [x] Milestone 2, 2026-11-07: ServerProfile owns the policy/metadata bytes and
+  TargetConfig has named fields. Matrix groups drive both runners. `just check`
+  passes with policy/documentation drift checks; a deliberately removed version
+  fails by name, and the resolver reproduces immutable 10002 identities/groups.
+  Direct request/ledger byte pins and the full direct groups pass unchanged.
+- [x] Milestone 3 (prototype), 2026-11-07: an owned Keeper/two-replica fixture
+  recorded 64 observations across all eight spike questions in
+  `docs/release-evidence/2026-11-07-replicated-spike.json`. Empty `none` success and
+  full-quorum writes support promotion; restricted-login membership uses local counts.
+  Managed production observations remain part of the consumer handoff.
+- [x] Milestone 4, 2026-11-07: validated replicated targets admit expected UUIDs,
+  qualified versions, cluster macros, effective policy and local storage. Single-shard
+  membership counts fail closed; unit probes and both container groups verify it.
+- [x] Milestone 5, 2026-11-07: both formats bind before target selection; all 48
+  vectors pass and v1 files are byte-identical. Fresh status uses configured v2
+  pending digests; initialized history records its format and refuses foreign v1.
+  Offline JSON keeps v1 fields and adds both digest sets; CLI compatibility passes.
+- [x] Milestone 6, 2026-11-07: six replicated engines pass the lexical envelope,
+  explicit paths/quoted forms remain excluded, and pending replicated database
+  creation/policy overrides fail before bootstrap. Direct v1 acceptance is preserved.
+- [x] Milestone 7, 2026-11-07: replicated ledgers initialize in pre-existing databases,
+  validate structural metadata/replica health, append with full quorum, read across
+  replicas and survive both restarts. Missing/Atomic/malformed/foreign-format cases
+  and stopped-replica uncertainty/recovery pass in both owned image fixtures.
+- [x] Milestone 8, 2026-11-07: `just check` and all 41 final release-matrix cases pass.
+  Installed Nix artifacts additionally pass both replicated groups. Seven shared
+  `0.1.1.0` source archives are generated; documentation, contracts and ADR 0015
+  record the result. The consumer's managed staging/production-readiness gate remains
+  external and unverified; no publication or managed cutover is claimed.
 
 
 ## Surprises & Discoveries
 
-- Observation (implementation, 2026-11-07): the published source tag is
-  `v26.3.60.10002-1.altinitystable`, commit `4d1d8cad81573563e3abece05c39fb4903fce73f`.
-  The image/reported server version omit `-1`; exact artifact identities and both
-  passing 39-case variants are retained in `docs/release-evidence/2026-11-07-altinity-10002.json`.
+- Observation (final qualification, 2026-11-07): pending status/run reports need
+  the configured topology's checksum format even before an initialized event exists.
+  Inferring format only from history incorrectly showed v1 pending digests for an
+  empty replicated ledger. The format is now passed explicitly into report building;
+  the public CLI fixture compares fresh status digests with offline v2 plan digests.
+
+- Observation (final qualification, 2026-11-07): HTTP readiness after process restart
+  can precede a Replicated database leaving read-only mode. A follow-up SYNC DATABASE
+  returned Code 159 during that window. `startReplica` now waits for all owned database and table replica
+  `is_readonly` values to clear, within a bounded deadline;
+  it never retries server startup. The schema parser also checks that both engine
+  arguments actually begin with single quotes, since the shared lexer classifies
+  both single-quoted and heredoc strings as literals.
+
+- Observation (corrected spike, 2026-11-07): the non-key UPDATE reports Code 341
+  with a stopped replica and catches up after restart. The initial mutation case
+  attempted to update the sorting key and returned Code 420, so it was corrected
+  before accepting the report. A metadata ALTER took about twelve seconds despite
+  a five-second inactive-replica setting; coordination overhead means a client
+  deadline can still produce uncertainty even with bounded server settings.
+
+- Observation (spike, 2026-11-07): `none` gives empty acknowledged DDL responses,
+  waits for the stopped replica and reports HTTP 408 / Code 159 at about 5.3 seconds.
+  Quorum INSERT reports Code 319 after a missing-replica wait, yet its row becomes
+  visible on both replicas after restart. `app` lacks READ ON REMOTE (Code 497),
+  while local `system.clusters`, `system.replicas` and storage reads work.
+  The server preserves `{uuid}`, `{shard}` and `{replica}` macros in `engine_full`;
+  `system.replicas` reports their expanded values. Evidence is in
+  `docs/release-evidence/2026-11-07-replicated-spike.json`.
+
+- Observation (spike, 2026-11-07): a deliberately lagging replica can return stale
+  rows with sequential consistency after a quorum-one INSERT; quorum one does not
+  establish the last quorum part. Therefore sequential consistency alone is not a
+  freshness guarantee. The supported policy always waits for the full replica count;
+  the fixture must prove that every acknowledged write is already visible on both.
+
+- Observation (infrastructure inspection, 2026-11-07):
+  `mori://tan/tan-app-infrastructure` (project-relative
+  `docs/runbooks/kansoku-staging-contract.md`, artifact-level URI pending) records
+  staging's default disk as healthy writable Local storage. Its
+  `pulumi/lib/tan-clickhouse-tenant.ts` grants narrow local system reads and no
+  REMOTE privilege. Per-replica endpoints, production storage and actual default
+  replica macros are not recorded there; those managed observations remain open.
+
+- Observation (implementation, 2026-11-07): upstream publishes this build under
+  `v26.3.60.10002-1.altinitystable`, not the tag predicted by the plan.
+  `git ls-remote --tags` resolves it to `4d1d8cad81573563e3abece05c39fb4903fce73f`.
+  The Docker tag and reported server version retain `26.3.60.10002.altinitystable`.
+  The arm64 manifest is `sha256:7e72405bf85df6d163205ee2e56251ebc35daf6dc71142f58bdee7a461690ffb`.
 
 - Observation: TAN staging was upgraded underneath the qualified allowlist. Evidence from
   2026-11-02 in `mori://tan/tan-app-infrastructure` (`docs/qualification/kansoku-image.json`)
@@ -230,6 +281,28 @@ Kansoku traffic.
 
 ## Decision Log
 
+- Decision (implementation, 2026-11-07): preserve the CLI report constructors'
+  existing arities with bundled bidirectional patterns; additive checksum storage
+  retains both digests without breaking existing report construction or matching.
+  `contextFor` keeps taking an already-selected Definition; adding a redundant
+  format argument there would not alter context bytes. Legacy adoption stays v1
+  and refuses replicated execution before writes rather than silently rehashing
+  a reviewed mapping. The final policy guard is topology-specific: v2 binding extends v1 engine support,
+  while pending replicated preflight reserves additional policy/wait identifiers.
+  This preserves every previously valid direct-target definition.
+
+- Decision (implementation, 2026-11-07): `replicatedTargetConfig` returns
+  `Either TargetError TargetConfig`, since the planned pure return type cannot
+  reject duplicate UUIDs. Reject replicated deadlines shorter than five seconds.
+  Split the available server-wait budget across three waits, leaving a two-second
+  response margin, because DDL and engine waits can run sequentially. The three minimum one-second waits plus response margin require five seconds.
+
+- Decision (implementation, 2026-11-07): promote the fixture's completion policy:
+  empty DDL success and full-quorum INSERT acknowledgment are supported. Use local
+  single-shard membership counts and per-socket UUID admission for restricted
+  logins, with local storage checks on admitted replicas. Active-query repair
+  diagnostics remain local and do not replace external drain evidence.
+
 - Decision: Qualify `26.3.60.10002.altinitystable` as a separate first milestone, keep
   `26.3.60.10001.altinitystable` admitted, and release that milestone by itself.
   Rationale: it unblocks the Kansoku staging rollout today without waiting for replicated
@@ -259,9 +332,9 @@ Kansoku traffic.
 
 - Decision: Replicated targets use a new completion policy and a new checksum format,
   `sha256-v2`. It uses the v1 framing, with the version field `v2` and the replicated policy
-  bytes. `sha256-v1` stays the only format for direct targets. The working policy bytes are
+  bytes. `sha256-v1` stays the only format for direct targets. The spike-confirmed policy bytes are
   `clickhouse-migrate/replicated-sync-v1;async_insert=0;mutations_sync=2;alter_sync=2;insert_quorum=all;insert_quorum_parallel=0;distributed_ddl_output_mode=none;select_sequential_consistency=1`,
-  to be confirmed or corrected by Milestone 3. The server-side wait bounds
+  confirmed by Milestone 3. The server-side wait bounds
   (`distributed_ddl_task_timeout`, `replication_wait_for_inactive_replica_timeout`,
   `insert_quorum_timeout`) are derived from the target's `HttpLimits` and are not part of
   the bytes.
@@ -352,10 +425,37 @@ Kansoku traffic.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+All eight local implementation milestones are complete. The independent exact-patch
+boundary is commit `0d4f889` (shared version `0.1.0.2`), with 39 passing cases in
+each of the Nix and extracted-source variants. The feature candidate is shared
+version `0.1.1.0`; `just check`, all 41 matrix cases and two installed-Nix replicated
+groups pass. The seven candidate archives include the new assets, and all v1 vector
+files remain byte-identical. Full evidence and archive/artifact identities are in
+`docs/release-evidence/2026-11-07-replicated.md` and its JSON receipt.
+
+Durable decisions are distilled into ADR 0015, with links from ADRs 0005 and 0014:
+replica-set admission, restricted-login count fallback, full quorum, DDL output mode,
+server/client waits, independent checksum format, explicit engine SQL, structural
+ledger validation and centralized server policy. The prototype exposed real server
+outcomes and prevented treating quorum timeouts as non-submission. Final checks
+also fixed Boolean probe spelling, replica readiness, strict string metadata,
+topology-specific pending hashes and preservation of all direct v1 definitions.
+
+Production readiness remains the consumer's gate: a replicated baseline, precreated
+Replicated databases, scoped system metadata grants, independently verified inventory,
+cluster-wide coordination/drain and a successful managed staging run. The referenced
+infrastructure tree establishes staging Local storage and narrow grants but does not
+record all production observations. No managed server was changed, no downstream
+repository was edited and no Hackage upload or release tag was made.
 
 
 ## Context and Orientation
+
+The detailed inventory below records the starting tree. The completed local feature
+uses shared version `0.1.1.0`, named TargetConfig fields and ServerProfile policy;
+checksum v2, SQL envelope v2 and replicated fixture files are described in the
+milestones and final outcomes. The independent patch boundary is commit `0d4f889`
+(shared version `0.1.0.2`).
 
 clickhouse-migrate is a Haskell toolkit (GHC 9.12, Cabal and Nix) that applies ordered,
 checksummed ClickHouse migrations and records each step in an append-only ledger. Its
@@ -622,7 +722,7 @@ loads the matrix, and fails unless the two version sets are equal, every `image`
 the matrix appears in a `docker ... pull` line of `.github/workflows/ci.yml`, and every
 matrix version is named in `docs/user/compatibility.md`.
 
-Sixth, add `scripts/qualify-candidate.py`. Given `--tag v26.3.60.10002.altinitystable`,
+Sixth, add `scripts/qualify-candidate.py`. Given `--tag v26.3.60.10002-1.altinitystable`,
 `--repo https://github.com/Altinity/ClickHouse` and
 `--image docker.io/altinity/clickhouse-server:26.3.60.10002.altinitystable`, it resolves
 the tag object and dereferenced commit with `git ls-remote`, resolves the index digest and
@@ -642,7 +742,7 @@ At the end, `just check` passes with the new drift check; temporarily removing o
 from `supportedVersions` makes `python3 scripts/check-candidate-policy.py` exit non-zero
 with the missing version named; `just test-transport`, `just test-completion-policy` and
 `just test-ledger` pass unchanged; and `python3 scripts/qualify-candidate.py` for the 10002
-tag prints an entry identical to the matrix's except for `status` and `qualification`.
+tag reproduces the matrix's immutable identity fields and declared groups; status, release-date and historical qualification annotations remain evidence maintained by the qualifier.
 
 
 ### Milestone 3 (prototype): two-replica Keeper fixture and replicated spike
@@ -715,7 +815,8 @@ Decision Log. The working assumption is `async_insert=0`, `mutations_sync=2`, `a
 `select_sequential_consistency=1` on reads, `fsync_metadata=1`, `wait_end_of_query=1`, with
 `distributed_ddl_task_timeout`, `replication_wait_for_inactive_replica_timeout` and
 `insert_quorum_timeout` derived from the request deadline (deadline minus a two second
-margin, floored at one second).
+margin, divided across three waits and floored at one second, with a five-second
+minimum replicated request deadline).
 
 Separately, ask the TAN infrastructure owner four read-only questions about
 `tan-production` and record the answers in Surprises & Discoveries: whether Altinity.Cloud
@@ -744,7 +845,7 @@ character rules as `ledgerNamespace`, plus `-`, because the production name is
 ```haskell
 replicatedTargetConfig
   :: TargetKey -> DirectEndpoint -> ClusterName -> NonEmpty ServerId
-  -> LedgerNamespace -> LedgerBinding -> Credentials -> HttpLimits -> TargetConfig
+  -> LedgerNamespace -> LedgerBinding -> Credentials -> HttpLimits -> Either TargetError TargetConfig
 ```
 
 It rejects duplicate UUIDs with a new `TargetError` constructor `DuplicateReplica`.
@@ -772,7 +873,7 @@ admitted replica's UUID and host, so reports show which replica answered.
 
 Make the repair active-query check in `Repair.hs` cover every replica on replicated targets
 (the query chosen from spike question 7, or the local `system.processes` with a documented
-caveat if `app` may not run it). Its result stays a diagnostic only, as today.
+caveat if `app` may not run it). The spike selected the local fallback; its result stays a diagnostic only, as today.
 
 Document in `docs/user/operations.md` how an operator obtains the replica UUIDs to
 configure: run `SELECT hostName(), toString(serverUUID()) FROM clusterAllReplicas('<cluster>', system.one)`
@@ -949,7 +1050,7 @@ nix develop --builders '' -c just test-integration
 For Milestone 1, resolve the new digest and run the matrix:
 
 ```bash
-git ls-remote --tags https://github.com/Altinity/ClickHouse 'v26.3.60.10002.altinitystable*'
+git ls-remote --tags https://github.com/Altinity/ClickHouse 'v26.3.60.10002-1.altinitystable*'
 docker --context "$CLICKHOUSE_MIGRATE_DOCKER_CONTEXT" buildx imagetools inspect \
   docker.io/altinity/clickhouse-server:26.3.60.10002.altinitystable
 docker --context "$CLICKHOUSE_MIGRATE_DOCKER_CONTEXT" pull \
@@ -966,7 +1067,7 @@ For Milestone 2, prove the refactor is a no-op and the tooling works:
 just test-unit
 just check-public-invariants
 python3 scripts/check-candidate-policy.py
-python3 scripts/qualify-candidate.py --tag v26.3.60.10002.altinitystable \
+python3 scripts/qualify-candidate.py --tag v26.3.60.10002-1.altinitystable \
   --repo https://github.com/Altinity/ClickHouse \
   --image docker.io/altinity/clickhouse-server:26.3.60.10002.altinitystable
 just test-transport && just test-completion-policy && just test-ledger
@@ -1047,8 +1148,11 @@ fixture and shows all of the following:
   as succeeded, and after the replica returns the existing recovery path resolves it.
 - A plain `MergeTree` migration fails with the server's Code 56, reported as an observed
   server failure.
-- A configured replica set that does not match the cluster is rejected before any
-  application or ledger bytes are sent.
+- A mismatched configured replica count, shard count or connected server UUID is
+  rejected before application or ledger bytes. With restricted-login membership,
+  UUIDs of unvisited replicas are operator-verified inventory; local counts cannot
+  attest them. This is the fallback specified in Milestone 4, not a cluster-wide
+  UUID attestation.
 
 Every existing group, including `test-transport`, `test-ledger`, `test-runner`,
 `test-repair`, `test-adoption` and `test-consumer-fixtures`, must still pass unchanged, and

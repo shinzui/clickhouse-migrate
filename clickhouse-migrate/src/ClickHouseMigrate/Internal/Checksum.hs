@@ -2,12 +2,15 @@
 module ClickHouseMigrate.Internal.Checksum
   ( completionPolicyV1,
     encodeStepV1,
+    encodeStepV2,
     encodeMigrationV1,
+    encodeMigrationV2,
     digest,
     digestHex,
   )
 where
 
+import ClickHouseMigrate.Internal.ServerProfile qualified as Profile
 import ClickHouseMigrate.Prelude
 import Crypto.Hash.SHA256 qualified as SHA256
 import Data.ByteString qualified as BS
@@ -18,7 +21,7 @@ import Data.Text.Encoding qualified as Text
 import Numeric (showHex)
 
 completionPolicyV1 :: ByteString
-completionPolicyV1 = "clickhouse-migrate/local-sync-v1;async_insert=0;mutations_sync=1;alter_sync=1"
+completionPolicyV1 = Profile.completionPolicyV1
 
 field :: ByteString -> Builder
 field bs = word64BE (fromIntegral (BS.length bs)) <> byteString bs
@@ -38,6 +41,25 @@ encodeMigrationV1 component migration steps =
     toLazyByteString $
       byteString "clickhouse-migrate/migration\0v1\0"
         <> field completionPolicyV1
+        <> foldMap (field . Text.encodeUtf8) [component, migration]
+        <> word64BE (fromIntegral (length steps))
+        <> foldMap field steps
+
+encodeStepV2 :: Text -> Text -> Text -> ByteString -> ByteString
+encodeStepV2 component migration step sql =
+  Lazy.toStrict $
+    toLazyByteString $
+      byteString "clickhouse-migrate/step\0v2\0"
+        <> field Profile.completionPolicyV2
+        <> foldMap (field . Text.encodeUtf8) [component, migration, step]
+        <> field sql
+
+encodeMigrationV2 :: Text -> Text -> [ByteString] -> ByteString
+encodeMigrationV2 component migration steps =
+  Lazy.toStrict $
+    toLazyByteString $
+      byteString "clickhouse-migrate/migration\0v2\0"
+        <> field Profile.completionPolicyV2
         <> foldMap (field . Text.encodeUtf8) [component, migration]
         <> word64BE (fromIntegral (length steps))
         <> foldMap field steps

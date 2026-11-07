@@ -57,12 +57,12 @@ initializeLedger config provider authorization quiet = command config provider $
 
 -- | Read-only exact-event reconciliation. NotObserved never authorizes a write.
 reconcileAppend :: TargetConfig -> ExclusiveAccess -> AppendReceipt -> IO (LedgerCommandResult (Reconciliation, ExpectedLedgerState))
-reconcileAppend config@(TargetConfig target _ _ _ _ _ _) provider receipt = command config provider $ \guard transport -> do
+reconcileAppend config@(TargetConfig {configKey = target}) provider receipt = command config provider $ \guard transport -> do
   (classification, observation) <- Store.reconcile guard transport config receipt
   pure (classification, case observation of Store.History state -> ExpectPosition (position state); _ -> ExpectAbsent target)
 
 command :: TargetConfig -> ExclusiveAccess -> (Guard -> Transport -> IO a) -> IO (LedgerCommandResult a)
-command config@(TargetConfig target _ _ _ _ _ _) provider@(ExclusiveAccess description _ _ _ _) action = do
+command config@(TargetConfig {configKey = target}) provider@(ExclusiveAccess description _ _ _ _) action = do
   observed <- try @SomeException $ do
     probe <- freshUuid >>= either (const (fail "Invalid diagnostic identity")) pure . queryId . ("chm-" <>)
     withExclusive provider target $ \guard ->

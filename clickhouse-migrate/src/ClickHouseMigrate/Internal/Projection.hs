@@ -1,7 +1,7 @@
 -- | Pure immutable history fold. No timestamp or merge order chooses a winner.
 module ClickHouseMigrate.Internal.Projection (project, appendProjection, comparePlan, unresolved, resolvedStep) where
 
-import ClickHouseMigrate.Internal.LedgerCodec (contextFor, definitions, definitionsDigest, validateEvent)
+import ClickHouseMigrate.Internal.LedgerCodec (contextFor, definitionsDigest, definitionsFor, validateEvent)
 import ClickHouseMigrate.Internal.LedgerTypes
 import ClickHouseMigrate.Plan (MigrationPlan)
 import ClickHouseMigrate.Prelude
@@ -143,7 +143,7 @@ getActive state = case (active state, adoption state) of
 
 comparePlan :: MigrationPlan -> Projection -> Either LedgerError ()
 comparePlan plan state = do
-  let supplied = definitions plan
+  let supplied = definitionsFor (projectionChecksumFormat state) plan
       recorded =
         [definition | RecordedMigration definition _ _ <- completed state]
           ++ [definition | Just (ActiveMigration definition _ _ _) <- [active state]]

@@ -33,7 +33,7 @@ resultValue (CommandResult command result) =
 
 reportValue :: CommandReport -> Value
 reportValue = \case
-  PlanReport components schedule -> object ["kind" .= ("plan" :: Text), "checksumFormat" .= Plan.checksumFormatName Plan.ChecksumV1, "completionPolicy" .= Encoding.decodeUtf8 Plan.completionPolicy, "components" .= componentsValue schedule 0 components, "schedule" .= [object ["ordinal" .= ordinal, "component" .= component, "migration" .= migration] | (ordinal, (component, migration)) <- zip [0 :: Int ..] schedule]]
+  PlanReport components schedule -> object ["kind" .= ("plan" :: Text), "checksumFormat" .= Plan.checksumFormatName Plan.ChecksumV1, "checksumFormats" .= (["sha256-v1", "sha256-v2"] :: [Text]), "completionPolicy" .= Encoding.decodeUtf8 Plan.completionPolicy, "components" .= componentsValue schedule 0 components, "schedule" .= [object ["ordinal" .= ordinal, "component" .= component, "migration" .= migration] | (ordinal, (component, migration)) <- zip [0 :: Int ..] schedule]]
   StatusReport report -> object ["kind" .= ("status" :: Text), "report" .= inspectionValue report]
   HistoryReport report -> object ["kind" .= ("history" :: Text), "report" .= historyValue report]
   VerificationReport (R.VerificationReport report current) -> object ["kind" .= ("verification" :: Text), "compatible" .= True, "current" .= current, "report" .= inspectionValue report]
@@ -43,7 +43,7 @@ reportValue = \case
 componentsValue :: [(Text, Text)] -> Int -> [PlanComponent] -> [Value]
 componentsValue _ _ [] = []
 componentsValue schedule componentIndex (PlanComponent name dependencies migrations : rest) =
-  object ["index" .= componentIndex, "name" .= name, "dependencies" .= dependencies, "migrations" .= [object ["ordinal" .= lookup (name, migration) (zip schedule [0 :: Int ..]), "name" .= migration, "description" .= description, "checksum" .= checksum, "steps" .= [object ["index" .= stepIndex, "name" .= step, "checksum" .= digest] | (stepIndex, PlanStep step digest) <- zip [0 :: Int ..] steps]] | PlanMigration migration description checksum steps <- migrations]] : componentsValue schedule (componentIndex + 1) rest
+  object ["index" .= componentIndex, "name" .= name, "dependencies" .= dependencies, "migrations" .= [object ["ordinal" .= lookup (name, migration) (zip schedule [0 :: Int ..]), "name" .= migration, "description" .= description, "checksum" .= checksum, "checksums" .= object ["sha256-v1" .= checksum, "sha256-v2" .= checksumV2], "steps" .= [object ["index" .= stepIndex, "name" .= step, "checksum" .= digest, "checksums" .= object ["sha256-v1" .= digest, "sha256-v2" .= digestV2]] | (stepIndex, PlanStepChecksums step digest digestV2) <- zip [0 :: Int ..] steps]] | PlanMigrationChecksums migration description checksum checksumV2 steps <- migrations]] : componentsValue schedule (componentIndex + 1) rest
 
 definitionValue :: R.DefinitionSummary -> Value
 definitionValue (R.DefinitionSummary ordinal componentIndex component dependencies migration checksum steps) = object ["ordinal" .= ordinal, "componentIndex" .= componentIndex, "component" .= component, "dependencies" .= dependencies, "migration" .= migration, "checksum" .= checksum, "steps" .= [object ["name" .= name, "checksum" .= digest] | (name, digest) <- steps]]
@@ -87,7 +87,7 @@ serverValue :: T.ServerIdentity -> Value
 serverValue identity = object ["serverId" .= T.serverIdText (T.identityServerId identity), "version" .= T.identityVersion identity, "hostName" .= T.identityHostName identity]
 
 historyValue :: R.HistoryReport -> Value
-historyValue (R.HistoryReport target server presence position access events migrations unresolved) = object ["target" .= T.targetKeyText target, "server" .= nullable serverValue server, "ledger" .= presenceValue presence, "position" .= fmap L.ledgerPositionText position, "access" .= observationAccess access, "events" .= map eventValue events, "migrations" .= map migrationValue migrations, "unresolved" .= unresolved]
+historyValue (R.HistoryReport target server presence position access events migrations unresolved) = object ["target" .= T.targetKeyText target, "checksumFormat" .= recordedFormat events, "server" .= nullable serverValue server, "ledger" .= presenceValue presence, "position" .= fmap L.ledgerPositionText position, "access" .= observationAccess access, "events" .= map eventValue events, "migrations" .= map migrationValue migrations, "unresolved" .= unresolved]
 
 inspectionValue :: R.InspectionReport -> Value
 inspectionValue (R.InspectionReport history migrations issues) = object ["observation" .= historyValue history, "migrations" .= map migrationValue migrations, "issues" .= map issueValue issues]
@@ -118,6 +118,7 @@ eventValue (R.HistoryEvent eventSequence identity ledger run attempt time audit 
 bodyValue :: R.HistoryBody -> Value
 bodyValue = \case
   R.LedgerInitialized target -> object ["target" .= T.targetKeyText target]
+  R.LedgerInitializedReplicated target -> object ["target" .= T.targetKeyText target, "checksumFormat" .= ("sha256-v2" :: Text)]
   R.MigrationDefinition definition -> object ["definition" .= definitionValue definition]
   R.StepIntent index query -> object ["step" .= index, "queryId" .= T.queryIdText query]
   R.StepCompletion index query -> object ["step" .= index, "queryId" .= T.queryIdText query]
@@ -159,13 +160,13 @@ transportValue :: L.TransportError -> Value
 transportValue (L.TransportError code status server) = object ["code" .= transportErrorCode code, "httpStatus" .= status, "serverCode" .= server]
 
 transportErrorCode :: L.TransportErrorCode -> Text
-transportErrorCode = \case L.AdministrativeAccessLost -> "administrative-access-lost"; L.InvalidRequest -> "invalid-request"; L.ClientScopeFailed -> "client-scope-failed"; L.ConnectionFailed -> "connection-failed"; L.DeadlineExpired -> "deadline-expired"; L.ResponseInterrupted -> "response-interrupted"; L.ResponseTooLarge -> "response-too-large"; L.UnexpectedResponse -> "unexpected-response"; L.ServerRejected -> "server-rejected"; L.RedirectRejected -> "redirect-rejected"; L.ServerIdentityMismatch -> "server-identity-mismatch"; L.UnsupportedServer -> "unsupported-server"; L.CompletionPolicyMismatch -> "completion-policy-mismatch"; L.CleanupFailed -> "cleanup-failed"; L.CleanupTimedOut -> "cleanup-timed-out"
+transportErrorCode = \case L.AdministrativeAccessLost -> "administrative-access-lost"; L.InvalidRequest -> "invalid-request"; L.ClientScopeFailed -> "client-scope-failed"; L.ConnectionFailed -> "connection-failed"; L.DeadlineExpired -> "deadline-expired"; L.ResponseInterrupted -> "response-interrupted"; L.ResponseTooLarge -> "response-too-large"; L.UnexpectedResponse -> "unexpected-response"; L.ServerRejected -> "server-rejected"; L.RedirectRejected -> "redirect-rejected"; L.ServerIdentityMismatch -> "server-identity-mismatch"; L.UnsupportedServer -> "unsupported-server"; L.CompletionPolicyMismatch -> "completion-policy-mismatch"; L.ReplicaSetMismatch -> "replica-set-mismatch"; L.CleanupFailed -> "cleanup-failed"; L.CleanupTimedOut -> "cleanup-timed-out"
 
 accessErrorCode :: Access.AccessError -> Text
 accessErrorCode = \case Access.InvalidAccessStrategy -> "invalid-access-strategy"; Access.AcquisitionTimedOut -> "acquisition-timed-out"; Access.AcquisitionFailed -> "acquisition-failed"; Access.AccessLost -> "access-lost"; Access.AccessScopeClosed -> "access-scope-closed"; Access.AccessActionFailed -> "access-action-failed"; Access.PredecessorQuiescenceRequired -> "predecessor-quiescence-required"; Access.AccessReleaseFailed -> "access-release-failed"; Access.AccessReleaseTimedOut -> "access-release-timed-out"
 
 ledgerErrorCode :: L.LedgerError -> Text
-ledgerErrorCode = \case L.InvalidPosition -> "invalid-position"; L.InvalidAudit -> "invalid-audit"; L.InvalidEvidence -> "invalid-evidence"; L.InvalidEvent -> "invalid-event"; L.UnsupportedLedgerVersion -> "unsupported-ledger-version"; L.SequenceGap -> "sequence-gap"; L.SequenceConflict -> "sequence-conflict"; L.EventIdentityConflict -> "event-identity-conflict"; L.LedgerIdentityMismatch -> "ledger-identity-mismatch"; L.MissingInitialization -> "missing-initialization"; L.ImpossibleTransition -> "impossible-transition"; L.DefinitionMismatch -> "definition-mismatch"; L.InvalidLedgerSchema -> "invalid-ledger-schema"; L.UnsupportedLedgerStorage -> "unsupported-ledger-storage"; L.LedgerAbsent -> "ledger-absent"; L.LedgerUninitialized -> "ledger-uninitialized"; L.InitializationNotAuthorized -> "initialization-not-authorized"; L.StaleLedgerState -> "stale-ledger-state"; L.UnresolvedHistory -> "unresolved-history"; L.OutstandingRequests -> "outstanding-requests"; L.LedgerLimitExceeded -> "ledger-limit-exceeded"
+ledgerErrorCode = \case L.InvalidPosition -> "invalid-position"; L.InvalidAudit -> "invalid-audit"; L.InvalidEvidence -> "invalid-evidence"; L.InvalidEvent -> "invalid-event"; L.UnsupportedLedgerVersion -> "unsupported-ledger-version"; L.SequenceGap -> "sequence-gap"; L.SequenceConflict -> "sequence-conflict"; L.EventIdentityConflict -> "event-identity-conflict"; L.LedgerIdentityMismatch -> "ledger-identity-mismatch"; L.MissingInitialization -> "missing-initialization"; L.ImpossibleTransition -> "impossible-transition"; L.DefinitionMismatch -> "definition-mismatch"; L.InvalidLedgerSchema -> "invalid-ledger-schema"; L.LedgerDatabaseMissing -> "ledger-database-missing"; L.UnsupportedLedgerStorage -> "unsupported-ledger-storage"; L.LedgerAbsent -> "ledger-absent"; L.LedgerUninitialized -> "ledger-uninitialized"; L.InitializationNotAuthorized -> "initialization-not-authorized"; L.StaleLedgerState -> "stale-ledger-state"; L.UnresolvedHistory -> "unresolved-history"; L.OutstandingRequests -> "outstanding-requests"; L.LedgerLimitExceeded -> "ledger-limit-exceeded"
 
 adoptionErrorCode :: A.AdoptionError -> Text
 adoptionErrorCode = \case A.InvalidSourceEvidence -> "invalid-source-evidence"; A.UnsupportedSourceChecksum -> "unsupported-source-checksum"; A.InvalidSourceChecksum -> "invalid-source-checksum"; A.DuplicateSourceRow -> "duplicate-source-row"; A.DuplicateMapping -> "duplicate-mapping"; A.IncompleteMapping -> "incomplete-mapping"; A.UnknownSourceRow -> "unknown-source-row"; A.MappingOrderMismatch -> "mapping-order-mismatch"; A.MappingDefinitionMismatch -> "mapping-definition-mismatch"; A.HistoricalChecksumMismatch -> "historical-checksum-mismatch"; A.HistoricalChecksumRequired -> "historical-checksum-required"; A.AdoptionTargetMismatch -> "adoption-target-mismatch"; A.AdoptionInitializationRequired -> "adoption-initialization-required"; A.AdoptionExpectedStateMismatch -> "adoption-expected-state-mismatch"; A.AdoptionNativeConflict -> "adoption-native-conflict"; A.AdoptionBatchConflict -> "adoption-batch-conflict"; A.AdoptionResumeRequired -> "adoption-resume-required"; A.AdoptionBatchTooLarge -> "adoption-batch-too-large"
@@ -180,6 +181,7 @@ runErrorCode :: R.RunError -> Text
 runErrorCode = \case
   R.InvalidRuntimePlan _ -> "invalid-runtime-plan"
   R.LedgerNamespaceInSql _ -> "ledger-namespace-in-sql"
+  R.DatabaseCreationOnReplicatedTarget _ -> "database-creation-on-replicated-target"
   R.DefinitionTooLarge _ -> "definition-too-large"
   R.AccessFailed problem -> accessErrorCode problem
   R.TargetFailed _ -> "target-failed"
@@ -209,6 +211,7 @@ runErrorValue failure = object (("code" .= runErrorCode failure) : fields failur
     fields = \case
       R.InvalidRuntimePlan step -> ["step" .= stepReferenceValue step]
       R.LedgerNamespaceInSql step -> ["step" .= stepReferenceValue step]
+      R.DatabaseCreationOnReplicatedTarget step -> ["step" .= stepReferenceValue step]
       R.DefinitionTooLarge definition -> ["definition" .= definitionValue definition]
       R.AccessFailed _ -> []
       R.TargetFailed problem -> ["transport" .= transportValue problem]
@@ -240,3 +243,9 @@ recoveryEventKind = \case
   R.RecoveryStepStartEvent -> "step-start"
   R.RecoveryStepSuccessEvent -> "step-success"
   R.RecoveryStepFailureEvent -> "step-failure"
+
+recordedFormat :: [R.HistoryEvent] -> Maybe Text
+recordedFormat events = case [kind | R.HistoryEvent _ _ _ _ _ _ _ _ _ kind <- events] of
+  R.LedgerInitialized _ : _ -> Just "sha256-v1"
+  R.LedgerInitializedReplicated _ : _ -> Just "sha256-v2"
+  _ -> Nothing

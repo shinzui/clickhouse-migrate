@@ -61,3 +61,5 @@ paths are not representable in the checksum encoder's inputs.
 The v1 policy is fixed. Changing these bytes, field order, domains, framing or
 completion policy requires a new checksum version and explicit migration guidance;
 existing ledger history must not be silently rewritten.
+
+Replicated targets use [checksum v2](checksum-v2.md); the v1 format and vectors remain unchanged.

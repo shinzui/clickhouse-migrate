@@ -15,3 +15,6 @@ result
 result-*
 .pre-commit-config.yaml
 clickhouse/
+
+# Local Python fixture bytecode.
+__pycache__/

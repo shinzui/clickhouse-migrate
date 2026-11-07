@@ -6,6 +6,7 @@ module ClickHouseMigrate.Internal.LedgerCodec
     eventValue,
     definitionValue,
     definitions,
+    definitionsFor,
     validateEvent,
     eventKind,
     encodeValue,
@@ -18,6 +19,7 @@ import ClickHouseMigrate.Definition qualified as Def
 import ClickHouseMigrate.Internal.Checksum qualified as Checksum
 import ClickHouseMigrate.Internal.LedgerTypes
 import ClickHouseMigrate.Internal.LedgerValidation (auditContext, ledgerPositionText, parseLedgerPosition)
+import ClickHouseMigrate.Internal.ServerProfile qualified as Profile
 import ClickHouseMigrate.Plan qualified as Plan
 import ClickHouseMigrate.Prelude
 import ClickHouseMigrate.Target qualified as Target
@@ -80,7 +82,7 @@ eventKind = \case
 
 bodyValue :: EventBody -> Value
 bodyValue = \case
-  Initialize target -> object ["target" .= Target.targetKeyText target, "schemaVersion" .= (1 :: Int), "checksumFormat" .= ("sha256-v1" :: Text), "policy" .= Encoding.decodeUtf8 Plan.completionPolicy]
+  InitializeFor target format -> object ["target" .= Target.targetKeyText target, "schemaVersion" .= (1 :: Int), "checksumFormat" .= Plan.checksumFormatName format, "policy" .= Encoding.decodeUtf8 (Profile.policyForFormat format)]
   StartMigration definition -> definitionValue definition
   StartStep step query -> stepValue step query
   SucceedStep step query -> stepValue step query
@@ -153,7 +155,10 @@ recoveryStep :: RecoveryAction -> Maybe Int
 recoveryStep = \case RetryStep step -> Just step; AcceptStep step -> Just step; _ -> Nothing
 
 definitions :: Plan.MigrationPlan -> [Definition]
-definitions plan =
+definitions = definitionsFor Plan.ChecksumV1
+
+definitionsFor :: Plan.ChecksumFormat -> Plan.MigrationPlan -> [Definition]
+definitionsFor format plan =
   zipWith
     bind
     [0 ..]
@@ -170,8 +175,8 @@ definitions plan =
         (Def.componentNameText (Plan.componentViewName component))
         (map Def.componentNameText (Set.toAscList (Plan.componentDependencies component)))
         (Def.migrationNameText (Def.migrationIdName (Plan.migrationId migration)))
-        (Plan.migrationChecksumHex (Plan.migrationChecksum migration))
-        [StepDefinition (Def.stepNameText (Plan.stepViewName step)) (Plan.stepChecksumHex (Plan.stepChecksum step)) | step <- NE.toList (Plan.migrationSteps migration)]
+        (Plan.migrationChecksumHex (Plan.migrationChecksumFor format migration))
+        [StepDefinition (Def.stepNameText (Plan.stepViewName step)) (Plan.stepChecksumHex (Plan.stepChecksumFor format step)) | step <- NE.toList (Plan.migrationSteps migration)]
 
 definitionsDigest :: [Definition] -> Text
 definitionsDigest values = Checksum.digestHex (Checksum.digest (encodeValue (Aeson.toJSON (map definitionValue values))))
@@ -204,8 +209,9 @@ parseBody = \case
     version <- o .: "schemaVersion" :: Parser Int
     format <- o .: "checksumFormat" :: Parser Text
     policy <- o .: "policy" :: Parser Text
-    unless (version == 1 && format == "sha256-v1" && policy == Encoding.decodeUtf8 Plan.completionPolicy) (fail "unsupported format")
-    Initialize <$> (o .: "target" >>= validated Target.targetKey)
+    parsed <- validated Plan.parseChecksumFormat format
+    unless (version == 1 && policy == Encoding.decodeUtf8 (Profile.policyForFormat parsed)) (fail "unsupported format")
+    (\target -> InitializeFor target parsed) <$> (o .: "target" >>= validated Target.targetKey)
   "migration-started" -> fmap StartMigration . parseDefinition
   "step-started" -> parseStep StartStep
   "step-succeeded" -> parseStep SucceedStep

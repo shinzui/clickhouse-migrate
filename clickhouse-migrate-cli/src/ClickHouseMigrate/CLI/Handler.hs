@@ -25,11 +25,12 @@ planReport plan =
   [ PlanComponent
       (componentNameText (componentViewName component))
       (map componentNameText (Set.toAscList (componentDependencies component)))
-      [ PlanMigration
+      [ PlanMigrationChecksums
           (migrationNameText (migrationIdName (migrationId migration)))
           (migrationDescription migration)
           (migrationChecksumHex (migrationChecksum migration))
-          [PlanStep (stepNameText (stepViewName step)) (stepChecksumHex (stepChecksum step)) | step <- NE.toList (migrationSteps migration)]
+          (Just (migrationChecksumHex (migrationChecksumFor ChecksumV2 migration)))
+          [PlanStepChecksums (stepNameText (stepViewName step)) (stepChecksumHex (stepChecksum step)) (Just (stepChecksumHex (stepChecksumFor ChecksumV2 step))) | step <- NE.toList (migrationSteps migration)]
       | migration <- NE.toList (componentMigrations component)
       ]
   | component <- NE.toList (inspectPlan plan)

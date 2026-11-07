@@ -11,6 +11,7 @@ import Control.Monad (forM_, unless)
 import Data.Aeson qualified as JSON
 import Data.ByteString qualified as BS
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty qualified as NE
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Encoding
@@ -45,6 +46,16 @@ main = do
       decode = decodeAdoptionInput key (L.ExpectAbsent key) authorization quiet audit
   offline <- handleCommand (error "Offline plan forced configuration") plan PlanCommand
   assert "offline plan missing" (case offline of CommandResult "plan" (Right (PlanReport [_] [("app", "one")])) -> True; _ -> False)
+  let boundMigration = NE.head (componentMigrations (NE.head (inspectPlan plan)))
+      boundStep = NE.head (migrationSteps boundMigration)
+      v1 = migrationChecksumHex (migrationChecksum boundMigration)
+      v2 = migrationChecksumHex (migrationChecksumFor ChecksumV2 boundMigration)
+      rendered = Encoding.decodeUtf8 (renderJson offline)
+      contains key value = ("\"" <> key <> "\":\"" <> value <> "\"") `Text.isInfixOf` rendered
+  assert "v1/v2 migration hashes must differ" (v1 /= v2)
+  assert "offline existing checksum moved from v1" (contains "checksum" v1)
+  assert "offline migration checksum formats missing" (contains "sha256-v1" v1 && contains "sha256-v2" v2)
+  assert "offline step checksum formats missing" (contains "sha256-v1" (stepChecksumHex (stepChecksum boundStep)) && contains "sha256-v2" (stepChecksumHex (stepChecksumFor ChecksumV2 boundStep)))
   let two = right (sqlMigration "two" (step :| []))
       a = right (migrationComponent "a" Set.empty (migration :| [two]))
       b = right (migrationComponent "b" (Set.singleton "a") (migration :| []))

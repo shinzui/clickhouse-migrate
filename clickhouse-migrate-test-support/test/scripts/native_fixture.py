@@ -59,7 +59,7 @@ def binary_for(entry):
 
 
 class NativeServer:
-    def __init__(self, entry):
+    def __init__(self, entry, deployment=None):
         self.entry = entry
         self.root = Path(tempfile.mkdtemp(prefix='clickhouse-migrate-server-', dir='/tmp'))
         self.port = port()
@@ -113,10 +113,15 @@ class NativeServer:
 <background_fetches_pool_size>2</background_fetches_pool_size><background_common_pool_size>2</background_common_pool_size>
 <mark_cache_size>0</mark_cache_size><uncompressed_cache_size>0</uncompressed_cache_size>
 </clickhouse>''')
+        if deployment:
+            extra = deployment['config']
+            config = self.root / 'config.xml'
+            config.write_text(config.read_text().replace('</clickhouse>', extra + '</clickhouse>'))
         try:
             if self.docker:
-                name = 'clickhouse-migrate-' + uuid.uuid4().hex
+                name = deployment['name'] if deployment else 'clickhouse-migrate-' + uuid.uuid4().hex
                 subprocess.run(self.docker + ['create', '--name', name, '--label', 'clickhouse-migrate.fixture=owned',
+                    *(['--network', deployment['network']] if deployment else []),
                     '--user', str(os.getuid()), '--memory', '2g', '--cpus', '2',
                     '-p', '127.0.0.1::8123', '-p', '127.0.0.1::9000',
                     '--entrypoint', '/bin/sh', entry['image'], '-c', 'exec sleep 2147483647'],
@@ -453,13 +458,17 @@ class FaultProxy:
         (self.target.root / f'proxy-{self.http.server_port}-events.json').write_text(json.dumps(evidence, indent=2) + '\n')
 
 
-def serve(matrix, entry_id):
-    entries = json.loads(Path(matrix).read_text())['entries']
-    entry = next(value for value in entries if value['id'] == entry_id)
-    server = NativeServer(entry)
+def serve(matrix, entry_id, replicated=False):
     def stop_signal(*_):
         raise SystemExit(1)
     signal.signal(signal.SIGTERM, stop_signal)
+    entries = json.loads(Path(matrix).read_text())['entries']
+    entry = next(value for value in entries if value['id'] == entry_id)
+    if replicated:
+        from replicated_fixture import ReplicatedServer
+        server = ReplicatedServer(entry)
+    else:
+        server = NativeServer(entry)
     print(json.dumps({'endpoint': server.endpoint, 'root': str(server.root), 'version': entry['version']}), flush=True)
     success = False
     try:
@@ -467,7 +476,15 @@ def serve(matrix, entry_id):
             request = json.loads(line)
             operation = request['operation']
             try:
-                if operation == 'restart':
+                if operation == 'query-replica':
+                    result = server.request(request['replica'], request['sql'], request.get('settings'), request.get('user', 'default'))
+                elif operation == 'stop-replica':
+                    server.stop_replica(request['replica'])
+                    result = None
+                elif operation == 'start-replica':
+                    server.start_replica(request['replica'])
+                    result = None
+                elif operation == 'restart':
                     server.restart()
                     result = None
                 elif operation == 'query':
@@ -525,5 +542,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--matrix', required=True)
     parser.add_argument('--entry', default='lts-native')
+    parser.add_argument('--replicated', action='store_true')
     options = parser.parse_args()
-    serve(options.matrix, options.entry)
+    serve(options.matrix, options.entry, options.replicated)

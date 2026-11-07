@@ -1,6 +1,9 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 -- | Private ledger protocol. No unchecked construction is exported publicly.
 module ClickHouseMigrate.Internal.LedgerTypes where
 
+import ClickHouseMigrate.Internal.Types (ChecksumFormat (..))
 import ClickHouseMigrate.Prelude
 import ClickHouseMigrate.Target (LedgerId, QueryId, TargetKey)
 import Data.Word (Word64)
@@ -39,6 +42,7 @@ data LedgerError
   | MissingInitialization
   | ImpossibleTransition
   | DefinitionMismatch
+  | LedgerDatabaseMissing
   | InvalidLedgerSchema
   | UnsupportedLedgerStorage
   | LedgerAbsent
@@ -72,7 +76,7 @@ data Recovery = Recovery !RecoveryAction !LedgerPosition !Text !Text !Quiescence
 data AdoptionBatch = AdoptionBatch !Text !Text !Text !Text !Int deriving stock (Eq, Show)
 
 data EventBody
-  = Initialize !TargetKey
+  = InitializeFor !TargetKey !ChecksumFormat
   | StartMigration !Definition
   | StartStep !Int !Text
   | SucceedStep !Int !Text
@@ -84,6 +88,18 @@ data EventBody
   | AdoptEntry !Definition !Evidence
   | CompleteAdoption !Text
   deriving stock (Eq, Show)
+
+pattern Initialize :: TargetKey -> EventBody
+pattern Initialize target <- InitializeFor target _
+  where
+    Initialize target = InitializeFor target ChecksumV1
+
+{-# COMPLETE Initialize, StartMigration, StartStep, SucceedStep, FailStep, CompleteMigration, AuthorizeRecovery, AcceptCompletion, StartAdoption, AdoptEntry, CompleteAdoption #-}
+
+projectionChecksumFormat :: Projection -> ChecksumFormat
+projectionChecksumFormat state = case events state of
+  LedgerEvent {body = InitializeFor _ format} : _ -> format
+  _ -> ChecksumV1
 
 data EventContext = EventContext !Text !Text !Text !(Maybe (Text, Text)) deriving stock (Eq, Show)
 
