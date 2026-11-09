@@ -1,22 +1,41 @@
 # Changelog
 
-## 0.1.1.0 — 2026-11-07
-
-Add validated single-shard replicated targets, full-replica completion policy,
-checksum v2 and replicated ledgers. Extend the lexical envelope for replicated
-MergeTree engines and add owned Keeper/two-replica qualification. Preserve direct
-request bytes and v1 vectors; centralize server policy and matrix qualification
-tooling. CLI plan JSON adds both checksum formats, preserving v1 fields.
-
-
-## 0.1.0.2 — 2026-11-07
-
-Add exact Altinity `26.3.60.10002.altinitystable` engine qualification with an
-owned Linux arm64 artifact; retain both previously qualified patches.
-
-
 All published packages share a single version and are released together under
 one `v<version>` tag. Per-package details live in each package's `CHANGELOG.md`.
+
+## 0.2.0.0 — 2026-11-08
+
+### Breaking Changes
+
+- Extend public checksum, target-error, transport-error, ledger-error, history
+  and run-error variants for replicated targets; consumers with exhaustive
+  matches must handle the new constructors.
+- Introduce checksum v2, SQL envelope v2 and replicated ledger initialization
+  and completion policies. Replicated targets require v2; direct targets retain
+  v1 behavior. CLI JSON v1 gains checksum-format and replicated-event fields.
+
+### New Features
+
+- Admit validated single-shard replica sets and wait for every configured replica
+  on acknowledged migration writes and ledger appends.
+- Support replicated MergeTree engines and structurally validated replicated
+  ledgers, with topology-specific preflight and guarded recovery.
+- Report both checksum formats in offline CLI plans.
+- Qualify exact Altinity `26.3.60.10001.altinitystable` and
+  `26.3.60.10002.altinitystable` Linux arm64 artifacts alongside the existing
+  native ClickHouse candidate; provide owned Keeper/two-replica fixtures.
+
+### Bug Fixes
+
+- Wait for writable database and table replicas during fixture restart readiness.
+
+### Other Changes
+
+- Centralize server policy and matrix qualification; add independent checksum v2
+  vectors, replicated examples, contract documentation and retained qualification
+  evidence.
+- Consolidate the unpublished 0.1.0.1, 0.1.0.2 and 0.1.1.0 candidates into this
+  release. Managed-cloud and production qualification remain application-owned.
 
 ## 0.1.0.0 — 2026-10-16
 

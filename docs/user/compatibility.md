@@ -180,6 +180,13 @@ minus a two-second response margin. The request deadline is at least five second
 Replicated ledgers record checksum format v2. The owned two-replica fixture and its
 64-observation spike are retained under `docs/release-evidence/`.
 
+The release version is `0.2.0.0`, consolidating the unpublished patch and
+replicated feature candidates below. The major bump accounts for public
+constructor additions and the new versioned replicated contracts. Direct targets
+retain checksum v1 and their existing completion policy. Earlier qualification
+receipts keep their original candidate versions; they do not establish publication
+or managed-cluster readiness.
+
 The independent patch cohort is `0.1.0.2`; the replicated feature candidate is the shared `0.1.1.0` cohort. Its package version does not imply Hackage publication or managed-cluster readiness.
 
 On 2026-11-07 all three exact candidates passed all thirteen existing groups in both Nix and extracted-source variants (39 cases per variant). See [the independent 10002 evidence](../release-evidence/2026-11-07-altinity-10002.md).

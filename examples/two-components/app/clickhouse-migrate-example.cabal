@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-example
-version: 0.1.1.0
+version: 0.2.0.0
 synopsis: Private two-component migration administrator example
 description: Private workspace executable, not intended for publication.
 license: BSD-3-Clause
@@ -29,10 +29,10 @@ executable clickhouse-migrate-example
   build-depends:
     base >=4.21 && <4.22,
     bytestring >=0.12.2 && <0.13,
-    clickhouse-migrate ==0.1.*,
-    clickhouse-migrate-cli ==0.1.*,
-    clickhouse-migrate-example-analytics ==0.1.*,
-    clickhouse-migrate-example-catalog ==0.1.*,
-    clickhouse-migrate-test-support ==0.1.*,
+    clickhouse-migrate ==0.2.*,
+    clickhouse-migrate-cli ==0.2.*,
+    clickhouse-migrate-example-analytics ==0.2.*,
+    clickhouse-migrate-example-catalog ==0.2.*,
+    clickhouse-migrate-test-support ==0.2.*,
     optparse-applicative >=0.18.1 && <0.20,
     text >=2.1 && <2.2,

@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-example-analytics
-version: 0.1.1.0
+version: 0.2.0.0
 synopsis: Private composed migration example component
 description: Private workspace example, not intended for publication.
 license: BSD-3-Clause
@@ -34,5 +34,5 @@ library
 
   build-depends:
     base >=4.21 && <4.22,
-    clickhouse-migrate ==0.1.*,
-    clickhouse-migrate-embed ==0.1.*,
+    clickhouse-migrate ==0.2.*,
+    clickhouse-migrate-embed ==0.2.*,

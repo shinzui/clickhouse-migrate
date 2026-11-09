@@ -1,19 +1,23 @@
 # Changelog for clickhouse-migrate-cli
 
-## 0.1.1.0 — 2026-11-07
+## 0.2.0.0 — 2026-11-08
 
-Add validated single-shard replicated targets, full-replica completion policy,
-checksum v2 and replicated ledgers. Extend the lexical envelope for replicated
-MergeTree engines and add owned Keeper/two-replica qualification. Preserve direct
-request bytes and v1 vectors; centralize server policy and matrix qualification
-tooling. CLI plan JSON adds both checksum formats, preserving v1 fields.
+### Breaking Changes
 
+- Extend the JSON v1 contract with both checksum formats in offline plans,
+  the recorded checksum format in history/status, and replicated initialization
+  fields and error codes.
 
-## 0.1.0.2 — 2026-11-07
+### New Features
 
-Add exact Altinity `26.3.60.10002.altinitystable` engine qualification with an
-owned Linux arm64 artifact; retain both previously qualified patches.
+- Populate offline plans with v1 and v2 migration and step digests.
+- Render replicated history and failures with structured evidence.
 
+### Other Changes
+
+- Retain legacy `PlanStep` and `PlanMigration` construction and matching arities;
+  legacy manually constructed reports render unknown v2 digests as null.
+- Require `clickhouse-migrate ==0.2.*` and update JSON golden fixtures.
 
 ## 0.1.0.0 — 2026-10-16
 

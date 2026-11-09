@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: clickhouse-migrate-cli
-version: 0.1.1.0
+version: 0.2.0.0
 synopsis: Reusable administrative CLI for ClickHouse migrations
 description:
   Reusable administrative CLI for ClickHouse migrations.
@@ -40,7 +40,7 @@ common common
     aeson >=2.2.4.1 && <2.4,
     base >=4.21 && <4.22,
     bytestring >=0.12.2 && <0.13,
-    clickhouse-migrate ==0.1.*,
+    clickhouse-migrate ==0.2.*,
     containers >=0.7 && <0.9,
     optparse-applicative >=0.18.1 && <0.20,
     text >=2.1 && <2.2,

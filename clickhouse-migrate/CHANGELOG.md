@@ -1,19 +1,27 @@
 # Changelog for clickhouse-migrate
 
-## 0.1.1.0 — 2026-11-07
+## 0.2.0.0 — 2026-11-08
 
-Add validated single-shard replicated targets, full-replica completion policy,
-checksum v2 and replicated ledgers. Extend the lexical envelope for replicated
-MergeTree engines and add owned Keeper/two-replica qualification. Preserve direct
-request bytes and v1 vectors; centralize server policy and matrix qualification
-tooling. CLI plan JSON adds both checksum formats, preserving v1 fields.
+### Breaking Changes
 
+- Add public checksum, target-error, transport-error, ledger-error, history and
+  run-error constructors; update exhaustive matches for replicated states.
+- Add checksum v2, SQL envelope v2 and replicated ledger initialization and
+  completion policies. Replicated targets require v2; direct targets retain v1.
 
-## 0.1.0.2 — 2026-11-07
+### New Features
 
-Add exact Altinity `26.3.60.10002.altinitystable` engine qualification with an
-owned Linux arm64 artifact; retain both previously qualified patches.
+- Validate single-shard replica-set targets and replica identity on new connections.
+- Support replicated MergeTree SQL, topology-specific preflight, structurally
+  validated replicated ledgers and full-replica quorum completion.
+- Expose topology and per-format checksum accessors.
+- Admit exact Altinity `26.3.60.10001.altinitystable` and
+  `26.3.60.10002.altinitystable` Linux arm64 engines.
 
+### Other Changes
+
+- Centralize server policy and add checksum v2 reference vectors, public API
+  checks and replicated contract documentation.
 
 ## 0.1.0.0 — 2026-10-16
 

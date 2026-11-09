@@ -1,19 +1,12 @@
 # Changelog for clickhouse-migrate-embed
 
-## 0.1.1.0 — 2026-11-07
+## 0.2.0.0 — 2026-11-08
 
-Add validated single-shard replicated targets, full-replica completion policy,
-checksum v2 and replicated ledgers. Extend the lexical envelope for replicated
-MergeTree engines and add owned Keeper/two-replica qualification. Preserve direct
-request bytes and v1 vectors; centralize server policy and matrix qualification
-tooling. CLI plan JSON adds both checksum formats, preserving v1 fields.
+### Other Changes
 
-
-## 0.1.0.2 — 2026-11-07
-
-Add exact Altinity `26.3.60.10002.altinitystable` engine qualification with an
-owned Linux arm64 artifact; retain both previously qualified patches.
-
+- Release with the 0.2 core API and require `clickhouse-migrate ==0.2.*`.
+- Qualify embedded replicated manifests and SQL through the shared build driver
+  and the replicated examples.
 
 ## 0.1.0.0 — 2026-10-16
 
