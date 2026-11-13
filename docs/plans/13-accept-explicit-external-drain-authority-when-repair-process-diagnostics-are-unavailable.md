@@ -38,13 +38,12 @@ and
 ## Progress
 
 - [x] M1 (2026-11-13): Additive `externalDrainRecoveryEvidence`, typed observer states and per-invocation `handleCommandWithExternalDrain` preserve strict existing APIs and JSON v1. A real scoped-role embedding passes denied metadata retry and SDK resume, with observer failure/cancellation and stale-position refusal. Only complete native access-denied code 497 is optional; every other failure remains fatal.
-- [ ] M2: Owned native repair covers denied/own-user observations, visible recorded work, stale positions, exact receipts and retained exclusion; qualification and source archives pass before adoption.
+- [x] M2 (2026-11-13): All 41 required extracted-source matrix groups pass across the three exact server candidates, including both replicated fixtures; seven archives, metadata, pure suites and Haddocks pass. Scoped denied/own-user repairs, visible-work refusal, exact interrupted receipts, observer failure/cancellation and strict-default JSON/API checks pass. See [qualified evidence](../release-evidence/2026-11-13-external-drain.md).
 
-Source implementation is now in progress. No package version has been selected
-or published. Kansoku still uses released 0.2.0.0; final upstream qualification,
-delivery and downstream adoption remain open. The expanded native repair group
-passes six denied/own-user operation flows and the existing interrupted-authorization
-receipt cases using the explicit policy for fresh recovery.
+Source implementation and qualification are complete at `f4bc4e6`. No package
+version has been selected or published. Delivery of that immutable upstream source
+and downstream adoption/acceptance remain distinct from the passing toolkit gates.
+Kansoku still selects released 0.2.0.0 until its explicit dependency change.
 
 ## Surprises & Discoveries
 
@@ -72,8 +71,11 @@ nonfatal. Never convert an observation exception into an empty active-query list
 
 ## Outcomes & Retrospective
 
-Open. Retain the downstream acceptance evidence and exact qualified source/release
-identity here when the library change is delivered.
+Implemented and source-qualified at `f4bc4e6d32decfaaf1a19e1033a22f3e28fc167c`;
+[the evidence record](../release-evidence/2026-11-13-external-drain.md) retains
+archive hashes, all 41 source groups, boundaries and fixture failures. Existing
+strict defaults and JSON v1 are preserved. This completes the toolkit work; actual
+source delivery and Kansoku acceptance remain explicitly owned by downstream EP-50.
 
 ## Context and Orientation
 

@@ -17,6 +17,14 @@ for entry in matrix['entries']:
     groups = entry.get('groups')
     if not isinstance(groups, list) or not groups or not all(isinstance(g, str) and g for g in groups) or len(groups) != len(set(groups)):
         raise SystemExit('Expected nonempty unique declared groups: ' + entry['id'])
+# Check every local OCI prerequisite before spending time on the native candidate.
+# Fixtures independently verify the exact digest/platform before each execution.
+if any('image' in entry for entry in matrix['entries']):
+    print(subprocess.check_output(['container', '--version'], text=True).strip(), flush=True)
+    for entry in matrix['entries']:
+        if 'image' in entry:
+            subprocess.run(['container', 'image', 'inspect', entry['image']],
+                           check=True, stdout=subprocess.DEVNULL)
 # Explicit overrides permit Nix and extracted-source artifacts to run the SAME
 # cases. Otherwise resolve already built Cabal artifacts from this project.
 def binary(variable, target, flags=()):

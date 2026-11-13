@@ -1,0 +1,52 @@
+{
+  "implementationCommit": "f4bc4e6d32decfaaf1a19e1033a22f3e28fc167c",
+  "matchedSourceFiles": 110,
+  "archives": [
+    {
+      "package": "clickhouse-migrate",
+      "archive": "clickhouse-migrate-0.2.0.0.tar.gz",
+      "sha256": "14db19caa755c48456b500544bbecbcf6722d2ed6d76e32c5925de52d13893e8"
+    },
+    {
+      "package": "clickhouse-migrate-embed",
+      "archive": "clickhouse-migrate-embed-0.2.0.0.tar.gz",
+      "sha256": "428265ae4632e327ffc3f784873659b9dce4e1e4faa23afff2e9a9fbb85fb3e8"
+    },
+    {
+      "package": "clickhouse-migrate-cli",
+      "archive": "clickhouse-migrate-cli-0.2.0.0.tar.gz",
+      "sha256": "7697589aa1accf06875f0aa765e463ea914209c12d93bfd376bc11041d7a0767"
+    },
+    {
+      "package": "clickhouse-migrate-test-support",
+      "archive": "clickhouse-migrate-test-support-0.2.0.0.tar.gz",
+      "sha256": "cc956477cfcb8be0eb1e72e49879721db017de9db942f723f6855bf61c59bec7"
+    },
+    {
+      "package": "clickhouse-migrate-example-catalog",
+      "archive": "clickhouse-migrate-example-catalog-0.2.0.0.tar.gz",
+      "sha256": "bc664f7d1c4733f7e4ed9240995c0efd56aea6c51eb17782ecf6eb07dba73eb5"
+    },
+    {
+      "package": "clickhouse-migrate-example-analytics",
+      "archive": "clickhouse-migrate-example-analytics-0.2.0.0.tar.gz",
+      "sha256": "67b92b996c410a47f9a9346d9fa1396632cc3af0b4e581adece29fa4fc47504b"
+    },
+    {
+      "package": "clickhouse-migrate-example",
+      "archive": "clickhouse-migrate-example-0.2.0.0.tar.gz",
+      "sha256": "8c8f1c59d42795d68bbaea590d956a402469f4a2edebdafbc84f5e9255477f20"
+    }
+  ],
+  "date": "2026-11-13",
+  "compiler": "ghc-9.12.4",
+  "clientPlatform": "aarch64-darwin",
+  "linuxRuntime": "Apple Container CLI 1.5.0",
+  "requiredSourceGroups": 41,
+  "failedSourceGroups": 0,
+  "skippedSourceGroups": 0,
+  "workingTreeNativeGroups": 13,
+  "publication": "Qualified source revision; no new package version, release tag or Hackage upload",
+  "scope": "Exact declared native macOS and owned Linux arm64 server artifacts; local client execution, no managed-cloud, remote CI or power-loss claim",
+  "sourceArchiveNote": "All 110 Haskell/Python/Cabal files match the implementation commit. Unreleased changelog and repository documentation annotations were added after archive creation; executable sources, manifests and SQL are unchanged."
+}
