@@ -1,5 +1,5 @@
 -- | Dispatch with application-owned configuration, sinks and command policy.
-module ClickHouseMigrate.CLI.Handler (commandEnvironment, handleCommand, planReport, quiescenceForCommand) where
+module ClickHouseMigrate.CLI.Handler (commandEnvironment, handleCommand, handleCommandWithExternalDrain, planReport, quiescenceForCommand) where
 
 import ClickHouseMigrate
 import ClickHouseMigrate.Adoption qualified as A
@@ -84,8 +84,17 @@ inspection provider True = maybe (Left MissingExclusiveAccess) (Right . I.Guarde
 
 -- Offline plan deliberately does not force the environment argument.
 handleCommand :: CommandEnvironment -> MigrationPlan -> Command -> IO CommandResult
-handleCommand _ plan PlanCommand = pure (CommandResult "plan" (Right (PlanReport (planReport plan) [(componentNameText (migrationIdComponent identity), migrationNameText (migrationIdName identity)) | view <- NE.toList (inspectSchedule plan), let identity = migrationId view])))
-handleCommand environment plan command =
+handleCommand = handleCommandUsing Nothing
+
+-- | One-call opt-in for an embedding application that already validated and
+-- retained independent external drain authority. Only repair uses this policy;
+-- the ordinary handler remains strict and every normal safety check is retained.
+handleCommandWithExternalDrain :: Repair.RepairObservationSink -> CommandEnvironment -> MigrationPlan -> Command -> IO CommandResult
+handleCommandWithExternalDrain sink = handleCommandUsing (Just sink)
+
+handleCommandUsing :: Maybe Repair.RepairObservationSink -> CommandEnvironment -> MigrationPlan -> Command -> IO CommandResult
+handleCommandUsing _ _ plan PlanCommand = pure (CommandResult "plan" (Right (PlanReport (planReport plan) [(componentNameText (migrationIdComponent identity), migrationNameText (migrationIdName identity)) | view <- NE.toList (inspectSchedule plan), let identity = migrationId view])))
+handleCommandUsing observation environment plan command =
   let name = commandName command
       reject = pure . CommandResult name . Left . CommandRejected
       finish = pure . CommandResult name
@@ -101,7 +110,7 @@ handleCommand environment plan command =
                 UpCommand (UpInput target input initialization _) -> case makeAudit input of
                   Left failure -> reject failure
                   Right audit -> mutate $ \context -> Run.up context (Run.upOptions audit (fmap (\ledger -> L.authorizeInitialization target ledger audit) initialization)) plan >>= finish . either (Left . RunFailed) (Right . RunReport)
-                RepairCommand operation (RepairInput _ expected attempt selected input quiet receipts) -> case recovery config input quiet receipts of
+                RepairCommand operation (RepairInput _ expected attempt selected input quiet receipts) -> case recovery observation config input quiet receipts of
                   Left failure -> reject failure
                   Right evidence -> case buildRepair operation expected attempt selected evidence of
                     Left failure -> reject failure
@@ -125,11 +134,11 @@ handleCommand environment plan command =
                                 ApplyAdoption -> mutate $ \context -> A.applyAdoption context plan adoption >>= finish . either (Left . RunFailed) (Right . RunReport)
                                 ResumeAdoption -> mutate $ \context -> A.resumeAdoption context plan adoption >>= finish . either (Left . RunFailed) (Right . RunReport)
 
-recovery :: TargetConfig -> AuditInput -> Bool -> [L.AppendReceipt] -> Either CommandError Repair.RecoveryEvidence
-recovery config input quiet receipts = do
+recovery :: Maybe Repair.RepairObservationSink -> TargetConfig -> AuditInput -> Bool -> [L.AppendReceipt] -> Either CommandError Repair.RecoveryEvidence
+recovery observation config input quiet receipts = do
   established <- makeQuiet (configuredTargetKey config) input quiet >>= maybe (Left QuiescenceRequired) Right
   audit <- makeAudit input
-  either (const (Left InvalidRepairInput)) Right (Repair.recoveryEvidence audit established receipts)
+  either (const (Left InvalidRepairInput)) Right (case observation of Nothing -> Repair.recoveryEvidence audit established receipts; Just sink -> Repair.externalDrainRecoveryEvidence audit established receipts sink)
 
 buildRepair :: RepairOperation -> L.LedgerPosition -> L.AttemptId -> Maybe R.StepAttempt -> Repair.RecoveryEvidence -> Either CommandError Repair.RepairRequest
 buildRepair operation expected attempt selected evidence = either (const (Left InvalidRepairInput)) Right $ case (operation, selected) of

@@ -6,7 +6,7 @@ docId: DOC-5
 tags: ["compatibility", "clickhouse", "qualification"]
 generated:
   by: human:nadeem
-  at: 2026-10-16T17:43:33Z
+  at: 2026-11-13T22:09:25Z
 ---
 
 # Compatibility evidence
@@ -63,10 +63,17 @@ a complete server error can have partial effects. Neither authorizes replay.
 Run from the native development environment:
 
 ```bash
-# Pre-pull the exact Linux arm64 digest from the matrix into an isolated local context.
-export CLICKHOUSE_MIGRATE_DOCKER_CONTEXT=<isolated-local-context>
+# Start Apple Container and pre-pull each exact Linux arm64 digest from the matrix.
+container system start
+container image pull --platform linux/arm64 <exact-matrix-image-digest>
 nix develop --builders '' -c just test-integration
 ```
+
+The current fixture uses Apple Container for Linux servers, including an owned
+Keeper and network for replication. It inspects the exact image digest/platform
+and uses inspected private addresses without assuming container-name DNS.
+Historical Docker qualification records describe their original execution boundary.
+The workflow configuration is updated; local evidence does not claim a remote CI run.
 
 Each suite owns a new temporary native server, data root, credentials and ports.
 No shared developer server is used. Profiles deliberately default to weaker

@@ -29,10 +29,7 @@ def main():
     if not isinstance(declared, list) or not declared or not all(isinstance(g, str) and g for g in declared) or len(declared) != len(set(declared)):
         raise SystemExit('Expected nonempty unique declared groups: ' + entry['id'])
     if 'image' in entry:
-        context = os.environ.get('CLICKHOUSE_MIGRATE_DOCKER_CONTEXT')
-        if not context:
-            raise SystemExit('Set CLICKHOUSE_MIGRATE_DOCKER_CONTEXT to an isolated local Docker context')
-        subprocess.run(['docker', '--context', context, 'image', 'inspect', entry['image']],
+        subprocess.run(['container', 'image', 'inspect', entry['image']],
                        check=True, capture_output=True)
     parent = ROOT / '.dev/candidates'
     parent.mkdir(parents=True, exist_ok=True)

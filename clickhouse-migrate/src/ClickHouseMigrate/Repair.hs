@@ -4,6 +4,9 @@ module ClickHouseMigrate.Repair
     RecoveryEvidence,
     RepairRequestError (..),
     recoveryEvidence,
+    externalDrainRecoveryEvidence,
+    RepairObservation (..),
+    RepairObservationSink,
     resumeRequest,
     retryStepRequest,
     acceptStepRequest,
@@ -26,11 +29,13 @@ import ClickHouseMigrate.Internal.RepairTypes
 import ClickHouseMigrate.Internal.Reporting qualified as Reporting
 import ClickHouseMigrate.Internal.RuntimeTypes (MutationContext (..))
 import ClickHouseMigrate.Internal.TargetTypes qualified as T
+import ClickHouseMigrate.Internal.Transport qualified as Transport
 import ClickHouseMigrate.Ledger qualified as Ledger
 import ClickHouseMigrate.Plan qualified as Plan
 import ClickHouseMigrate.Prelude
 import ClickHouseMigrate.Report qualified as R
 import ClickHouseMigrate.Target qualified as Target
+import Control.Exception (SomeException, throwIO, try)
 import Data.List (findIndex)
 import Data.List.NonEmpty qualified as NE
 import Data.Set qualified as Set
@@ -45,7 +50,17 @@ recoveryEvidence audit quiet receipts
   | null (Ledger.auditReferences audit) = Left MissingRecoveryEvidence
   | length receipts > 32 = Left TooManyPendingReceipts
   | any (\(L.AppendReceipt target _ _ _ _ _) -> target /= Ledger.quiescenceTarget quiet) receipts = Left InvalidRecoveryTarget
-  | otherwise = Right (RecoveryEvidence audit quiet receipts)
+  | otherwise = Right (RecoveryEvidence audit quiet receipts StrictObservation)
+
+-- | Opt in only after independently establishing and retaining external drain
+-- under the caller's exclusion. A denied process-list read is then unavailable
+-- diagnostics, not an empty observation. The sink is called before authorization
+-- and must retain that distinction. All other errors and positive observations
+-- remain blocking. The existing 'recoveryEvidence' keeps its strict behavior.
+externalDrainRecoveryEvidence :: Ledger.AuditContext -> Ledger.QuiescenceEvidence -> [Ledger.AppendReceipt] -> RepairObservationSink -> Either RepairRequestError RecoveryEvidence
+externalDrainRecoveryEvidence audit quiet receipts sink = do
+  _ <- recoveryEvidence audit quiet receipts
+  pure (RecoveryEvidence audit quiet receipts (ExternalDrain sink))
 
 resumeRequest :: Ledger.LedgerPosition -> Ledger.AttemptId -> RecoveryEvidence -> Either RepairRequestError RepairRequest
 resumeRequest position attempt evidence = validateReceipts position evidence >> Right (ResumeRequest position attempt evidence)
@@ -60,7 +75,7 @@ acceptStepRequest :: Ledger.LedgerPosition -> Ledger.AttemptId -> R.StepAttempt 
 acceptStepRequest position attempt step evidence = validateReceipts position evidence >> validateStep step >> Right (AcceptStepRequest position attempt step evidence)
 
 validateReceipts :: Ledger.LedgerPosition -> RecoveryEvidence -> Either RepairRequestError ()
-validateReceipts (L.LedgerPosition ledger _ _) (RecoveryEvidence _ _ receipts)
+validateReceipts (L.LedgerPosition ledger _ _) (RecoveryEvidence _ _ receipts _)
   | any (\(L.AppendReceipt _ actual _ _ _ _) -> actual /= ledger) receipts = Left ForeignLedgerReceipt
   | otherwise = Right ()
 
@@ -76,7 +91,7 @@ requestParts = \case
 
 repair :: MutationContext -> Plan.MigrationPlan -> RepairRequest -> IO (Either R.RunFailure R.RunReport)
 repair context@(MutationContext (T.TargetConfig {T.configKey = target, T.configBinding = binding}) _ _ _) plan request =
-  let (expected@(L.LedgerPosition ledger _ _), requested, RecoveryEvidence audit quiet receipts) = requestParts request
+  let (expected@(L.LedgerPosition ledger _ _), requested, RecoveryEvidence audit quiet receipts observationPolicy) = requestParts request
       prerequisite = case binding of
         T.FirstUse -> Left R.ExistingBindingRequired
         T.ExistingLedger actual | actual /= ledger -> Left (R.LedgerFailed L.LedgerIdentityMismatch)
@@ -92,8 +107,18 @@ repair context@(MutationContext (T.TargetConfig {T.configKey = target, T.configB
         unless (Ledger.attemptIdText requested == current) (abort (R.AttemptMismatch requested (Just (L.AttemptId current))))
         mapM_ (checkReceipt projection) receipts
         let queries = Set.toAscList (Set.fromList ([T.QueryId query | event <- L.events projection, L.StartStep _ query <- [L.body event]] ++ [query | L.AppendReceipt _ _ _ _ _ query <- receipts]))
-        active <- activeQueries runtime queries
-        unless (null active) (abort (R.PriorQueriesActive active))
+        observation <- activeQueries runtime queries observationPolicy
+        case observationPolicy of
+          StrictObservation -> pure ()
+          ExternalDrain sink -> do
+            delivered <- try @SomeException (sink observation)
+            case delivered of
+              Left exception | isAsync exception -> throwIO exception
+              Left _ -> abort (R.CallbackFailed (R.EventCallback "RepairProcessObservation"))
+              Right () -> pure ()
+        case observation of
+          RecordedQueriesActive active -> abort (R.PriorQueriesActive active)
+          _ -> pure ()
         migration <- case drop (L.ordinal definition) (orderedMigrations (L.projectionChecksumFormat projection) plan) of
           (actual, migration) : _ | actual == definition -> pure migration
           _ -> abort (R.LedgerFailed L.DefinitionMismatch)
@@ -188,15 +213,29 @@ selectedStep projection definition checkpoints requested@(R.StepAttempt _ name q
   unless (findIndex (not . resolvedStep) checkpoints == Just index && Target.queryIdText query == recorded && Reporting.stepAttempt definition index (Just recorded) (L.events projection) == Just requested) (abort (R.StepAttemptMismatch requested))
   pure (index, query)
 
-activeQueries :: Runtime -> [T.QueryId] -> IO [T.QueryId]
-activeQueries _ [] = pure []
-activeQueries runtime queries = callStore $ do
+activeQueries :: Runtime -> [T.QueryId] -> ProcessObservationPolicy -> IO RepairObservation
+activeQueries _ [] _ = pure NoRecordedQueries
+activeQueries runtime queries policy = do
   let sql = "SELECT query_id FROM system.processes WHERE query_id IN (" <> Text.intercalate "," ["'" <> Target.queryIdText query <> "'" | query <- queries] <> ")"
-  rows <- Store.readRows (Just (runtimeGuard runtime)) (runtimeTransport runtime) (Encoding.encodeUtf8 sql)
-  mapM
-    ( \row -> do
-        Store.keys ["query_id"] row
-        value <- Store.member "query_id" row
-        either (const (Store.abort (Store.LedgerProblem L.InvalidEvent))) pure (Target.queryId value)
-    )
-    rows
+  observed <- Store.storeResult (Store.readRows (Just (runtimeGuard runtime)) (runtimeTransport runtime) (Encoding.encodeUtf8 sql))
+  case observed of
+    Left failure | denied failure && external policy -> pure ProcessObservationUnavailable
+    Left failure -> abort (Reporting.storeError failure)
+    Right rows -> do
+      active <-
+        callStore $
+          mapM
+            ( \row -> do
+                Store.keys ["query_id"] row
+                value <- Store.member "query_id" row
+                either (const (Store.abort (Store.LedgerProblem L.InvalidEvent))) pure (Target.queryId value)
+            )
+            rows
+      pure (if null active then NoVisibleRecordedQueries else RecordedQueriesActive active)
+  where
+    external (ExternalDrain _) = True
+    external _ = False
+    -- A complete explicit access-denied response is the only optional failure.
+    -- Guard loss, timeouts, malformed rows and unrelated failures remain fatal.
+    denied (Store.RequestProblem (Transport.ObservedServerFailure (Transport.TransportError Transport.ServerRejected _ (Just 497))) Nothing) = True
+    denied _ = False

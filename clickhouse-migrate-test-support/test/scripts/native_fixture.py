@@ -58,6 +58,18 @@ def binary_for(entry):
     return binary
 
 
+def verify_apple_image(entry):
+    """Require the exact local matrix digest and Linux architecture; never a tag."""
+    image = json.loads(subprocess.check_output(
+        ['container', 'image', 'inspect', entry['image']], text=True))[0]
+    digest = entry['image'].split('@', 1)[1]
+    if not any(v.get('digest') == digest and
+               v.get('platform', {}).get('architecture') == entry['architecture'] and
+               v.get('platform', {}).get('os') == 'linux'
+               for v in image.get('variants', [])):
+        raise RuntimeError('Apple Container candidate digest/platform mismatch; pre-pull the exact matrix digest')
+
+
 class NativeServer:
     def __init__(self, entry, deployment=None):
         self.entry = entry
@@ -65,18 +77,10 @@ class NativeServer:
         self.port = port()
         self.tcp_port = port()
         self.container = None
-        self.docker = None
+        self.runtime = None
         if 'image' in entry:
-            context = os.environ.get('CLICKHOUSE_MIGRATE_DOCKER_CONTEXT')
-            if not context:
-                raise RuntimeError('OCI candidate requires an explicit isolated Docker context')
-            self.docker = ['docker', '--context', context]
-            endpoint = json.loads(subprocess.check_output(self.docker + ['context', 'inspect', context], text=True))[0]['Endpoints']['docker']['Host']
-            if not endpoint.startswith('unix://'):
-                raise RuntimeError('Owned OCI fixture requires a local Unix Docker socket')
-            image = json.loads(subprocess.check_output(self.docker + ['image', 'inspect', entry['image']], text=True))[0]
-            if image['Architecture'] != entry['architecture'] or image['Os'] != 'linux':
-                raise RuntimeError('OCI candidate platform mismatch; pre-pull the exact matrix digest')
+            self.runtime = ['container']
+            verify_apple_image(entry)
             self.binary = None
         else:
             self.binary = binary_for(entry)
@@ -92,13 +96,13 @@ class NativeServer:
 <profile>default</profile><quota>default</quota><access_management>1</access_management></default></users>
 <quotas><default><interval><duration>3600</duration><queries>0</queries><errors>0</errors>
 <result_rows>0</result_rows><read_rows>0</read_rows><execution_time>0</execution_time></interval></default></quotas></clickhouse>''')
-        root = '/fixture' if self.docker else escape(str(self.root))
-        if self.docker:
+        root = '/fixture' if self.runtime else escape(str(self.root))
+        if self.runtime:
             users.write_text(users.read_text().replace('<ip>127.0.0.1</ip>', '<ip>::/0</ip>'))
-        users_path = '/fixture/users.xml' if self.docker else str(users)
-        listener = '0.0.0.0' if self.docker else '127.0.0.1'
-        http_port = 8123 if self.docker else self.port
-        tcp_port = 9000 if self.docker else self.tcp_port
+        users_path = '/fixture/users.xml' if self.runtime else str(users)
+        listener = '0.0.0.0' if self.runtime else '127.0.0.1'
+        http_port = 8123 if self.runtime else self.port
+        tcp_port = 9000 if self.runtime else self.tcp_port
         (self.root / 'config.xml').write_text(f'''<clickhouse>
 <logger><level>warning</level><log>{root}/server.log</log><errorlog>{root}/error.log</errorlog></logger>
 <path>{root}/data/</path><tmp_path>{root}/tmp/</tmp_path><user_files_path>{root}/user_files/</user_files_path>
@@ -118,46 +122,47 @@ class NativeServer:
             config = self.root / 'config.xml'
             config.write_text(config.read_text().replace('</clickhouse>', extra + '</clickhouse>'))
         try:
-            if self.docker:
+            if self.runtime:
                 name = deployment['name'] if deployment else 'clickhouse-migrate-' + uuid.uuid4().hex
-                subprocess.run(self.docker + ['create', '--name', name, '--label', 'clickhouse-migrate.fixture=owned',
+                self.container = name
+                subprocess.run(self.runtime + ['run', '--detach', '--name', name,
+                    '--label', 'clickhouse-migrate.fixture=owned',
                     *(['--network', deployment['network']] if deployment else []),
                     '--user', str(os.getuid()), '--memory', '2g', '--cpus', '2',
-                    '-p', '127.0.0.1::8123', '-p', '127.0.0.1::9000',
+                    '--platform', 'linux/' + entry['architecture'],
+                    '--volume', str(self.root) + ':/fixture',
+                    '-p', f'127.0.0.1:{self.port}:8123',
+                    '-p', f'127.0.0.1:{self.tcp_port}:9000',
                     '--entrypoint', '/bin/sh', entry['image'], '-c', 'exec sleep 2147483647'],
-                    check=True, capture_output=True, timeout=20)
-                self.container = name
-                subprocess.run(self.docker + ['cp', str(self.root) + '/.', name + ':/fixture'], check=True, capture_output=True, timeout=20)
-                # Docker allocates ports on its own host, not the client OS.
-                # Keep the namespace alive while restarting only ClickHouse so
-                # these exact bindings remain reserved for the fixture lifetime.
-                subprocess.run(self.docker + ['start', name], check=True, capture_output=True, timeout=20)
-                self.port = int(subprocess.check_output(self.docker + ['port', name, '8123/tcp'], text=True, timeout=5).strip().rsplit(':', 1)[1])
-                self.tcp_port = int(subprocess.check_output(self.docker + ['port', name, '9000/tcp'], text=True, timeout=5).strip().rsplit(':', 1)[1])
-            self.start()
-            deadline = time.monotonic() + 30
-            while time.monotonic() < deadline:
-                if self.process.poll() is not None:
-                    raise RuntimeError(f'Owned server exited before readiness: {self.process.returncode}')
-                try:
-                    with urllib.request.urlopen(self.endpoint + '/ping', timeout=.2) as response:
-                        if response.read() == b'Ok.\n':
-                            break
-                except OSError:
-                    pass
-                time.sleep(.05)
-            else:
-                raise RuntimeError('Owned server readiness deadline expired')
-            identity = self.query('SELECT version() AS version, toString(serverUUID()) AS server_id')[0]
-            version = identity['version']
-            if identity['server_id'] != self.retained_uuid():
-                raise RuntimeError('Endpoint is not the owned server data directory')
-            if version != entry['version']:
-                raise RuntimeError('Candidate server version mismatch')
+                    check=True, capture_output=True, timeout=60)
+            if not (deployment and deployment.get('defer_start')):
+                self.ready()
         except BaseException:
             print(f"Owned server failure evidence: {self.root}", file=sys.stderr, flush=True)
             self.close(False)
             raise
+
+    def ready(self):
+        self.start()
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None:
+                raise RuntimeError(f'Owned server exited before readiness: {self.process.returncode}')
+            try:
+                with urllib.request.urlopen(self.endpoint + '/ping', timeout=.2) as response:
+                    if response.read() == b'Ok.\n':
+                        break
+            except OSError:
+                pass
+            time.sleep(.05)
+        else:
+            raise RuntimeError('Owned server readiness deadline expired')
+        identity = self.query('SELECT version() AS version, toString(serverUUID()) AS server_id')[0]
+        version = identity['version']
+        if identity['server_id'] != self.retained_uuid():
+            raise RuntimeError('Endpoint is not the owned server data directory')
+        if version != self.entry['version']:
+            raise RuntimeError('Candidate server version mismatch')
 
     @property
     def endpoint(self):
@@ -169,25 +174,25 @@ class NativeServer:
             return [json.loads(line) for line in response.read().splitlines() if line.strip()]
 
     def retained_uuid(self):
-        if self.docker:
-            return subprocess.check_output(self.docker + ['exec', self.container, 'cat', '/fixture/data/uuid'], text=True, timeout=5).strip()
+        if self.runtime:
+            return subprocess.check_output(self.runtime + ['exec', self.container, 'cat', '/fixture/data/uuid'], text=True, timeout=5).strip()
         return (self.root / 'data/uuid').read_text().strip()
 
     def start(self):
-        command = self.docker + ['exec', self.container, '/bin/sh', '-c', 'echo $$ > /fixture/owned-server.pid; exec clickhouse server --config-file=/fixture/config.xml'] if self.docker else [str(self.binary), 'server', '--config-file', str(self.root / 'config.xml')]
+        command = self.runtime + ['exec', self.container, '/bin/sh', '-c', 'echo $$ > /fixture/owned-server.pid; exec clickhouse server --config-file=/fixture/config.xml'] if self.runtime else [str(self.binary), 'server', '--config-file', str(self.root / 'config.xml')]
         self.process = subprocess.Popen(command, stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
 
     def stop(self, sig):
         if self.process is not None and self.process.poll() is None:
-            if self.docker:
-                subprocess.run(self.docker + ['exec', self.container, '/bin/sh', '-c', 'kill -s "$1" "$(cat /fixture/owned-server.pid)"', 'sh', signal.Signals(sig).name.removeprefix('SIG')], check=True, capture_output=True, timeout=10)
+            if self.runtime:
+                subprocess.run(self.runtime + ['exec', self.container, '/bin/sh', '-c', 'kill -s "$1" "$(cat /fixture/owned-server.pid)"', 'sh', signal.Signals(sig).name.removeprefix('SIG')], check=True, capture_output=True, timeout=10)
             else:
                 os.killpg(self.process.pid, sig)
             try:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                if self.docker:
-                    subprocess.run(self.docker + ['exec', self.container, '/bin/sh', '-c', 'kill -KILL "$(cat /fixture/owned-server.pid)"'], check=True, capture_output=True, timeout=10)
+                if self.runtime:
+                    subprocess.run(self.runtime + ['exec', self.container, '/bin/sh', '-c', 'kill -KILL "$(cat /fixture/owned-server.pid)"'], check=True, capture_output=True, timeout=10)
                 else:
                     os.killpg(self.process.pid, signal.SIGKILL)
                 self.process.wait(timeout=5)
@@ -216,13 +221,8 @@ class NativeServer:
             self.stop(signal.SIGTERM)
         finally:
             if self.container:
-                # Copy only this fixture's private data/logs before removing its
-                # recorded container. No ambient container or host volume is used.
-                if not success:
-                    evidence = self.root / 'container-evidence'
-                    evidence.mkdir()
-                    subprocess.run(self.docker + ['cp', self.container + ':/fixture/.', str(evidence)], capture_output=True, timeout=30, check=True)
-                subprocess.run(self.docker + ['rm', '--force', self.container], capture_output=True, timeout=15, check=True)
+                # The private bind mount retains failure evidence on the host.
+                subprocess.run(self.runtime + ['delete', '--force', self.container], capture_output=True, timeout=30, check=True)
             self.log.close()
         if success:
             shutil.rmtree(self.root)

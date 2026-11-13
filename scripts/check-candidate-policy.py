@@ -18,7 +18,7 @@ def check():
     if len(versions) != len(set(versions)) or set(versions) != expected:
         raise SystemExit('Candidate policy mismatch: missing runtime versions ' + str(sorted(expected - set(versions))) + '; missing matrix versions ' + str(sorted(set(versions) - expected)))
     ci = (ROOT / '.github/workflows/ci.yml').read_text()
-    pulls = [l for l in ci.splitlines() if re.search(r'\bdocker\b.*\bpull\s', l)]
+    pulls = [l for l in ci.splitlines() if re.search(r'\bcontainer image pull\s', l)]
     guide = (ROOT / 'docs/user/compatibility.md').read_text()
     for entry in entries:
         if entry.get('image') and not any(entry['image'] in line for line in pulls):

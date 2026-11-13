@@ -4,6 +4,7 @@ title: "Operating the Haskell API"
 description: "Operate the Haskell API and recover uncertain work using explicit coordination and evidence."
 docId: DOC-13
 tags: ["operations", "recovery", "coordination"]
+timestamp: 2026-11-13T21:53:35Z
 generated:
   by: human:nadeem
   at: 2026-10-16T15:34:07Z
@@ -150,3 +151,29 @@ absence there is never proof of cluster-wide drain.
 Legacy adoption currently binds v1 mapping checksums and is supported on direct targets. Replicated adoption refuses with `unsupported-ledger-version` before writes. Replicated installations start with a fresh native baseline.
 
 Server waits can include coordination overhead: the spike observed a metadata ALTER error after about twelve seconds with a five-second inactive-replica wait. The HTTP deadline remains authoritative; if it expires before a complete response, preserve submission uncertainty and never infer non-submission or retry automatically.
+
+
+## Explicit external drain with unavailable process diagnostics (unreleased)
+
+The existing `recoveryEvidence` constructor remains strict: a failed process
+observation refuses repair. A caller that independently established and retained
+external drain under its exclusion may opt in with
+`externalDrainRecoveryEvidence audit quiet receipts observationSink`. This is a
+source-candidate API; published 0.2.0.0 does not include it.
+
+The sink receives `NoRecordedQueries`, `NoVisibleRecordedQueries`,
+`RecordedQueriesActive queryIds` or `ProcessObservationUnavailable`. Retain this
+observation separately from the external authority. An empty restricted view or a
+denied read is never drain evidence. Only a complete access-denied response (native
+code 497) from the optional `system.processes` query is eligible for unavailable
+status. Unknown transport failures, malformed rows, failed history/identity checks,
+loss of exclusion and cancellation remain fatal. Any positively observed recorded
+query still refuses recovery, under either constructor.
+
+The observer runs before recovery authorization. A synchronous observer failure
+stops the operation with the existing event-callback classification and phase
+`RepairProcessObservation`; cancellation propagates after cleanup. No raw server
+error, SQL or credential is delivered through this diagnostic callback. All exact
+position, attempt, selected-step and pending-receipt checks remain in force.
+Every later recovery call still needs current caller-established exclusion/drain;
+this API does not turn an old observation into standing authorization.

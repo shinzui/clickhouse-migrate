@@ -3,6 +3,11 @@
 All published packages share a single version and are released together under
 one `v<version>` tag. Per-package details live in each package's `CHANGELOG.md`.
 
+## Unreleased
+
+- Add explicit external-drain repair authority with required typed process diagnostics, preserving strict defaults and CLI JSON v1.
+- Run owned Linux single-server and replicated qualification fixtures through Apple Container.
+
 ## 0.2.0.0 — 2026-11-08
 
 ### Breaking Changes

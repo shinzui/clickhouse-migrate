@@ -1,6 +1,7 @@
 module RepairIntegration (repairEarlyCases) where
 
 import ClickHouseMigrate
+import ClickHouseMigrate.CLI qualified as CLI
 import ClickHouseMigrate.Event qualified as Event
 import ClickHouseMigrate.Inspection qualified as Inspect
 import ClickHouseMigrate.Ledger qualified as Ledger
@@ -9,7 +10,8 @@ import ClickHouseMigrate.Report qualified as R
 import ClickHouseMigrate.Runner qualified as Run
 import ClickHouseMigrate.TestSupport.FaultProxy
 import ClickHouseMigrate.TestSupport.Server
-import Control.Monad (forM_, when)
+import Control.Exception (AsyncException (ThreadKilled), SomeAsyncException, SomeException, fromException, throwIO, try)
+import Control.Monad (forM_, void, when)
 import Data.Aeson (Value)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List.NonEmpty (NonEmpty (..))
@@ -61,6 +63,8 @@ applicationCount proxy = do
 
 repairEarlyCases :: Server -> IO ()
 repairEarlyCases server = do
+  externalDrainCase server
+  externalOperationCases server
   oversizedRecovery server
   access <- provider
   audit <- right (Ledger.auditContext "runner fixture" "explicit first use" ["owned server; parent serializes whole job"])
@@ -197,3 +201,113 @@ oversizedRecovery server = withFaultProxy server $ \proxy -> do
   _ <- Inspect.verify Inspect.Observe bound (Inspect.verifyOptions True) plan >>= right
   assert "accept/finalize submitted application SQL" . (== 0) =<< applicationCount proxy
   putStrLn "recovery size: oversized acceptance preserves (3,3) events, position and attempt; combined audits reject authorization; replacement against original position accepts and finalizes without SQL"
+
+-- First real embedding producer/consumer: separate app-scoped credentials may
+-- not inspect processes, while the parent owns every earlier completed request.
+externalDrainCase :: Server -> IO ()
+externalDrainCase server = do
+  let label = "repair_external_drain"
+      username = "repair_external_user"
+  ledger <- newLedgerId
+  key <- right (targetKey ("runner-tests/" <> label))
+  access <- provider
+  audit <- right (Ledger.auditContext "owned external-drain fixture" "all predecessor calls joined under parent exclusion" ["owned fixture: no runtime, schedule or predecessor remains"])
+  quiet <- right (Ledger.attestQuiescence key audit)
+  plan <- planWithTail label
+  owner <- fixture server label (serverEndpoint server) FirstUse
+  let stop (Event.RunEvent phase _ _ _ step _ _) = when (phase == Event.BeforeSql && step == Just "insert") (fail "controlled before-SQL stop")
+  initial <- Run.up (Run.mutationContext owner access stop Event.redactedDiagnostics) (Run.upOptions audit (Just (Ledger.authorizeInitialization key ledger audit))) plan
+  report <- case initial of Left (R.RunFailure (R.CallbackFailed _) acknowledged _) -> pure acknowledged; _ -> fail "External fixture did not retain an uncertain intent"
+  (position, attempt, steps) <- checkpoint report
+  step <- selected steps
+  config <- scopedRepairFixture server label username ledger False
+  let context = Run.mutationContext config access Event.quietEvents Event.redactedDiagnostics
+  strict <- right (Repair.recoveryEvidence audit quiet []) >>= right . Repair.retryStepRequest position attempt step
+  rejected <- Repair.repair context plan strict
+  assert "Strict repair did not refuse denied process metadata" (case rejected of Left (R.RunFailure (R.LedgerRequestFailed _ _ _) _ _) -> True; _ -> False)
+  -- The observer is part of pre-authorization policy and cannot fail open.
+  throwing <- right (Repair.externalDrainRecoveryEvidence audit quiet [] (const (fail "SQL_SECRET_MARKER"))) >>= right . Repair.retryStepRequest position attempt step
+  failed <- Repair.repair context plan throwing
+  assert "External observer failure did not stop authorization" (case failed of Left (R.RunFailure (R.CallbackFailed (R.EventCallback "RepairProcessObservation")) _ _) -> not ("SQL_SECRET_MARKER" `Text.isInfixOf` Text.pack (show failed)); _ -> False)
+  cancelling <- right (Repair.externalDrainRecoveryEvidence audit quiet [] (const (throwIO ThreadKilled))) >>= right . Repair.retryStepRequest position attempt step
+  cancelled <- try @SomeException (Repair.repair context plan cancelling)
+  assert
+    "Observer cancellation became an ordinary repair result"
+    ( case cancelled of
+        Left exception -> case fromException exception :: Maybe SomeAsyncException of
+          Just _ -> True
+          _ -> False
+        Right _ -> False
+    )
+  observations <- newIORef []
+  let sink observation = modifyIORef' observations (<> [observation])
+      environment = CLI.commandEnvironment (Just config) (Just access) Event.quietEvents Event.redactedDiagnostics CLI.AdministrativeCommands
+      input = CLI.AuditInput "owned embedding" "independent predecessor drain retained" ["owned fixture: all calls joined; no other submitter exists"]
+      command = CLI.RepairCommand CLI.RetryStep (CLI.RepairInput key position attempt (Just step) input True [])
+  result <- CLI.handleCommandWithExternalDrain sink environment plan command
+  retried <- case result of CLI.CommandResult _ (Right (CLI.RunReport value)) -> pure value; _ -> fail (Text.unpack (Encoding.decodeUtf8 (CLI.renderJson result)))
+  assert "Denied observation was erased into an empty result" . (== [Repair.ProcessObservationUnavailable]) =<< readIORef observations
+  assert "External retry did not execute the exact selected step" . (== 1) =<< scalar server ("SELECT toUInt32(count()) AS value FROM default." <> label)
+  staleEvidence <- right (Repair.externalDrainRecoveryEvidence audit quiet [] sink)
+  staleRequest <- right (Repair.retryStepRequest position attempt step staleEvidence)
+  stale <- Repair.repair context plan staleRequest
+  assert "External authority bypassed a stale position" (case stale of Left (R.RunFailure (R.StalePosition _ _) _ _) -> True; _ -> False)
+  assert "Stale repair reached optional diagnostics" . (== 1) . length =<< readIORef observations
+  (after, nextAttempt, _) <- checkpoint retried
+  resumed <- right (Repair.resumeRequest after nextAttempt staleEvidence) >>= Repair.repair context plan >>= right
+  assert "External resume failed the exact pending suffix" (case resumed of R.RunReport _ _ _ _ _ [R.MigrationSummary _ R.Applied _ _, R.MigrationSummary _ R.Pending _ _] _ _ -> True; _ -> False)
+  assert "External resume replayed the selected insert" . (== 1) =<< scalar server ("SELECT toUInt32(count()) AS value FROM default." <> label)
+  putStrLn "external repair: actual denied metadata; strict refusal; callback failure/cancellation; CLI retry and SDK resume; stale-position refusal"
+
+scopedRepairFixture :: Server -> Text.Text -> Text.Text -> LedgerId -> Bool -> IO TargetConfig
+scopedRepairFixture server label username ledger ownProcesses = do
+  key <- right (targetKey ("runner-tests/" <> label))
+  void (queryServer server ("CREATE USER " <> username <> " IDENTIFIED WITH no_password"))
+  void (queryServer server ("GRANT SELECT,INSERT,ALTER ON default." <> label <> " TO " <> username))
+  void (queryServer server ("GRANT SELECT,INSERT ON " <> label <> "_history.* TO " <> username))
+  forM_ ["databases", "tables", "columns", "storage_policies", "disks"] $ \table ->
+    void (queryServer server ("GRANT SELECT ON system." <> table <> " TO " <> username))
+  rows <- queryServer server "SELECT toString(serverUUID()) AS id" >>= fromJson :: IO [Value]
+  identity <- case rows of [row] -> field "id" row; _ -> fail "Owned server identity missing"
+  config <- targetConfig key <$> right (directEndpoint (serverEndpoint server)) <*> right (serverId identity) <*> right (ledgerNamespace (label <> "_history")) <*> pure (ExistingLedger ledger) <*> right (basicCredentials username "") <*> pure defaultHttpLimits
+  when ownProcesses (void (queryServer server ("GRANT SELECT ON system.processes TO " <> username)))
+  pure config
+
+externalOperationCases :: Server -> IO ()
+externalOperationCases server = forM_ [(visible, action) | visible <- [False, True], action <- ["retry", "accept", "finalize"], visible || action /= "retry"] $ \(visible, action) -> do
+  let suffix = if visible then "own" else "denied"
+      label = "repair_external_" <> action <> "_" <> suffix
+      username = label <> "_user"
+  ledger <- newLedgerId
+  key <- right (targetKey ("runner-tests/" <> label))
+  access <- provider
+  audit <- right (Ledger.auditContext "scoped recovery fixture" "all previous native requests joined; parent retains target exclusion" ["owned serialized fixture: no unjoined client or schedule"])
+  quiet <- right (Ledger.attestQuiescence key audit)
+  plan <- planWithTail label
+  owner <- fixture server label (serverEndpoint server) FirstUse
+  let stop (Event.RunEvent phase _ _ _ step _ _) = when ((action == "finalize" && phase == Event.BeforeMigrationComplete) || (action /= "finalize" && phase == Event.BeforeSql && step == Just "insert")) (fail "controlled recovery boundary")
+  initial <- Run.up (Run.mutationContext owner access stop Event.redactedDiagnostics) (Run.upOptions audit (Just (Ledger.authorizeInitialization key ledger audit))) plan
+  report <- case initial of Left (R.RunFailure (R.CallbackFailed _) value _) -> pure value; _ -> fail "Scoped recovery interruption missing"
+  (position, attempt, steps) <- checkpoint report
+  when (action == "accept") (void (queryServer server ("INSERT INTO default." <> label <> " VALUES(7,'SQL_SECRET_MARKER')")))
+  config <- scopedRepairFixture server label username ledger visible
+  observations <- newIORef []
+  evidence <- right (Repair.externalDrainRecoveryEvidence audit quiet [] (\observation -> modifyIORef' observations (<> [observation])))
+  request <-
+    if action == "finalize"
+      then right (Repair.finalizeRequest position attempt evidence)
+      else do
+        step <- selected steps
+        right (if action == "accept" then Repair.acceptStepRequest position attempt step evidence else Repair.retryStepRequest position attempt step evidence)
+  let context = Run.mutationContext config access Event.quietEvents Event.redactedDiagnostics
+      expectedObservation = if visible then Repair.NoVisibleRecordedQueries else Repair.ProcessObservationUnavailable
+  repaired <- Repair.repair context plan request >>= right
+  assert "Scoped observation lost its visibility distinction" . (== [expectedObservation]) =<< readIORef observations
+  assert "Acceptance/finalization replayed or omitted actual effects" . (== 1) =<< scalar server ("SELECT toUInt32(count()) AS value FROM default." <> label)
+  when (action /= "finalize") $ do
+    assert "Selected recovery ran the remaining suffix" . (== 0) =<< scalar server ("SELECT toUInt32(count()) AS value FROM system.columns WHERE database='default' AND table='" <> label <> "' AND name='later'")
+    (after, next, _) <- checkpoint repaired
+    _ <- right (Repair.resumeRequest after next evidence) >>= Repair.repair context plan >>= right
+    assert "Scoped resume did not execute the pending suffix" . (== 1) =<< scalar server ("SELECT toUInt32(count()) AS value FROM system.columns WHERE database='default' AND table='" <> label <> "' AND name='later'")
+  assert "Scoped recovery started another migration" . (== 1) =<< scalar server ("SELECT toUInt32(count()) AS value FROM default." <> label)
+  putStrLn ("external repair: " ++ Text.unpack action ++ "; process visibility=" ++ Text.unpack suffix ++ "; exact step and pending suffix preserved")

@@ -11,6 +11,7 @@ import ClickHouseMigrate.TestSupport.FaultProxy
 import ClickHouseMigrate.TestSupport.Server
 import Control.Monad (forM_, when)
 import Data.Aeson (Value)
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import RunnerIntegration (assert, field, fixture, fromJson, planFor, provider, right)
@@ -82,7 +83,10 @@ repairBoundaryCases server = do
     newPosition <- maybe (fail "Missing new position") pure currentPosition
     (newAttempt, newSteps) <- case current of [R.MigrationSummary _ _ (Just value) values] -> pure (value, values); _ -> fail "Missing new active attempt"
     assert "Authorization did not change attempt" (newAttempt /= attempt)
-    freshEvidence <- right (Repair.recoveryEvidence audit quiet receipt)
+    -- Exercise the explicit external policy across the real lost-authorization
+    -- receipts, with all original position/step/receipt checks still in force.
+    processObservations <- newIORef []
+    freshEvidence <- right (Repair.externalDrainRecoveryEvidence audit quiet receipt (\value -> modifyIORef' processObservations (<> [value])))
     fresh <- case action of
       "accept" -> do
         step <- selected newSteps
@@ -104,6 +108,8 @@ repairBoundaryCases server = do
         pure ()
       else pure ()
     _ <- I.verify I.Observe bound (I.verifyOptions True) plan >>= right
+    observations <- readIORef processObservations
+    assert "Receipt recovery lost its explicit diagnostic distinction" (not (null observations) && all (== Repair.NoVisibleRecordedQueries) observations)
     assert "Recovery replayed completed steps or executed acceptance SQL" . (== 2) =<< count proxy
     putStrLn ("repair authorization " ++ T.unpack action ++ ": lost response=" ++ show lost ++ "; ordinary restart blocked; fresh request succeeds without replay")
   -- Acceptance and finalization have their own dependent append acknowledgements.

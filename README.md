@@ -51,8 +51,8 @@ Documentation checks require `okf` 0.9.0.0 or later and `dhall`; see the
 
 The [compatibility matrix](docs/user/compatibility.md) identifies exact qualified
 Apple Silicon macOS and Altinity Linux arm64 server artifacts. The latter requires
-a pre-pulled immutable image and an explicit local Unix Docker context in
-`CLICKHOUSE_MIGRATE_DOCKER_CONTEXT`; it uses fresh owned containers. Client artifacts
+Apple Container with the pre-pulled immutable image; each fixture creates its own
+containers and replicated network. Client artifacts
 are qualified on Darwin; Linux client builders and remote CI execution remain separate.
 Test recipes own new server processes, credentials, temporary roots and ports; they
 never use a persistent application database. The

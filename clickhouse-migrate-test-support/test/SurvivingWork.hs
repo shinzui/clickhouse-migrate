@@ -15,7 +15,7 @@ import Control.Concurrent (forkFinally, killThread, newEmptyMVar, putMVar, takeM
 import Control.Exception (SomeAsyncException, finally, fromException)
 import Control.Monad (forM_, void)
 import Data.Aeson (Value)
-import Data.IORef (atomicModifyIORef', newIORef)
+import Data.IORef (atomicModifyIORef', modifyIORef', newIORef, readIORef)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Set qualified as Set
 import Data.Text qualified as T
@@ -122,6 +122,12 @@ survivingWorkCases server = do
             unsafe <- right (Repair.acceptStepRequest expected attempt selected falseEvidence)
             rejected <- Repair.repair (Run.mutationContext bound broken E.quietEvents E.redactedDiagnostics) plan unsafe
             assert "Recovery accepted a positively active predecessor" (case rejected of Left (R.RunFailure (R.PriorQueriesActive queries) _ _) -> query `elem` queries; _ -> False)
+            observations <- newIORef []
+            externalEvidence <- right (Repair.externalDrainRecoveryEvidence audit falseQuiet [] (\value -> modifyIORef' observations (<> [value])))
+            externalRequest <- right (Repair.acceptStepRequest expected attempt selected externalEvidence)
+            externallyRejected <- Repair.repair (Run.mutationContext bound broken E.quietEvents E.redactedDiagnostics) plan externalRequest
+            assert "External policy accepted a positively active predecessor" (case externallyRejected of Left (R.RunFailure (R.PriorQueriesActive queries) _ _) -> query `elem` queries; _ -> False)
+            assert "Active work was not retained as a positive diagnostic" . any (\case Repair.RecordedQueriesActive queries -> query `elem` queries; _ -> False) =<< readIORef observations
             stopClient
             assert "Server mutation did not survive client shutdown" =<< activeMutation
             blocked <- hostLocalExclusiveAccess root 1000000 Nothing >>= right

@@ -59,3 +59,22 @@ Applications must supply real exclusion/drain evidence; flags and types cannot p
 that promise. No Linux, Cloud, distributed/replicated, broad patch or power-loss claim
 follows from native process/server kill tests. The external runner replacement at
 `mori://shinzui/kansoku` remains a separate authorized workflow and release gate.
+
+
+## Per-invocation external-drain integration (2026-11-13)
+
+Add a separate handler entry point for an embedding application that already
+validated independent external drain. Keep the ordinary handler, parser command
+shapes, public environment constructor and JSON v1 representation unchanged. Only
+repair selects the explicit external evidence constructor. The observation states
+are delivered through a caller-owned Haskell callback, not additional implicit
+JSON authority. Callback failure uses the existing event-callback classification
+with the safe `RepairProcessObservation` phase. The native controlled embedding
+proves actual denied/own-user visibility, strict refusal, explicit retry/resume,
+callback cancellation and preserved stale-position checks before delivery.
+
+Owned Linux qualification now uses Apple Container. Fixtures require exact local
+image digest/platform matches and use inspected private addresses for Keeper and
+replicas, avoiding implicit container-name DNS. They stop only their recorded
+containers and guest process IDs. Historical Docker evidence retains its original
+execution boundary; updating workflow configuration is not a remote CI run.

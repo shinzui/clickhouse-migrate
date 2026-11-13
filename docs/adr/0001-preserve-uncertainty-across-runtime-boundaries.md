@@ -35,3 +35,21 @@ Server affinity, completion policy and durability still require the real-server 
 [ClickHouse HTTP documentation](https://clickhouse.com/docs/concepts/features/interfaces/http) explains response-body errors and continuing queries after connection loss. [ClickHouse transaction documentation](https://clickhouse.com/docs/concepts/features/operations/insert/transactions) describes operation-dependent atomicity. These support treating failure and missing observations conservatively.
 
 The locally inspected `Core.hs` and `Manager.hs` in `mori://snoyberg/http-client/packages/http-client` implement retry on reused connections when the configured predicate permits it. Dependency versions remain an implementation-time choice requiring registry/tag verification.
+
+
+## Explicit external diagnostic policy (2026-11-13)
+
+Keep the existing recovery-evidence constructor strict. An embedding caller with
+independently established, retained external drain may explicitly opt in to a
+permission-denied process diagnostic without weakening any target, ledger,
+position, attempt, receipt or live-guard check. Only a complete native access-denied
+response from that optional read is eligible. Malformed rows, unrelated transport
+failures, failed ledger reads and cancellation remain failures. Positive recorded
+active work blocks both policies. Missing or denied observations never establish
+quiescence.
+
+Deliver no-recorded-query, no-visible-query, active-query and unavailable states
+through a required typed observer before recovery authorization. Observer failure
+stops authorization, and asynchronous cancellation propagates. The embedding
+application retains these diagnostics with its own external owner/freshness proof;
+the library does not parse platform receipts or mint reusable authority.

@@ -4,6 +4,7 @@ title: "Mounting the CLI"
 description: "Mount reusable migration commands with application-owned configuration, output, and exit policy."
 docId: DOC-4
 tags: ["cli", "integration", "adoption"]
+timestamp: 2026-11-13T21:53:35Z
 generated:
   by: human:nadeem
   at: 2026-10-16T17:20:17Z
@@ -80,3 +81,23 @@ Only with an actual retained source checksum may a mapping use
 historical bytes). The core verifies the historical digest; current file hashes
 alone cannot promote evidence. Attested evidence forbids `historicalBytesHex`.
 No optional field implicitly imports SQL or grants administrative authority.
+
+
+## Embedding an independently verified external-drain policy (unreleased)
+
+`handleCommand` keeps its existing strict repair behavior. An embedding application
+that already validated and retained independent external drain may call
+`handleCommandWithExternalDrain observationSink environment plan command` for that
+single invocation. Only repair uses this opt-in; no parser flag, command shape,
+`CommandEnvironment` constructor or JSON v1 field changes. The application retains
+the typed `RepairObservation` with its own owner/counter evidence. Refer to the
+[operational contract](operations.md#explicit-external-drain-with-unavailable-process-diagnostics-unreleased)
+for observations, retained authority and refusal rules.
+
+Do not select this handler merely because a process view is empty or denied.
+The application must keep every submitting principal excluded and old native work
+drained, enforce its own freshness and identity requirements, preserve exact
+uncertain receipts, and keep its provider alive through the call. A failed audit
+sink prevents recovery authorization. Standalone callers using the ordinary
+handler keep the strict default. This source-candidate API is not in published
+0.2.0.0; delivery and downstream cohort qualification remain separate gates.

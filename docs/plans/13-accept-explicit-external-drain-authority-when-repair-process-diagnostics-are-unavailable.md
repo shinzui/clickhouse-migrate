@@ -9,6 +9,12 @@ provenance:
     model: "gpt-6.1-sol"
     harness: "codex-cli"
     at: 2026-11-13T19:21:21Z
+  revisions:
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-11-13T21:34:38Z
+      mode: "implement"
+      note: "Implement additive opt-in repair evidence and per-call CLI observer while preserving strict default and frozen JSON"
 ---
 
 # Accept explicit external drain authority when repair process diagnostics are unavailable
@@ -31,11 +37,14 @@ and
 
 ## Progress
 
-- [ ] M1: Explicit observation policy and public failure/report behavior preserve strict existing recovery while representing unavailable diagnostics under independent external authority.
+- [x] M1 (2026-11-13): Additive `externalDrainRecoveryEvidence`, typed observer states and per-invocation `handleCommandWithExternalDrain` preserve strict existing APIs and JSON v1. A real scoped-role embedding passes denied metadata retry and SDK resume, with observer failure/cancellation and stale-position refusal. Only complete native access-denied code 497 is optional; every other failure remains fatal.
 - [ ] M2: Owned native repair covers denied/own-user observations, visible recorded work, stale positions, exact receipts and retained exclusion; qualification and source archives pass before adoption.
 
-No source or package-version change is made by creating this plan. Kansoku currently
-uses released 0.2.0.0; upstream delivery and downstream qualification remain open.
+Source implementation is now in progress. No package version has been selected
+or published. Kansoku still uses released 0.2.0.0; final upstream qualification,
+delivery and downstream adoption remain open. The expanded native repair group
+passes six denied/own-user operation flows and the existing interrupted-authorization
+receipt cases using the explicit policy for fresh recovery.
 
 ## Surprises & Discoveries
 
@@ -43,7 +52,19 @@ uses released 0.2.0.0; upstream delivery and downstream qualification remain ope
 A denied observation therefore aborts repair despite independently supplied
 `RecoveryEvidence`. Its source already documents that absence is only diagnostic.
 
+The Linux fixtures previously required a Docker/Colima context. They now use
+Apple Container, exact inspected image digests/platforms, private bind mounts,
+owned lifecycle handles and inspected replica/Keeper addresses. A first smoke
+run exposed absent container-name DNS; it failed before bootstrap and retained
+evidence. Using inspected addresses passes single-server restart and two-replica
+bootstrap without DNS assumptions. CI configuration follows the same runtime;
+remote execution remains unclaimed.
+
 ## Decision Log
+
+2026-11-13: Use additive evidence and handler functions plus a required typed
+observer, preserving existing public constructors and JSON v1. Do not add a
+standalone flag that mistakes diagnostic denial for external authority.
 
 2026-11-13: Keep strict recovery as the existing API default. A caller must choose
 an explicit external-authority policy before an unavailable observation can be
@@ -64,8 +85,11 @@ request constructors, guarded repair and `activeQueries`. The internal
 classification. `Report.hs`, `Event.hs` and the CLI renderer own public diagnostic
 reporting; the new policy must not change ledger event hashes or historical bytes.
 Read the relevant checked-in user contracts and existing repair integration tests
-before changing those surfaces. No local ADR corpus was found during this scoped
-discovery; durable contract decisions belong in the existing user contracts.
+before changing those surfaces. The plain Markdown ADR corpus includes
+[uncertainty boundaries](../adr/0001-preserve-uncertainty-across-runtime-boundaries.md)
+and [owned CLI policy](../adr/0009-mount-cli-with-owned-policy-and-native-release-evidence.md);
+these have been amended with the explicit opt-in and observer contract. There is
+no profiled ADR bundle; user documentation has its own strict OKF profile.
 
 Kansoku owns its versioned envelope, persistent PostgreSQL owner/predecessor
 binding, expected UUID inventory and retained proof audit. This library does not

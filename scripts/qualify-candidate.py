@@ -27,10 +27,8 @@ def main():
     ref = 'refs/tags/' + args.tag
     if ref not in refs:
         raise SystemExit('Tag not found: ' + args.tag + '; use the exact published upstream tag')
-    context = os.environ.get('CLICKHOUSE_MIGRATE_DOCKER_CONTEXT')
-    if not context:
-        raise SystemExit('Set CLICKHOUSE_MIGRATE_DOCKER_CONTEXT to the isolated qualification context')
-    docker = ['docker', '--context', context, 'buildx', 'imagetools', 'inspect']
+    # Registry metadata inspection does not run a local Docker daemon.
+    docker = ['docker', 'buildx', 'imagetools', 'inspect']
     index = json.loads(output(*docker, '--raw', args.image))
     manifests = [m for m in index['manifests'] if m['platform']['os'] == 'linux' and m['platform']['architecture'] == 'arm64']
     if len(manifests) != 1:
@@ -50,7 +48,7 @@ def main():
     entry['groups'] = template['groups']
     entry['scope'] = template['scope']
     print(json.dumps(entry, indent=2))
-    print('\nCI: docker --context "$CLICKHOUSE_MIGRATE_DOCKER_CONTEXT" pull ' + entry['image'], file=sys.stderr)
+    print('\nCI: container image pull --platform linux/arm64 ' + entry['image'], file=sys.stderr)
     print('\nEvidence skeleton: record tag/commit/index/manifest above, host/compiler, both artifact variants, every declared group, failures and scope limits.', file=sys.stderr)
     if args.write:
         matrix = json.loads(MATRIX.read_text())

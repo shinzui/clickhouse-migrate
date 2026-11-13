@@ -1,5 +1,11 @@
 # Bundle Update Log
 
+## 2026-11-13
+
+* **Update**: Use Apple Container for owned Linux candidate and replicated fixtures, with exact digest/platform checks and inspected private addresses; distinguish historical and remote CI evidence.
+
+* **Update**: DOC-13 and DOC-4: document unreleased explicit external-drain evidence and per-call embedding handler; preserve strict defaults and JSON v1.
+
 ## 2026-11-07
 * **Add**: Replicated checksum v2 (DOC-14) and SQL envelope v2 (DOC-15).
 * **Update**: Document replicated configuration, completion, ledger storage, JSON additions and errors (DOC-3, DOC-5, DOC-8, DOC-9, DOC-11, DOC-12, DOC-13); link v1 checksums to v2 (DOC-7).

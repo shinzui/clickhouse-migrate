@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Owned Keeper plus two replicas; no shared server or Docker network."""
+"""Owned Keeper plus two replicas; no shared server or container network."""
 import base64
 import http.client
 import json
@@ -17,7 +17,7 @@ import time
 import urllib.parse
 import uuid
 
-from native_fixture import NativeServer, PASSWORD
+from native_fixture import NativeServer, PASSWORD, port, verify_apple_image
 
 
 class RoundRobin:
@@ -70,23 +70,15 @@ class ReplicatedServer:
             raise RuntimeError('Replicated fixture requires an OCI candidate')
         self.entry = entry
         self.root = Path(tempfile.mkdtemp(prefix='clickhouse-migrate-replicated-', dir='/tmp'))
-        context = os.environ.get('CLICKHOUSE_MIGRATE_DOCKER_CONTEXT')
-        if not context:
-            raise RuntimeError('Replicated fixture requires an explicit isolated Docker context')
-        self.docker = ['docker', '--context', context]
-        endpoint = json.loads(subprocess.check_output(self.docker + ['context', 'inspect', context], text=True))[0]['Endpoints']['docker']['Host']
-        if not endpoint.startswith('unix://'):
-            raise RuntimeError('Owned replicated fixture requires a local Unix Docker socket')
-        image = json.loads(subprocess.check_output(self.docker + ['image', 'inspect', entry['image']], text=True))[0]
-        if image['Architecture'] != entry['architecture'] or image['Os'] != 'linux':
-            raise RuntimeError('Replicated OCI candidate platform mismatch; pre-pull the exact matrix digest')
+        self.runtime = ['container']
+        verify_apple_image(entry)
         self.network = 'clickhouse-migrate-' + uuid.uuid4().hex
         self.keeper = None
         self.replicas = []
         self.proxy = None
         self.closed = False
         try:
-            subprocess.run(self.docker + ['network', 'create', '--label', 'clickhouse-migrate.fixture=owned', self.network], check=True, capture_output=True)
+            subprocess.run(self.runtime + ['network', 'create', '--label', 'clickhouse-migrate.fixture=owned', self.network], check=True, capture_output=True)
             keeper_name = self.network + '-keeper'
             self.keeper = keeper_name
             keeper_config = self.root / 'keeper.xml'
@@ -96,12 +88,15 @@ class ReplicatedServer:
 <coordination_settings><operation_timeout_ms>10000</operation_timeout_ms><session_timeout_ms>10000</session_timeout_ms></coordination_settings>
 <raft_configuration><server><id>1</id><hostname>localhost</hostname><port>9234</port></server></raft_configuration>
 </keeper_server></clickhouse>''')
-            subprocess.run(self.docker + ['create', '--name', keeper_name, '--network', self.network, '--label', 'clickhouse-migrate.fixture=owned', '--user', str(os.getuid()), '-p', '127.0.0.1::9181', '--memory', '512m', '--entrypoint', '/bin/sh', entry['image'], '-c', 'exec sleep 2147483647'], check=True, capture_output=True)
-            subprocess.run(self.docker + ['cp', str(self.root) + '/.', keeper_name + ':/fixture'], check=True, capture_output=True)
-            subprocess.run(self.docker + ['start', keeper_name], check=True, capture_output=True)
+            keeper_port = port()
+            subprocess.run(self.runtime + ['run', '--detach', '--name', keeper_name,
+                '--network', self.network, '--label', 'clickhouse-migrate.fixture=owned',
+                '--user', str(os.getuid()), '-p', f'127.0.0.1:{keeper_port}:9181',
+                '--memory', '512m', '--platform', 'linux/' + entry['architecture'],
+                '--volume', str(self.root) + ':/fixture', '--entrypoint', '/bin/sh',
+                entry['image'], '-c', 'exec sleep 2147483647'], check=True, capture_output=True, timeout=60)
             self.keeper_log = (self.root / 'keeper.log').open('w')
-            self.keeper_process = subprocess.Popen(self.docker + ['exec', keeper_name, 'clickhouse', 'keeper', '--config-file=/fixture/keeper.xml'], stdout=self.keeper_log, stderr=subprocess.STDOUT)
-            keeper_port = int(subprocess.check_output(self.docker + ['port', keeper_name, '9181/tcp'], text=True).strip().rsplit(':', 1)[1])
+            self.keeper_process = subprocess.Popen(self.runtime + ['exec', keeper_name, 'clickhouse', 'keeper', '--config-file=/fixture/keeper.xml'], stdout=self.keeper_log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + 20
             while time.monotonic() < deadline:
                 if self.keeper_process.poll() is not None:
@@ -117,11 +112,20 @@ class ReplicatedServer:
             else:
                 raise RuntimeError('Keeper readiness deadline expired')
             names = [self.network + '-r1', self.network + '-r2']
-            cluster = '<remote_servers><fixture><shard>' + ''.join('<replica><host>' + name + '</host><port>9000</port><user>default</user><password>' + PASSWORD + '</password></replica>' for name in names) + '</shard></fixture></remote_servers>'
-            for i, name in enumerate(names):
-                extra = cluster + '<zookeeper><node><host>' + keeper_name + '</host><port>9181</port></node></zookeeper><macros><cluster>fixture</cluster><shard>1</shard><replica>r' + str(i + 1) + '</replica></macros><interserver_http_port>9009</interserver_http_port><interserver_http_host>' + name + '</interserver_http_host><distributed_ddl><path>/clickhouse/task_queue/ddl</path></distributed_ddl>'
-                self.replicas.append(NativeServer(entry, dict(name=name, network=self.network, config=extra)))
-                (self.root / 'replicas.json').write_text(json.dumps([dict(replica='r' + str(n + 1), root=str(replica.root), endpoint=replica.endpoint) for n, replica in enumerate(self.replicas)], indent=2) + '\n')
+            for name in names:
+                self.replicas.append(NativeServer(entry, dict(name=name, network=self.network, config='', defer_start=True)))
+            def address(name):
+                inspected = json.loads(subprocess.check_output(['container', 'inspect', name], text=True))[0]
+                return inspected['status']['networks'][0]['ipv4Address'].split('/')[0]
+            addresses = [address(name) for name in names]
+            keeper_address = address(keeper_name)
+            cluster = '<remote_servers><fixture><shard>' + ''.join('<replica><host>' + ip + '</host><port>9000</port><user>default</user><password>' + PASSWORD + '</password></replica>' for ip in addresses) + '</shard></fixture></remote_servers>'
+            for i, replica in enumerate(self.replicas):
+                extra = cluster + '<zookeeper><node><host>' + keeper_address + '</host><port>9181</port></node></zookeeper><macros><cluster>fixture</cluster><shard>1</shard><replica>r' + str(i + 1) + '</replica></macros><interserver_http_port>9009</interserver_http_port><interserver_http_host>' + addresses[i] + '</interserver_http_host><distributed_ddl><path>/clickhouse/task_queue/ddl</path></distributed_ddl>'
+                config = replica.root / 'config.xml'
+                config.write_text(config.read_text().replace('</clickhouse>', extra + '</clickhouse>'))
+                replica.ready()
+                (self.root / 'replicas.json').write_text(json.dumps([dict(replica='r' + str(n + 1), root=str(r.root), endpoint=r.endpoint) for n, r in enumerate(self.replicas)], indent=2) + '\n')
             # Administrative bootstrap exactly mirrors consumer infrastructure.
             for database in ['fixture_app', 'fixture_ledger']:
                 result = self.request(0, "CREATE DATABASE " + database + " ON CLUSTER fixture ENGINE=Replicated('/clickhouse/databases/{uuid}', '{shard}', '{replica}')", user='default')
@@ -182,13 +186,13 @@ class ReplicatedServer:
         for replica in reversed(self.replicas):
             replica.close(success)
         if self.keeper:
-            logs = subprocess.run(self.docker + ['logs', self.keeper], capture_output=True, text=True)
+            logs = subprocess.run(self.runtime + ['logs', self.keeper], capture_output=True, text=True)
             (self.root / 'keeper-container.log').write_text(logs.stdout + logs.stderr)
-            subprocess.run(self.docker + ['rm', '-f', self.keeper], capture_output=True, timeout=15)
+            subprocess.run(self.runtime + ['delete', '--force', self.keeper], capture_output=True, timeout=15)
             if hasattr(self, 'keeper_process'):
                 self.keeper_process.wait(timeout=10)
                 self.keeper_log.close()
-        subprocess.run(self.docker + ['network', 'rm', self.network], capture_output=True, timeout=15)
+        subprocess.run(self.runtime + ['network', 'delete', self.network], capture_output=True, timeout=15)
         if success:
             shutil.rmtree(self.root)
         else:
