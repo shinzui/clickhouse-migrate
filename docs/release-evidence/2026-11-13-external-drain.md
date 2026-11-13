@@ -24,7 +24,7 @@ both Linux artifacts, including Keeper/two-replica restart and recovery. This is
 not a claim that the failed working-tree 41-case command completed successfully.
 The matrix runner now checks every OCI prerequisite before starting native work.
 
-Six actual scoped-role repair flows exercise denied and own-user observations,
+Six actual scoped-role repair flows exercise denied and read-granted observations,
 retry, accept, finalize and resume; strict refusal, observer failure/cancellation
 and stale native positions remain covered. Interrupted recovery retains exact
 pending receipts. Both real surviving-mutation cases refuse visible recorded work
@@ -58,3 +58,14 @@ source selection for the complete cohort. No package version, release tag or
 Hackage upload is selected by this implementation. Downstream selection and
 acceptance belong to
 `mori://shinzui/kansoku/plans/50-accept-portable-drain-evidence-without-cross-user-process-visibility`.
+
+
+Qualification clarification: the read-granted fixture above did not run a second
+user's active query to prove row isolation. Kansoku's subsequent joined test found
+that SELECT on system.processes alone exposes cross-user query text on 26.8.28.14.
+That fixture therefore qualifies diagnostic availability, not an enforced own-user
+view. Actual isolation requires denying SELECT or an operator-owned row policy
+verified against active other-user work. The delivered SDK still requires explicit
+external drain authority and refuses visible recorded work. The corrected joined
+application proof belongs to
+`mori://shinzui/kansoku/plans/53-prove-shared-server-maintenance-across-deployment-platforms`.
