@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add explicit bounded SELECT-only inspection for constrained reader roles; preserve strict defaults and refuse overflowing histories.
+
 - Add `externalDrainRecoveryEvidence` and typed `RepairObservation` callbacks for callers retaining independent external drain. Only explicit process access denial becomes unavailable diagnostics; visible recorded work and all ordinary repair checks remain blocking. Existing `recoveryEvidence` remains strict.
 
 ## 0.2.0.0 — 2026-11-08

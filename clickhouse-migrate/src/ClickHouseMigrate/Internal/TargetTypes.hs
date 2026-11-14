@@ -32,7 +32,8 @@ data TargetConfig = TargetConfig
     configNamespace :: !LedgerNamespace,
     configBinding :: !LedgerBinding,
     configCredentials :: !Credentials,
-    configLimits :: !HttpLimits
+    configLimits :: !HttpLimits,
+    configObservationLimits :: !(Maybe (Int, Int))
   }
 
 data ServerIdentity = ServerIdentity !ServerId !Text !Text deriving stock (Eq, Show)

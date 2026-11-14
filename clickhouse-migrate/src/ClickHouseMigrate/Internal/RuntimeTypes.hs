@@ -10,6 +10,6 @@ data MutationContext = MutationContext !TargetConfig !ExclusiveAccess !EventSink
 
 data UpOptions = UpOptions !AuditContext !(Maybe InitializationAuthorization)
 
-data InspectionOptions = Observe | Guarded !ExclusiveAccess
+data InspectionOptions = Observe | ObserveBounded !Int !Int | Guarded !ExclusiveAccess
 
 data VerifyOptions = VerifyOptions !Bool deriving stock (Eq, Show)

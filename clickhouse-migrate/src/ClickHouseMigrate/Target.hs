@@ -111,7 +111,7 @@ defaultHttpLimits :: HttpLimits
 defaultHttpLimits = HttpLimits 30000000 1048576
 
 targetConfig :: TargetKey -> DirectEndpoint -> ServerId -> LedgerNamespace -> LedgerBinding -> Credentials -> HttpLimits -> TargetConfig
-targetConfig key endpoint identity = TargetConfig key endpoint (DirectServer identity)
+targetConfig key endpoint identity namespace binding credentials limits = TargetConfig key endpoint (DirectServer identity) namespace binding credentials limits Nothing
 
 targetKeyText :: TargetKey -> Text
 targetKeyText (TargetKey value) = value
@@ -183,4 +183,4 @@ replicatedTargetConfig :: TargetKey -> DirectEndpoint -> ClusterName -> NonEmpty
 replicatedTargetConfig key endpoint cluster replicas namespace binding credentials limits@(HttpLimits micros _)
   | Set.size (Set.fromList (NE.toList replicas)) /= NE.length replicas = Left DuplicateReplica
   | micros < 5000000 = Left InvalidHttpLimits
-  | otherwise = Right (TargetConfig key endpoint (ReplicatedCluster cluster replicas) namespace binding credentials limits)
+  | otherwise = Right (TargetConfig key endpoint (ReplicatedCluster cluster replicas) namespace binding credentials limits Nothing)

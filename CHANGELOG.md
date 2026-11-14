@@ -5,6 +5,8 @@ one `v<version>` tag. Per-package details live in each package's `CHANGELOG.md`.
 
 ## Unreleased
 
+- Add explicit bounded SELECT-only inspection for constrained reader roles; preserve strict defaults and refuse overflowing histories.
+
 - Add explicit external-drain repair authority with required typed process diagnostics, preserving strict defaults and CLI JSON v1.
 - Run owned Linux single-server and replicated qualification fixtures through Apple Container.
 

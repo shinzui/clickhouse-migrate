@@ -146,7 +146,7 @@ checkValue (ProbeFailure failure) = object ["probeFailure" .= outcomeValue failu
 -- The fixture owns a fresh isolated server, and this explicit provider represents
 -- its single administrative process. It is not an application/default provider.
 ledgerSmoke :: TargetConfig -> QueryId -> IO ()
-ledgerSmoke config@(TargetTypes.TargetConfig key _ _ _ _ _ _) probe = do
+ledgerSmoke config@(TargetTypes.TargetConfig key _ _ _ _ _ _ _) probe = do
   audit <- either (fail . show) pure (Ledger.auditContext "test operator's \"review\" 雪" "roundtrip\nencoding" ["owned isolated fixture"])
   quiet <- either (fail . show) pure (Ledger.attestQuiescence key audit)
   uuid <- freshUuid >>= either (fail . show) pure . ledgerId
@@ -178,7 +178,7 @@ ledgerSmoke config@(TargetTypes.TargetConfig key _ _ _ _ _ _) probe = do
     unlessTest condition message = if condition then pure () else fail message
 
 ledgerProtocol :: String -> TargetConfig -> QueryId -> IO ()
-ledgerProtocol mode config@(TargetTypes.TargetConfig key _ _ namespace _ _ _) probe = do
+ledgerProtocol mode config@(TargetTypes.TargetConfig key _ _ namespace _ _ _ _) probe = do
   audit <- either (fail . show) pure (Ledger.auditContext "protocol test administrator" "one-shot ledger qualification" ["owned isolated fixture; predecessor requests are quiescent"])
   quiet <- either (fail . show) pure (Ledger.attestQuiescence key audit)
   requested <- lookupEnv "CHM_LEDGER_ID"

@@ -1,6 +1,7 @@
 # Bundle Update Log
 
 ## 2026-11-14
+* **Update**: DOC-13: document explicit bounded read-only inspection and throwing overflow.
 * **Update**: DOC-5: qualify the exact direct Linux arm64 26.8.28.14 OCI artifact with 13 working-tree, extracted-source and Nix groups; preserve topology/client limits.
 
 ## 2026-11-13

@@ -134,6 +134,24 @@ runnerEarlyCases server = do
     kinds <- mapM (field "stage") received :: IO [Maybe Text.Text]
     assert "Completed migration replayed" (length (filter (== Just "application-sql") kinds) == 2)
     _ <- Inspect.verify Inspect.Observe bound (Inspect.verifyOptions True) plan >>= right
+    -- A constrained reader rejects the legacy unlimited-result requests.
+    -- Explicit bounded observation succeeds; overflow cannot return a prefix.
+    let reader = "bounded_history_reader"
+        namespace = label <> "_history"
+    _ <- queryServer server ("CREATE USER " <> reader <> " IDENTIFIED BY 'bounded-test' SETTINGS readonly=2 CONST, max_result_rows=10000 MIN 1 MAX 10000, max_result_bytes=1048576 MIN 1 MAX 1048576")
+    _ <- queryServer server ("GRANT SELECT ON " <> namespace <> ".* TO " <> reader)
+    _ <- queryServer server ("GRANT SELECT ON system.disks TO " <> reader)
+    _ <- queryServer server ("GRANT SELECT ON system.storage_policies TO " <> reader)
+    sid <- case configuredTopology bound of DirectServer value -> pure value; _ -> fail "expected direct fixture"
+    readerConfig <- targetConfig (configuredTargetKey bound) <$> right (directEndpoint (serverEndpoint server)) <*> pure sid <*> right (ledgerNamespace namespace) <*> pure (ExistingLedger persisted) <*> right (basicCredentials reader "bounded-test") <*> pure defaultHttpLimits
+    legacy <- Inspect.verify Inspect.Observe readerConfig (Inspect.verifyOptions True) plan
+    assert "unbounded request unexpectedly admitted by constrained role" (case legacy of Left _ -> True; _ -> False)
+    bounded <- maybe (fail "invalid bounds") pure (Inspect.boundedObservation 10000 1048576)
+    _ <- Inspect.verify bounded readerConfig (Inspect.verifyOptions True) plan >>= right
+    tiny <- maybe (fail "invalid tiny bound") pure (Inspect.boundedObservation 1 1048576)
+    overflow <- Inspect.verify tiny readerConfig (Inspect.verifyOptions True) plan
+    assert "bounded ledger overflow returned false success" (case overflow of Left _ -> True; _ -> False)
+    putStrLn "bounded readonly inspection: constrained role accepted; overflowing history refuses without prefix success"
     changed <- planFor label 8
     blocked <- Run.up (Run.mutationContext bound access Event.quietEvents Event.redactedDiagnostics) (Run.upOptions audit Nothing) changed
     assert "Modified applied SQL accepted" (case blocked of Left (R.RunFailure (R.IncompatibleHistory _) _ _) -> True; _ -> False)

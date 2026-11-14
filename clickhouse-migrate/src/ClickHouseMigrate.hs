@@ -11,6 +11,7 @@ module ClickHouseMigrate
     upOptions,
     up,
     InspectionOptions (Observe, Guarded),
+    boundedObservation,
     VerifyOptions,
     verifyOptions,
     status,

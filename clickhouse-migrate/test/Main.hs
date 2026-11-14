@@ -48,6 +48,9 @@ main = do
   streamValidation
   scheduleValidation
   targetValidation
+  assert "zero row observation bound refused" (case boundedObservation 0 1 of Nothing -> True; _ -> False)
+  assert "zero byte observation bound refused" (case boundedObservation 1 0 of Nothing -> True; _ -> False)
+  assert "positive observation bounds admitted" (case boundedObservation 10000 1048576 of Just _ -> True; _ -> False)
   directProfilePins
   replicatedTargetValidation
   let sql = "CREATE TABLE app.events (id UInt64) ENGINE=MergeTree ORDER BY id"

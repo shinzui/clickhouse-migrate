@@ -243,7 +243,7 @@ makeRequest config endpoint user password micros identity kind sql = do
   let request =
         HTTP.applyBasicAuth user password $
           HTTP.setQueryString
-            (Profile.requestSettings (configTopology config) (configLimits config) identity kind)
+            (observationSettings config kind (Profile.requestSettings (configTopology config) (configLimits config) identity kind))
             base
               { HTTP.method = "POST",
                 HTTP.requestBody = HTTP.RequestBodyBS sql,
@@ -260,3 +260,9 @@ registered threads action = mask $ \restore -> do
   identity <- myThreadId
   atomicModifyIORef' threads (\old -> (identity : old, ()))
   restore action `finally` atomicModifyIORef' threads (\old -> (filter (/= identity) old, ()))
+
+-- Used only by Inspection.boundedObservation; defaults retain their byte pins.
+observationSettings :: TargetConfig -> RequestKind -> [(ByteString, Maybe ByteString)] -> [(ByteString, Maybe ByteString)]
+observationSettings config kind settings = case configObservationLimits config of
+  Just (rows, bytes) | kind /= Command -> map (\(key, value) -> (key, if key == "max_result_rows" then Just (Encoding.encodeUtf8 (Text.pack (show rows))) else if key == "max_result_bytes" then Just (Encoding.encodeUtf8 (Text.pack (show bytes))) else value)) settings
+  _ -> settings

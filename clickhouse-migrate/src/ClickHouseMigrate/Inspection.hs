@@ -1,6 +1,7 @@
 -- | Read-only observations. No inspection path initializes or repairs history.
 module ClickHouseMigrate.Inspection
   ( InspectionOptions (Observe, Guarded),
+    boundedObservation,
     VerifyOptions,
     verifyOptions,
     status,
@@ -25,11 +26,22 @@ import ClickHouseMigrate.Report qualified as R
 import Control.Exception (SomeAsyncException, SomeException, fromException, throwIO, try)
 import Data.IORef (newIORef, readIORef, writeIORef)
 
+-- | An explicitly bounded SELECT-only observation for constrained reader roles.
+-- Server overflow modes remain throwing, so a truncated history is never success.
+-- No mutation or guarded-inspection path accepts these bounds.
+boundedObservation :: Int -> Int -> Maybe InspectionOptions
+boundedObservation rows bytes
+  | rows > 0 && bytes > 0 = Just (ObserveBounded rows bytes)
+  | otherwise = Nothing
+
 verifyOptions :: Bool -> VerifyOptions
 verifyOptions = VerifyOptions
 
 history :: InspectionOptions -> TargetConfig -> IO (Either R.InspectionFailure R.HistoryReport)
-history options config@(TargetConfig {configKey = target}) = do
+history options original@(TargetConfig {configKey = target}) = do
+  let config = case options of
+        ObserveBounded rows bytes -> original {configObservationLimits = Just (rows, bytes)}
+        _ -> original
   latest <- newIORef Nothing
   observed <- try @SomeException $ do
     probe <- QueryId . ("chm-" <>) <$> freshUuid
@@ -51,6 +63,7 @@ history options config@(TargetConfig {configKey = target}) = do
           )
     case options of
       Observe -> flatten <$> scoped Nothing R.UnguardedObservation
+      ObserveBounded _ _ -> flatten <$> scoped Nothing R.UnguardedObservation
       Guarded provider@(ExclusiveAccess description _ _ _ _) -> do
         AccessResult result cleanup <- withExclusive provider target (\guard -> scoped (Just guard) (R.GuardedObservation description))
         pure $ case result of

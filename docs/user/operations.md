@@ -4,7 +4,7 @@ title: "Operating the Haskell API"
 description: "Operate the Haskell API and recover uncertain work using explicit coordination and evidence."
 docId: DOC-13
 tags: ["operations", "recovery", "coordination"]
-timestamp: 2026-11-13T21:53:35Z
+timestamp: 2026-11-14T01:47:31Z
 generated:
   by: human:nadeem
   at: 2026-10-16T15:34:07Z
@@ -177,3 +177,16 @@ error, SQL or credential is delivered through this diagnostic callback. All exac
 position, attempt, selected-step and pending-receipt checks remain in force.
 Every later recovery call still needs current caller-established exclusion/drain;
 this API does not turn an old observation into standing authorization.
+
+## Constrained SELECT-only inspection
+
+The unreleased source API `boundedObservation rows bytes` returns an explicit
+observation option when both bounds are positive. Use it with `history`, `status`
+or `verify` for a reader whose server policy forbids unlimited results, for example
+`boundedObservation 10000 1048576`. No mutation context or guarded option accepts
+these bounds. Ordinary `Observe` and all mutation/repair requests keep their
+existing request settings. Result, read, timeout and sort overflow modes remain
+`throw`: exceeding the bound fails the entire observation and never accepts a
+truncated history. The server identity and storage checks, ledger validation,
+response bounds and cleanup checks still run. This API is a source candidate,
+not part of the published 0.2.0.0 release.
