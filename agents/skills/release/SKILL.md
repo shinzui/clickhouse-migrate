@@ -15,8 +15,13 @@ with a single shared version and one git tag per release.
 ## Versioning Strategy
 
 All published packages share the **same version number** and are released
-together. A single annotated git tag `v<version>` marks each release. They are
-currently all at `0.1.0.0`.
+together. A single annotated git tag `v<version>` marks each release (prior
+releases: `v0.1.0.0`, `v0.2.0.0`, `v0.2.1.0`). Always read the current version
+from the cabal files rather than assuming it.
+
+The three unpublished example packages (see below) are **versioned in lockstep**
+with the published packages even though they never go to Hackage:
+`just qualify-distributions` requires all seven packages at the same version.
 
 The Haskell PVP version format is `A.B.C.D`:
 
@@ -38,7 +43,7 @@ Increment rules:
 ## Packages (in dependency order)
 
 Publish in this order because of inter-package dependencies (each non-core
-package depends on `clickhouse-migrate ^>=` the core library):
+package depends on the core library via `clickhouse-migrate ==A.B.*`):
 
 1. **clickhouse-migrate** — `clickhouse-migrate/` — core definitions and
    execution (no internal deps). **Publish first.**
@@ -63,6 +68,8 @@ in-repo example app that demonstrates composition:
 - **clickhouse-migrate-example** — `examples/two-components/app/` (example
   executable).
 
+They are not uploaded, but their `version:` is bumped with every release (step 3).
+
 ## Arguments
 
 `$ARGUMENTS` is optional:
@@ -78,10 +85,10 @@ in-repo example app that demonstrates composition:
   `version:`; all packages share it).
 - Find the latest git tag matching `v*` to identify the last release point:
   `git tag --list 'v*'` / `git describe --tags --abbrev=0`.
-- If there are tags, run `git log --oneline <last-tag>..HEAD`; if there are no
-  tags yet, this is the **first release** — summarize `git log --oneline`
-  instead and treat the current `0.1.0.0` as the release version unless the
-  user asks to bump it.
+- Run `git log --oneline <last-tag>..HEAD`,
+  `git diff --stat <last-tag>..HEAD`, and read the `## Unreleased` sections of
+  the root and per-package `CHANGELOG.md` files (developers record entries
+  there as they go).
 - If there are no commits since the last tag, tell the user there is nothing
   to release and stop.
 
@@ -92,13 +99,18 @@ directories changed.
 ### 2. Determine the next version using PVP
 
 - If `$ARGUMENTS` is `major`, `minor`, or `patch`, use that bump level.
-- For the **first release** (no prior tag), default to keeping `0.1.0.0`
-  unless the user supplied a bump.
 - Otherwise analyze the commits (Conventional Commits prefixes help):
   - breaking / removed / renamed / changed type / `!` / `BREAKING CHANGE`,
     or any change to a versioned contract → **major**.
   - `feat` / new export / new module → **minor**.
   - `fix` / `docs` / `refactor` / `test` / `chore` / internal → **patch**.
+- Confirm against the actual source diff, not just commit prefixes:
+  `git diff <last-tag>..HEAD -- */src`. Only modules in each cabal's
+  `exposed-modules` are public; the `ClickHouseMigrate.Internal.*` modules are
+  `other-modules`, so changes there (including new constructors on types whose
+  constructors are not exported) are not breaking. Check export lists for
+  removed/changed names and new exported constructors (the latter is major —
+  consumers' exhaustive matches break).
 - Present the proposed bump and the resulting version, and **ask the user to
   confirm before proceeding**.
 
@@ -106,45 +118,74 @@ directories changed.
 
 #### Version update
 
-Edit the `version:` field (line 3) in each published cabal to the new version:
+Edit the `version:` field (line 3) in **all seven** cabal files — the four
+published packages and the three unpublished examples:
 
 - `clickhouse-migrate/clickhouse-migrate.cabal`
 - `clickhouse-migrate-embed/clickhouse-migrate-embed.cabal`
 - `clickhouse-migrate-cli/clickhouse-migrate-cli.cabal`
 - `clickhouse-migrate-test-support/clickhouse-migrate-test-support.cabal`
+- `examples/two-components/catalog/clickhouse-migrate-example-catalog.cabal`
+- `examples/two-components/analytics/clickhouse-migrate-example-analytics.cabal`
+- `examples/two-components/app/clickhouse-migrate-example.cabal`
 
-Verify all four are at the target version before committing.
+`sed` in the dev shell is GNU sed: use `sed -i '3s/^version: OLD$/version: NEW/'`
+(no `''` after `-i`). Verify with `grep -n '^version' */*.cabal examples/*/*/*.cabal`
+that all seven are at the target version. Skipping the examples makes
+`just qualify-distributions` fail with a missing
+`clickhouse-migrate-example-catalog-<version>.tar.gz`.
 
 #### Internal dependency bounds
 
-The non-core packages pin the core library as `clickhouse-migrate ==0.1.*`,
-and `clickhouse-migrate-test-support`'s integration test-suite also pins
-`clickhouse-migrate-cli ==0.1.*` and `clickhouse-migrate-embed ==0.1.*`.
+Every sibling reference uses a major-series bound `==A.B.*`:
 
-- For a **patch** or **minor** bump within the current `0.1.*` series, these
-  `==0.1.*` bounds stay valid — leave them unchanged.
-- For a **major** bump (e.g. `0.1.x` → `0.2.0.0`), update every internal
-  `==0.N.*` bound to the new major series (`==0.2.*`) in all packages that
-  reference a sibling (embed, cli, test-support — including the test-suite
-  build-depends in `clickhouse-migrate-test-support`). Grep for
-  `clickhouse-migrate ==` and `clickhouse-migrate-cli ==` /
-  `clickhouse-migrate-embed ==` to find them all.
+- embed, cli and test-support pin `clickhouse-migrate ==A.B.*`;
+  `clickhouse-migrate-test-support`'s integration test-suite also pins
+  `clickhouse-migrate-cli` and `clickhouse-migrate-embed`;
+- the examples pin `clickhouse-migrate`, `clickhouse-migrate-embed`,
+  `clickhouse-migrate-cli`, `clickhouse-migrate-test-support` and each other.
+
+- For a **patch** or **minor** bump, these bounds stay valid — leave them
+  unchanged.
+- For a **major** bump (e.g. `0.2.x` → `0.3.0.0`), update every internal
+  `==A.B.*` bound to the new series in all of them. Find them with
+  `grep -n 'clickhouse-migrate[a-z-]* ==' */*.cabal examples/*/*/*.cabal`.
 
 #### Changelogs
 
-There are currently **no `CHANGELOG.md` files**. Create a `CHANGELOG.md` in
-each published package directory on the first release (and maintain them
-after), plus a root `CHANGELOG.md`.
+The root `CHANGELOG.md` and each published package's `CHANGELOG.md` exist.
+Developers add entries under a `## Unreleased` heading as they work.
 
-- Add a new section for the new version above previous entries, dated today in
-  `YYYY-MM-DD` format.
-- Move any "Unreleased" content into the new section.
-- Summarize commits since the last release, grouped as **Breaking Changes**
-  (major), **New Features** (minor/major), **Bug Fixes**, and **Other
-  Changes** — include only non-empty groups.
+- Replace `## Unreleased` with `## <version> — YYYY-MM-DD` (today's date, em
+  dash, matching earlier sections), above previous entries.
+- Regroup the Unreleased bullets — plus anything from the commits they missed —
+  under **Breaking Changes** (major), **New Features** (minor/major),
+  **Bug Fixes**, and **Other Changes**, including only non-empty groups. Wrap
+  lines at ~80 columns like the existing sections.
+- A published package with no changes still gets a section, e.g.
+  `### Other Changes` / `- Release alongside the <version> core; no changes to
+  this package.`
+
+#### User docs
+
+New APIs are documented in `docs/user/` (an OKF bundle) as unreleased while
+they are in development. Find that wording and update it for the release:
+
+```bash
+grep -rnE 'unreleased|source.candidate|not (in|part of) (the )?published' README.md docs/user
+```
+
+- Replace "unreleased / source-candidate / not in published X" with
+  "available since <version>". Removing `(unreleased)` from a heading changes
+  its anchor — fix any links to it (e.g. `cli.md` links into `operations.md`).
+- Add a short release note to `docs/user/compatibility.md` stating what the
+  release changes for compatibility (contracts, runtime versions).
+- Add an entry to `docs/user/log.md` under today's `## YYYY-MM-DD` heading
+  (create it if missing), naming the touched docIds — `just check` runs
+  `okf validate --log-enforce`.
 
 Show the user **all** changes (version bumps, any bounds changes, changelog
-entries) for review before committing.
+entries, docs edits) for review before committing.
 
 ### 4. Verify builds and run the release gates
 
@@ -162,15 +203,32 @@ Run from the repo root, inside `nix develop` (the pinned GHC 9.12.4 shell):
   and runs the full native matrix against the archived sources. This proves
   the exact source distributions that will go to Hackage build and pass, so
   do not skip it.
+  - It takes about **15–20 minutes**: ~3.5 min to build the archives, unit
+    suites and Haddocks, then ~54 sequential server cases across three
+    candidates (native LTS plus two Altinity Linux arm64 images in Apple
+    Container VMs, with Keeper/replica fixtures and deliberate timeout waits).
+    Run it with `run_in_background` and redirect output to a log in the
+    scratchpad. Success ends with `Seven archives, metadata, three pure suites,
+    Haddocks and the full native matrix passed`.
+  - The Linux candidates need Apple Container running (`container system start`)
+    with the matrix images pre-pulled.
 - `nix flake check --builders '' --accept-flake-config` — the CI gate
-  (treefmt + pre-commit).
+  (treefmt + pre-commit). It starts no servers, so it can run in parallel with
+  `just qualify-distributions`.
 
-If any gate fails, fix the issue and re-run before proceeding. Do not publish
-on a failing gate.
+`just check` takes a few minutes; it can also run in the background. Grepping
+its log for "error" or "fail" gives false positives (fault-injection case names
+such as `LateError`, "fail-closed"); rely on the exit code and the final lines.
+
+If any gate fails, fix the issue and re-run before proceeding. If you change
+any file after a gate passed, re-run at least `just check` before committing.
+Do not publish on a failing gate.
 
 ### 5. Commit, tag, and push
 
-- Stage the modified `.cabal` files and all `CHANGELOG.md` files.
+- Stage the modified `.cabal` files (all seven), all `CHANGELOG.md` files and
+  the `docs/user` edits (`git add -u` covers them when no new files were
+  created). The pre-commit hooks (treefmt and others) run on commit.
 - Create a single commit with a Conventional Commits message:
   `chore(release): <new-version>`. The body summarizes what is in the release
   and why this bump was chosen.
@@ -182,27 +240,36 @@ The commit and tag are created **only after** the user approves all changes
 
 ### 6. Publish to Hackage (in dependency order)
 
-Publishing is **irreversible**. For EACH package, in the order
-clickhouse-migrate → clickhouse-migrate-embed → clickhouse-migrate-cli →
+Publishing is **irreversible**. Prepare every artifact first, then ask the
+user for one final explicit confirmation before the first upload.
+
+**Prepare (after the tag is pushed, from the committed tree):**
+
+1. Build the four source tarballs into the scratchpad:
+   `cabal sdist clickhouse-migrate clickhouse-migrate-embed clickhouse-migrate-cli clickhouse-migrate-test-support --output-directory <scratchpad>/release/sdist`
+   (do not pass `all` — that includes the unpublished examples).
+2. Run `cabal check` in each published package directory (final guard).
+3. Build the Haddock tarballs:
+   `cabal haddock <pkg> --haddock-for-hackage --haddock-hyperlink-source --haddock-quickjump`
+   for each package. They land at `dist-newstyle/<pkg>-<version>-docs.tar.gz`.
+   A plain `cabal haddock` works for all four (verified for 0.2.1.0, including
+   `clickhouse-migrate-embed`; its library docs don't need an embedded
+   manifest). Only if that ever fails, mirror the `just haddock` recipe and run
+   it through
+   `cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input <pkg-dir> <manifest> -- haddock <pkg> ...`.
+
+**Upload**, for EACH package in the order clickhouse-migrate →
+clickhouse-migrate-embed → clickhouse-migrate-cli →
 clickhouse-migrate-test-support:
 
-1. `cabal sdist <pkg>` to build the source tarball (or reuse the archive from
-   `just qualify-distributions`).
-2. `cabal check` in the package directory (already covered by the gate; this
-   is a final guard).
-3. `cabal upload --publish <tarball-path>` to publish the source distribution.
-4. Upload Haddock documentation:
-   `cabal haddock <pkg> --haddock-for-hackage --haddock-hyperlink-source --haddock-quickjump`
-   then `cabal upload --publish --documentation <docs-tarball-path>`.
-   - **Note:** `clickhouse-migrate-embed` embeds SQL at compile time, so
-     generating its Haddock needs the embed inputs. Mirror the `just haddock`
-     recipe — run the build through
-     `cabal run clickhouse-migrate-embed:exe:clickhouse-migrate-embed-build -- --input clickhouse-migrate-embed test/fixtures/component/manifest.json -- haddock clickhouse-migrate-embed ...`
-     — if a plain `cabal haddock` fails for want of an embedded manifest. If
-     Hackage's own doc builder is preferred for a package, you may skip the
-     manual docs upload for it.
-5. Report the Hackage URL:
+1. `cabal upload --publish <sdist-tarball>`.
+2. `cabal upload --publish --documentation dist-newstyle/<pkg>-<version>-docs.tar.gz`.
+3. Report the Hackage URL:
    `https://hackage.haskell.org/package/<pkg>-<version>`.
+
+A single `bash -c 'set -e; for p in ...; do ...; done'` inside `nix develop`
+uploads all four in order and stops at the first failure. Credentials come from
+the user's cabal config; never print or pass them on the command line.
 
 If an upload fails for a package, **stop** — do not upload any package that
 depends on it (never publish a dependent after its upstream upload failed).
@@ -245,6 +312,9 @@ table, and report the GitHub release URL when done.
 
 - Always ask the user to confirm the version bump and changelogs **before**
   committing.
+- Bump all seven cabal versions (four published + three examples) together.
+- Ask for a separate, explicit confirmation immediately before the first
+  Hackage upload; approval to commit/tag/push does not cover publishing.
 - Always publish in dependency order: clickhouse-migrate → embed → cli →
   test-support.
 - Never skip the gates: `nix fmt`, `just check`, `just qualify-distributions`,
