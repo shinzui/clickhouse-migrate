@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-11-14
+* **Update**: DOC-5: qualify the exact direct Linux arm64 26.8.28.14 OCI artifact with 13 working-tree, extracted-source and Nix groups; preserve topology/client limits.
+
 ## 2026-11-13
 
 * **Update**: Use Apple Container for owned Linux candidate and replicated fixtures, with exact digest/platform checks and inspected private addresses; distinguish historical and remote CI evidence.

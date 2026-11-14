@@ -12,7 +12,8 @@ generated:
 # Compatibility evidence
 
 The exact server candidates are ClickHouse **26.8.28.14 LTS** on Apple Silicon macOS
-and **26.3.60.10001.altinitystable** and **26.3.60.10002.altinitystable** on Linux arm64 in an owned local container. The exact official binary URL, SHA-256, release tag object
+and in an exact owned Linux arm64 OCI image, plus **26.3.60.10001.altinitystable**
+and **26.3.60.10002.altinitystable** on Linux arm64 in owned local containers. The exact official binary URL, SHA-256, release tag object
 and dereferenced source commit are in
 [test/compatibility/clickhouse-matrix.json](../../test/compatibility/clickhouse-matrix.json).
 The fixture verifies the digest before execution. This file links to the packaged
@@ -199,3 +200,13 @@ The independent patch cohort is `0.1.0.2`; the replicated feature candidate is t
 On 2026-11-07 all three exact candidates passed all thirteen existing groups in both Nix and extracted-source variants (39 cases per variant). See [the independent 10002 evidence](../release-evidence/2026-11-07-altinity-10002.md).
 
 The `0.1.1.0` candidate passes the final 41-case matrix plus both installed-Nix replicated groups; see [the replicated qualification](../release-evidence/2026-11-07-replicated.md).
+
+
+A direct Linux arm64 26.8.28.14 OCI artifact is qualified for the owned
+Nagare ceremony at
+`mori://shinzui/kansoku/plans/53-prove-shared-server-maintenance-across-deployment-platforms`.
+Its exact platform manifest is
+`docker.io/clickhouse/clickhouse-server@sha256:597add6eeadf0b3c562b58c9a63d9712b9a0cde4e49b68e64a697dbf2b363b25`.
+This adds no runtime version and changes no SDK implementation. Working-tree, extracted-source and Nix variants each pass all thirteen direct
+native groups; see [the qualification](../release-evidence/2026-11-14-lts-linux-arm64.md).
+no replicated or Linux-client support is inferred for this image.

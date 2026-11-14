@@ -1,6 +1,6 @@
 {
   "matrixVersion": 1,
-  "checkedAt": "2026-11-07",
+  "checkedAt": "2026-11-14",
   "policy": "Only exact qualified patches and declared topology groups; no prereleases or managed-cloud certification",
   "entries": [
     {
@@ -153,6 +153,48 @@
         ],
         "evidence": "docs/release-evidence/2026-11-07-replicated.md"
       }
+    },
+    {
+      "id": "lts-linux-arm64",
+      "version": "26.8.28.14",
+      "tag": "v26.8.28.14-lts",
+      "commit": "3694fe07040369cef78c937311cbaac5f0555484",
+      "platform": "aarch64-linux",
+      "architecture": "arm64",
+      "image": "docker.io/clickhouse/clickhouse-server@sha256:597add6eeadf0b3c562b58c9a63d9712b9a0cde4e49b68e64a697dbf2b363b25",
+      "indexDigest": "sha256:63e02621435cde1146ab0fde66057091ee75b312d12917c0109a6a0c99bc7ce1",
+      "status": "native-qualified",
+      "groups": [
+        "transport",
+        "completion",
+        "ledger",
+        "exclusive",
+        "runner",
+        "repair",
+        "boundaries",
+        "survivors",
+        "adoption",
+        "consumer",
+        "cli",
+        "example",
+        "remediation"
+      ],
+      "scope": "Owned direct Atomic Linux arm64 server; no replicated, managed-cloud or Linux-client qualification",
+      "qualification": {
+        "date": "2026-11-14",
+        "cohort": "f4bc4e6d32decfaaf1a19e1033a22f3e28fc167c",
+        "compiler": "ghc-9.12.4",
+        "clientHost": "macOS arm64",
+        "requiredGroups": 13,
+        "artifactVariants": [
+          "working-tree Cabal binaries",
+          "seven extracted sibling source distributions",
+          "Nix installed suite, driver and example"
+        ],
+        "evidence": "docs/release-evidence/2026-11-14-lts-linux-arm64.md",
+        "scope": "Direct Atomic local synchronous effects on exact Linux arm64 OCI artifact; no replicated, managed-cloud or Linux-client certification"
+      },
+      "tagObject": "cb8b2f96f32feb4203ab9edbf4f03b274bbb6952"
     }
   ],
   "unqualifiedReleases": [

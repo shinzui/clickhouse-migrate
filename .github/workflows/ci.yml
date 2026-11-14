@@ -23,6 +23,7 @@ jobs:
           container system start --enable-kernel-install
           container image pull --platform linux/arm64 docker.io/altinity/clickhouse-server@sha256:3bafa18ced8daf9b81de70927b40c13b06545363abe3ad7f20ae77848f500c5a
           container image pull --platform linux/arm64 docker.io/altinity/clickhouse-server@sha256:7e72405bf85df6d163205ee2e56251ebc35daf6dc71142f58bdee7a461690ffb
+          container image pull --platform linux/arm64 docker.io/clickhouse/clickhouse-server@sha256:597add6eeadf0b3c562b58c9a63d9712b9a0cde4e49b68e64a697dbf2b363b25
       - run: nix develop --builders '' --accept-flake-config -c ghc --numeric-version
       - run: nix develop --builders '' --accept-flake-config -c cabal update
       - run: nix develop --builders '' --accept-flake-config -c just build
