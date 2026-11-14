@@ -210,3 +210,8 @@ Its exact platform manifest is
 This adds no runtime version and changes no SDK implementation. Working-tree, extracted-source and Nix variants each pass all thirteen direct
 native groups; see [the qualification](../release-evidence/2026-11-14-lts-linux-arm64.md).
 no replicated or Linux-client support is inferred for this image.
+
+Release `0.2.1.0` adds only compatible APIs (bounded read-only inspection and
+explicit external-drain repair). It changes no checksum, envelope, ledger or CLI
+JSON contract and adds no runtime version; the qualified candidates above are
+unchanged.

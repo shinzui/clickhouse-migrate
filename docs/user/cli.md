@@ -83,7 +83,7 @@ alone cannot promote evidence. Attested evidence forbids `historicalBytesHex`.
 No optional field implicitly imports SQL or grants administrative authority.
 
 
-## Embedding an independently verified external-drain policy (unreleased)
+## Embedding an independently verified external-drain policy
 
 `handleCommand` keeps its existing strict repair behavior. An embedding application
 that already validated and retained independent external drain may call
@@ -91,7 +91,7 @@ that already validated and retained independent external drain may call
 single invocation. Only repair uses this opt-in; no parser flag, command shape,
 `CommandEnvironment` constructor or JSON v1 field changes. The application retains
 the typed `RepairObservation` with its own owner/counter evidence. Refer to the
-[operational contract](operations.md#explicit-external-drain-with-unavailable-process-diagnostics-unreleased)
+[operational contract](operations.md#explicit-external-drain-with-unavailable-process-diagnostics)
 for observations, retained authority and refusal rules.
 
 Do not select this handler merely because a process view is empty or denied.
@@ -99,5 +99,5 @@ The application must keep every submitting principal excluded and old native wor
 drained, enforce its own freshness and identity requirements, preserve exact
 uncertain receipts, and keep its provider alive through the call. A failed audit
 sink prevents recovery authorization. Standalone callers using the ordinary
-handler keep the strict default. This source-candidate API is not in published
-0.2.0.0; delivery and downstream cohort qualification remain separate gates.
+handler keep the strict default. This API is available since 0.2.1.0; downstream
+cohort qualification remains a separate gate.

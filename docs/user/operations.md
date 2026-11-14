@@ -153,13 +153,13 @@ Legacy adoption currently binds v1 mapping checksums and is supported on direct 
 Server waits can include coordination overhead: the spike observed a metadata ALTER error after about twelve seconds with a five-second inactive-replica wait. The HTTP deadline remains authoritative; if it expires before a complete response, preserve submission uncertainty and never infer non-submission or retry automatically.
 
 
-## Explicit external drain with unavailable process diagnostics (unreleased)
+## Explicit external drain with unavailable process diagnostics
 
 The existing `recoveryEvidence` constructor remains strict: a failed process
 observation refuses repair. A caller that independently established and retained
 external drain under its exclusion may opt in with
-`externalDrainRecoveryEvidence audit quiet receipts observationSink`. This is a
-source-candidate API; published 0.2.0.0 does not include it.
+`externalDrainRecoveryEvidence audit quiet receipts observationSink`, available
+since 0.2.1.0.
 
 The sink receives `NoRecordedQueries`, `NoVisibleRecordedQueries`,
 `RecordedQueriesActive queryIds` or `ProcessObservationUnavailable`. Retain this
@@ -180,7 +180,7 @@ this API does not turn an old observation into standing authorization.
 
 ## Constrained SELECT-only inspection
 
-The unreleased source API `boundedObservation rows bytes` returns an explicit
+Since 0.2.1.0, `boundedObservation rows bytes` returns an explicit
 observation option when both bounds are positive. Use it with `history`, `status`
 or `verify` for a reader whose server policy forbids unlimited results, for example
 `boundedObservation 10000 1048576`. No mutation context or guarded option accepts
@@ -188,5 +188,4 @@ these bounds. Ordinary `Observe` and all mutation/repair requests keep their
 existing request settings. Result, read, timeout and sort overflow modes remain
 `throw`: exceeding the bound fails the entire observation and never accepts a
 truncated history. The server identity and storage checks, ledger validation,
-response bounds and cleanup checks still run. This API is a source candidate,
-not part of the published 0.2.0.0 release.
+response bounds and cleanup checks still run.

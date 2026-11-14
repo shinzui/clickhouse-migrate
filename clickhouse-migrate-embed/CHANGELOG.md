@@ -1,5 +1,11 @@
 # Changelog for clickhouse-migrate-embed
 
+## 0.2.1.0 — 2026-11-14
+
+### Other Changes
+
+- Release alongside the 0.2.1.0 core; no changes to this package.
+
 ## 0.2.0.0 — 2026-11-08
 
 ### Other Changes

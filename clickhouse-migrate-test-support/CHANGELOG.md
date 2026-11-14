@@ -1,9 +1,16 @@
 # Changelog for clickhouse-migrate-test-support
 
-## Unreleased
+## 0.2.1.0 — 2026-11-14
 
-- Use Apple Container with exact digest/platform inspection, owned bind mounts and inspected replica addresses.
-- Cover denied/own-user process observations, callback failure/cancellation, exact interrupted receipts and active-work refusal under explicit external authority.
+### Other Changes
+
+- Use Apple Container with exact digest/platform inspection, owned bind mounts
+  and inspected replica addresses.
+- Cover denied/own-user process observations, callback failure/cancellation,
+  exact interrupted receipts and active-work refusal under explicit external
+  authority.
+- Qualify bounded read-only inspection and the direct Linux arm64 26.8.28.14
+  LTS image.
 
 ## 0.2.0.0 — 2026-11-08
 

@@ -1,6 +1,7 @@
 # Bundle Update Log
 
 ## 2026-11-14
+* **Update**: DOC-13 and DOC-4: mark bounded inspection and explicit external-drain repair as released in 0.2.1.0.
 * **Update**: DOC-13: document explicit bounded read-only inspection and throwing overflow.
 * **Update**: DOC-5: qualify the exact direct Linux arm64 26.8.28.14 OCI artifact with 13 working-tree, extracted-source and Nix groups; preserve topology/client limits.
 

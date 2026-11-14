@@ -1,10 +1,18 @@
 # Changelog for clickhouse-migrate
 
-## Unreleased
+## 0.2.1.0 — 2026-11-14
 
-- Add explicit bounded SELECT-only inspection for constrained reader roles; preserve strict defaults and refuse overflowing histories.
+### New Features
 
-- Add `externalDrainRecoveryEvidence` and typed `RepairObservation` callbacks for callers retaining independent external drain. Only explicit process access denial becomes unavailable diagnostics; visible recorded work and all ordinary repair checks remain blocking. Existing `recoveryEvidence` remains strict.
+- Add `boundedObservation` for explicit bounded SELECT-only inspection by
+  constrained reader roles. Overflow modes remain throwing, so an overflowing
+  history fails rather than being truncated; `Observe` and mutation paths keep
+  their existing settings.
+- Add `externalDrainRecoveryEvidence` and typed `RepairObservation` callbacks
+  (`RepairObservationSink`) for callers retaining independent external drain.
+  Only explicit process access denial becomes unavailable diagnostics; visible
+  recorded work and all ordinary repair checks remain blocking. Existing
+  `recoveryEvidence` remains strict.
 
 ## 0.2.0.0 — 2026-11-08
 
